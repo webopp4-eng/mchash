@@ -1,0 +1,529 @@
+import { Router } from 'express';
+import prisma from '../lib/prisma';
+import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
+import { getActivePlan, getMiningSessions, calculateDailyEarnings, calculateTotalEarnings } from '../services/mining';
+
+const router = Router();
+
+// All dashboard routes require auth
+router.use(authenticateToken, loadUser);
+
+// ============ DASHBOARD ============
+router.get('/dashboard', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const activePlan = await getActivePlan(userId);
+    const sessions = await getMiningSessions(userId);
+    const recentTx = await prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+    const notifications = await prisma.notification.findMany({
+      where: { userId, read: false },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+
+    res.json({
+      user,
+      activePlan,
+      miningSessions: sessions,
+      recentTransactions: recentTx,
+      notifications,
+    });
+  } catch (error) {
+    console.error('Dashboard error:', error);
+    res.status(500).json({ error: 'Failed to load dashboard' });
+  }
+});
+
+// ============ MINING ============
+router.get('/mining', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const activePlan = await getActivePlan(userId);
+    const sessions = await getMiningSessions(userId);
+    const history = await prisma.miningPurchase.findMany({
+      where: { userId },
+      include: { plan: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let miningStats = null;
+    if (activePlan) {
+      const dailyEarnings = calculateDailyEarnings(Number(activePlan.plan.hashRate), Number(activePlan.plan.dailyRate));
+      const totalEarnings = calculateTotalEarnings(dailyEarnings, activePlan.plan.durationDays);
+      const now = new Date();
+      const totalMs = activePlan.endsAt.getTime() - activePlan.startedAt.getTime();
+      const elapsedMs = now.getTime() - activePlan.startedAt.getTime();
+      const progress = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
+      const remainingMs = Math.max(0, activePlan.endsAt.getTime() - now.getTime());
+      const days = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((remainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      miningStats = {
+        plan: activePlan.plan,
+        purchase: activePlan,
+        hashRate: activePlan.plan.hashRate,
+        dailyEarnings,
+        totalEarnings,
+        progress: Math.round(progress),
+        timeRemaining: `${days}d ${hours}h ${minutes}m`,
+        status: 'active',
+      };
+    }
+
+    res.json({ activePlan: miningStats, sessions, history });
+  } catch (error) {
+    console.error('Mining error:', error);
+    res.status(500).json({ error: 'Failed to load mining data' });
+  }
+});
+
+// ============ PLANS ============
+router.get('/plans', async (_req, res) => {
+  try {
+    const plans = await prisma.miningPlan.findMany({
+      where: { active: true },
+      orderBy: { price: 'asc' },
+    });
+    res.json({ plans });
+  } catch (error) {
+    console.error('Plans error:', error);
+    res.status(500).json({ error: 'Failed to load plans' });
+  }
+});
+
+// Purchase a plan
+router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { planId } = req.params;
+    const { txHash, chain } = req.body;
+
+    const plan = await prisma.miningPlan.findUnique({ where: { id: planId } });
+    if (!plan || !plan.active) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Check if user already has active plan
+    const existing = await getActivePlan(userId);
+    if (existing) {
+      return res.status(400).json({ error: 'You already have an active mining plan' });
+    }
+
+    // Create purchase
+    const now = new Date();
+    const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
+
+    const purchase = await prisma.miningPurchase.create({
+      data: {
+        userId,
+        planId,
+        amount: plan.price,
+        currency: plan.currency,
+        chain: chain || plan.chain,
+        txHash: txHash || null,
+        status: 'active',
+        startedAt: now,
+        endsAt,
+      },
+    });
+
+    // Create mining session
+    await prisma.miningSession.create({
+      data: {
+        userId,
+        purchaseId: purchase.id,
+        hashRate: plan.hashRate,
+        status: 'active',
+        startedAt: now,
+      },
+    });
+
+    // Create transaction
+    await prisma.transaction.create({
+      data: {
+        userId,
+        type: 'purchase',
+        amount: plan.price,
+        currency: plan.currency,
+        chain: chain || plan.chain,
+        txHash: txHash || null,
+        status: 'completed',
+        metadata: { planId: plan.id, planName: plan.name },
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: 'purchase',
+        title: 'Plan Activated',
+        message: `${plan.name} mining plan activated successfully. Mining has started!`,
+      },
+    });
+
+    // Referral commission
+    if (user.referredBy) {
+      const referrer = await prisma.user.findUnique({ where: { id: user.referredBy } });
+      if (referrer) {
+        const commission = Number(plan.price) * (Number(plan.referralBonus) / 100);
+        const referral = await prisma.referral.findUnique({ where: { userId: referrer.id } });
+        if (referral) {
+          await prisma.referralEarning.create({
+            data: {
+              referralId: referral.id,
+              userId: referrer.id,
+              amount: commission,
+              level: 1,
+              sourceType: 'purchase',
+              status: 'completed',
+            },
+          });
+          await prisma.referral.update({
+            where: { id: referral.id },
+            data: { totalEarned: { increment: commission } },
+          });
+          await prisma.notification.create({
+            data: {
+              userId: referrer.id,
+              type: 'referral',
+              title: 'Referral Commission',
+              message: `You earned ${commission.toFixed(2)} USDT from a referral purchase.`,
+            },
+          });
+        }
+      }
+    }
+
+    res.json({ success: true, purchase });
+  } catch (error) {
+    console.error('Purchase error:', error);
+    res.status(500).json({ error: 'Failed to purchase plan' });
+  }
+});
+
+// ============ WALLET ============
+router.get('/wallet', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { wallets: true },
+    });
+    const deposits = await prisma.deposit.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    res.json({
+      platformBalance: user?.platformBalance,
+      walletAddress: user?.walletAddress,
+      chain: user?.chain,
+      walletType: user?.walletType,
+      wallets: user?.wallets,
+      deposits,
+    });
+  } catch (error) {
+    console.error('Wallet error:', error);
+    res.status(500).json({ error: 'Failed to load wallet' });
+  }
+});
+
+// ============ EARNINGS ============
+router.get('/earnings', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const miningTx = await prisma.transaction.findMany({
+      where: { userId, type: 'mining' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const referralEarnings = await prisma.referralEarning.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      totalEarned: user?.totalEarned,
+      platformBalance: user?.platformBalance,
+      miningEarnings: miningTx,
+      referralEarnings,
+    });
+  } catch (error) {
+    console.error('Earnings error:', error);
+    res.status(500).json({ error: 'Failed to load earnings' });
+  }
+});
+
+// ============ REFERRALS ============
+router.get('/referrals', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const referral = await prisma.referral.findUnique({ where: { userId } });
+    const referredUsers = await prisma.user.findMany({
+      where: { referredBy: userId },
+      select: { id: true, username: true, walletAddress: true, createdAt: true, status: true },
+    });
+    const earnings = await prisma.referralEarning.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      referralCode: user?.referralCode,
+      referralLink: `${process.env.FRONTEND_URL || 'http://localhost:3000'}?ref=${user?.referralCode}`,
+      totalReferrals: referral?.totalReferrals || 0,
+      activeReferrals: referral?.activeReferrals || 0,
+      totalEarned: referral?.totalEarned || 0,
+      referredUsers,
+      earnings,
+    });
+  } catch (error) {
+    console.error('Referrals error:', error);
+    res.status(500).json({ error: 'Failed to load referrals' });
+  }
+});
+
+// ============ TRANSACTIONS ============
+router.get('/transactions', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const transactions = await prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    res.json({ transactions });
+  } catch (error) {
+    console.error('Transactions error:', error);
+    res.status(500).json({ error: 'Failed to load transactions' });
+  }
+});
+
+// ============ WITHDRAWALS ============
+router.get('/withdrawals', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const withdrawals = await prisma.withdrawal.findMany({
+      where: { userId },
+      orderBy: { requestedAt: 'desc' },
+    });
+    res.json({ withdrawals });
+  } catch (error) {
+    console.error('Withdrawals error:', error);
+    res.status(500).json({ error: 'Failed to load withdrawals' });
+  }
+});
+
+// Request withdrawal
+router.post('/withdrawals', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { amount, currency, chain } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (Number(user.platformBalance) < amount) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
+    // Deduct balance
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        platformBalance: { decrement: amount },
+        totalWithdrawn: { increment: amount },
+      },
+    });
+
+    const withdrawal = await prisma.withdrawal.create({
+      data: {
+        userId,
+        amount,
+        currency: currency || 'USDT',
+        chain: chain || user.chain,
+        destinationAddress: user.walletAddress,
+        status: 'pending',
+      },
+    });
+
+    await prisma.transaction.create({
+      data: {
+        userId,
+        type: 'withdrawal',
+        amount: -amount,
+        currency: currency || 'USDT',
+        chain: chain || user.chain,
+        status: 'pending',
+        metadata: { withdrawalId: withdrawal.id },
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: 'withdrawal',
+        title: 'Withdrawal Requested',
+        message: `Withdrawal of ${amount} ${currency || 'USDT'} is pending approval.`,
+      },
+    });
+
+    res.json({ success: true, withdrawal });
+  } catch (error) {
+    console.error('Withdrawal error:', error);
+    res.status(500).json({ error: 'Failed to process withdrawal' });
+  }
+});
+
+// ============ SUPPORT ============
+router.get('/support/tickets', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const tickets = await prisma.supportTicket.findMany({
+      where: { userId },
+      include: { messages: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ tickets });
+  } catch (error) {
+    console.error('Support tickets error:', error);
+    res.status(500).json({ error: 'Failed to load tickets' });
+  }
+});
+
+router.post('/support/tickets', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { subject, category, priority, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Subject and message required' });
+    }
+
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        userId,
+        subject,
+        category: category || 'general',
+        priority: priority || 'normal',
+        status: 'open',
+        messages: {
+          create: {
+            senderId: userId,
+            senderRole: 'user',
+            message,
+          },
+        },
+      },
+      include: { messages: true },
+    });
+
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Create ticket error:', error);
+    res.status(500).json({ error: 'Failed to create ticket' });
+  }
+});
+
+router.post('/support/tickets/:ticketId/messages', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { ticketId } = req.params;
+    const { message } = req.body;
+
+    if (!message) return res.status(400).json({ error: 'Message required' });
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { id: ticketId, userId },
+    });
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+
+    const msg = await prisma.supportMessage.create({
+      data: {
+        ticketId,
+        senderId: userId,
+        senderRole: 'user',
+        message,
+      },
+    });
+
+    res.json({ success: true, message: msg });
+  } catch (error) {
+    console.error('Ticket message error:', error);
+    res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// ============ NOTIFICATIONS ============
+router.get('/notifications', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+    const unread = notifications.filter((n: { read: boolean }) => !n.read).length;
+    res.json({ notifications, unread });
+  } catch (error) {
+    console.error('Notifications error:', error);
+    res.status(500).json({ error: 'Failed to load notifications' });
+  }
+});
+
+router.patch('/notifications/:id/read', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { id } = req.params;
+    await prisma.notification.updateMany({
+      where: { id, userId },
+      data: { read: true },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Mark read error:', error);
+    res.status(500).json({ error: 'Failed to mark notification' });
+  }
+});
+
+// ============ SETTINGS ============
+router.get('/settings', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const settings = await prisma.adminSetting.findMany();
+    const settingsMap: Record<string, string> = {};
+    settings.forEach((s: { key: string; value: string }) => { settingsMap[s.key] = s.value; });
+
+    res.json({
+      user: {
+        username: user?.username,
+        walletAddress: user?.walletAddress,
+        chain: user?.chain,
+        walletType: user?.walletType,
+      },
+      platformSettings: settingsMap,
+    });
+  } catch (error) {
+    console.error('Settings error:', error);
+    res.status(500).json({ error: 'Failed to load settings' });
+  }
+});
+
+export default router;
