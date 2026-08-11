@@ -24,10 +24,20 @@ const wallets: WalletOption[] = [
   { id: 'trust', name: 'Trust Wallet', chain: 'ethereum', icon: '💎', color: 'from-blue-600 to-indigo-800' },
   { id: 'coinbase', name: 'Coinbase Wallet', chain: 'ethereum', icon: '🔵', color: 'from-blue-500 to-blue-700' },
   { id: 'rainbow', name: 'Rainbow', chain: 'ethereum', icon: '🌈', color: 'from-pink-500 to-purple-600' },
-  { id: 'binance', name: 'Binance Wallet', chain: 'bnb', icon: '🟡', color: 'from-yellow-500 to-amber-600' },
+  { id: 'binance', name: 'Binance Wallet', chain: 'bnb', icon: '🟡', color: 'from-yellow-600 to-amber-600' },
 ];
 
 type LoginMethod = 'wallet' | 'qr' | 'address';
+
+// Helper to safely parse JSON responses
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text || `Server returned ${res.status}` };
+  }
+}
 
 export default function WalletSignIn() {
   const router = useRouter();
@@ -96,7 +106,7 @@ export default function WalletSignIn() {
         }),
       });
 
-      const data = await authRes.json();
+      const data = await safeJson(authRes);
       if (!authRes.ok) {
         console.error('[WalletSignIn] Auth failed:', data);
         throw new Error(data.error || `Authentication failed (${authRes.status})`);
@@ -125,7 +135,7 @@ export default function WalletSignIn() {
       const res = await fetch(`${API_URL}/api/auth/qr/session`, {
         method: 'POST',
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || 'Failed to create QR session');
       setQrSession(data);
       setQrPolling(true);
@@ -148,7 +158,7 @@ export default function WalletSignIn() {
       // Detect chain based on address format
       let chain: Chain = 'ethereum';
       if (walletAddress.startsWith('1') || walletAddress.startsWith('3') || walletAddress.startsWith('bc1')) {
-        chain = 'ethereum'; // BTC not supported yet, treat as EVM
+        chain = 'ethereum';
       } else if (walletAddress.length === 44) {
         chain = 'solana';
       }
@@ -163,7 +173,7 @@ export default function WalletSignIn() {
 
       // Prompt user to sign
       setError('Please sign the message in your wallet to complete login');
-      
+
       let signature;
       if (chain === 'solana') {
         signature = await signSolanaMessage(message);
@@ -184,7 +194,7 @@ export default function WalletSignIn() {
         }),
       });
 
-      const data = await authRes.json();
+      const data = await safeJson(authRes);
       if (!authRes.ok) {
         console.error('[WalletSignIn] Auth failed:', data);
         throw new Error(data.error || `Authentication failed (${authRes.status})`);
@@ -213,8 +223,8 @@ export default function WalletSignIn() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`${API_URL}/api/auth/qr/session/${qrSession.sessionId}`);
-        const data = await res.json();
-        
+        const data = await safeJson(res);
+
         if (res.ok && data.status === 'used' && data.address) {
           // QR login successful - complete authentication
           clearInterval(interval);
@@ -222,6 +232,10 @@ export default function WalletSignIn() {
 
           // Get nonce and sign
           const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${data.address}`);
+          if (!nonceRes.ok) {
+            const errText = await nonceRes.text();
+            throw new Error(`Backend error (${nonceRes.status}): ${errText || 'Failed to get nonce'}`);
+          }
           const { message } = await nonceRes.json();
 
           setError('Please sign the message in your wallet to complete login');
@@ -245,7 +259,7 @@ export default function WalletSignIn() {
             }),
           });
 
-          const authData = await authRes.json();
+          const authData = await safeJson(authRes);
           if (!authRes.ok) {
             throw new Error(authData.error || 'QR login failed');
           }

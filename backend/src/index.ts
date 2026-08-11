@@ -39,13 +39,19 @@ const apiLimiter = rateLimit({
   max: 100, // 100 requests per window
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
+  },
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20, // Stricter for auth endpoints
+  max: 50, // Relaxed to prevent blocking legitimate login retries
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
+  },
 });
 
 // Apply rate limiting
