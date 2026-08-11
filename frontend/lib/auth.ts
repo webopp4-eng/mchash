@@ -11,7 +11,13 @@ export interface User {
   role: string;
 }
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mchash.onrender.com';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_RENDER_API_URL || 'https://mchash.onrender.com';
+
+export const ADMIN_API_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL || API_URL;
+
+export function getAdminApiBase(): string {
+  return ADMIN_API_URL || API_URL;
+}
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -51,14 +57,21 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
-  if (res.status === 401) {
-    logout();
-    throw new Error('Session expired');
+  try {
+    const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+    if (res.status === 401) {
+      console.error('[apiFetch] Unauthorized access detected, logging out', path);
+      logout();
+      throw new Error('Session expired');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error('[apiFetch] Backend request failed:', res.status, path, data);
+      throw new Error(data.error || 'Request failed');
+    }
+    return data;
+  } catch (error) {
+    console.error('[apiFetch] Request error:', path, error);
+    throw error;
   }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.error || 'Request failed');
-  }
-  return data;
 }

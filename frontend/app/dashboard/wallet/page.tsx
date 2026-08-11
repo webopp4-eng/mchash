@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { FaWallet, FaWifi, FaArrowDown, FaArrowUp, FaHistory, FaCopy } from 'react-icons/fa';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
+import Link from 'next/link';
 
 export default function WalletPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -48,9 +49,9 @@ export default function WalletPage() {
   const walletType = data?.walletType || user?.walletType || 'Wallet';
 
   const actions = [
-    { label: 'Deposit', desc: 'Add funds to your account', icon: FaArrowDown, color: 'text-emerald-400 bg-emerald-500/20' },
-    { label: 'Withdraw', desc: 'Request your earnings', icon: FaArrowUp, color: 'text-rose-400 bg-rose-500/20' },
-    { label: 'History', desc: 'View all transactions', icon: FaHistory, color: 'text-cmblue-400 bg-cmblue-500/20' },
+    { label: 'Deposit', desc: 'View deposit history', href: '/dashboard/transactions', icon: FaArrowDown, color: 'text-emerald-400 bg-emerald-500/20' },
+    { label: 'Withdraw', desc: 'Request your earnings', href: '/dashboard/withdrawals', icon: FaArrowUp, color: 'text-rose-400 bg-rose-500/20' },
+    { label: 'History', desc: 'View all transactions', href: '/dashboard/transactions', icon: FaHistory, color: 'text-cmblue-400 bg-cmblue-500/20' },
   ];
 
   return (
@@ -102,8 +103,9 @@ export default function WalletPage() {
       {/* Actions */}
       <div className="grid gap-3 sm:grid-cols-3">
         {actions.map((action) => (
-          <button
+          <Link
             key={action.label}
+            href={action.href}
             className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-white/5 p-4 text-left backdrop-blur-xl transition-all hover:border-cmblue-500/30 hover:bg-white/10"
           >
             <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${action.color}`}>
@@ -113,7 +115,7 @@ export default function WalletPage() {
               <p className="text-sm font-semibold">{action.label}</p>
               <p className="text-[10px] text-slate-500">{action.desc}</p>
             </div>
-          </button>
+          </Link>
         ))}
       </div>
 

@@ -10,6 +10,7 @@ import {
   verifySolanaSignature,
   findOrCreateUser,
   generateJWT,
+  isValidWalletAddress,
 } from '../services/walletAuth';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 
@@ -38,11 +39,11 @@ setInterval(() => {
 // Get nonce for wallet signing
 router.get('/nonce/:address', (req, res) => {
   const { address } = req.params;
-  if (!address || address.length < 10) {
+  if (!address || !isValidWalletAddress(address)) {
     return res.status(400).json({ error: 'Invalid wallet address' });
   }
   const nonce = generateNonce(address);
-  res.json({ nonce, message: `Sign this message to authenticate with CM HASH:\n\n${nonce}` });
+  res.json({ nonce, message: `Sign this message to authenticate with CM HASH:\n\nAddress: ${address}\nNonce: ${nonce}` });
 });
 
 // Generate QR code session
@@ -101,7 +102,7 @@ router.get('/qr/session/:sessionId', (req, res) => {
   }
 
   if (session.used) {
-    return res.json({ status: 'used', address: session.address });
+    return res.json({ status: 'used', address: session.address, chain: session.chain, walletType: session.walletType });
   }
 
   if (session.expiresAt < new Date()) {
@@ -211,7 +212,11 @@ router.post('/wallet', async (req, res) => {
     const { address, chain, signature, message, walletType, referredBy } = parsed.data;
 
     // Verify nonce from message
-    const nonceMatch = message.match(/\n\n([A-Za-z0-9+/=]+)$/);
+    if (!isValidWalletAddress(address, chain)) {
+      return res.status(400).json({ error: 'Invalid wallet address' });
+    }
+
+    const nonceMatch = message.match(/Nonce:\s*([A-Za-z0-9+/=]+)$/);
     if (!nonceMatch) {
       return res.status(400).json({ error: 'Invalid message format' });
     }

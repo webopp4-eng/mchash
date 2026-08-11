@@ -23,7 +23,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const user = getUser();
 
+  const deployMode = process.env.NEXT_PUBLIC_DEPLOY_MODE || 'public';
+  const localAdminOnly = process.env.NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY === 'true';
+
   useEffect(() => {
+    if (deployMode !== 'local-admin' || !localAdminOnly) {
+      console.warn('[AdminLayout] Public build detected. Admin routes are local-only. Redirecting to public front page.');
+      router.replace('/');
+      return;
+    }
+
     if (!isAuthenticated()) {
       console.log('[AdminLayout] Not authenticated, redirecting to /login');
       router.replace('/login');
@@ -34,7 +43,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       router.replace('/dashboard');
       return;
     }
-  }, [router, user]);
+  }, [router, user, deployMode, localAdminOnly]);
+
+  if (deployMode !== 'local-admin' || !localAdminOnly) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
+        <div className="text-center">
+          <p className="text-sm text-slate-400">Admin panel is local-only.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated() || !user || user.role !== 'admin') {
     return (

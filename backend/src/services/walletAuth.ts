@@ -31,6 +31,16 @@ export function isValidSolanaAddress(address: string): boolean {
   return base58Regex.test(address);
 }
 
+export function isValidEvmAddress(address: string): boolean {
+  return ethers.isAddress(address);
+}
+
+export function isValidWalletAddress(address: string, chain?: string): boolean {
+  if (chain === 'solana') return isValidSolanaAddress(address);
+  if (chain === 'ethereum' || chain === 'bnb') return isValidEvmAddress(address);
+  return isValidSolanaAddress(address) || isValidEvmAddress(address);
+}
+
 // Solana signature verification - returns true if address format is valid
 // Full ed25519 verification happens client-side via Phantom/Solflare SDKs
 export function verifySolanaSignature(message: string, signature: string, address: string): boolean {
@@ -52,6 +62,10 @@ export function verifyEvmSignature(message: string, signature: string, address: 
 // Create or find user by wallet
 export async function findOrCreateUser(walletAddress: string, chain: string, walletType?: string, referredBy?: string) {
   const normalizedAddress = walletAddress.trim().toLowerCase();
+
+  if (!isValidWalletAddress(walletAddress, chain)) {
+    throw new Error('Invalid wallet address');
+  }
 
   const existing = await prisma.user.findFirst({
     where: {

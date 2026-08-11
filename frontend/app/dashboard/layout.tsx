@@ -15,10 +15,6 @@ export default function DashboardLayoutWrapper({ children }: { children: React.R
       router.replace('/login');
       return;
     }
-    if (user?.role === 'admin') {
-      console.log('[DashboardLayout] Admin user redirected to /admin');
-      router.replace('/admin');
-    }
   }, [router, user]);
 
   if (!isAuthenticated() || !user) {

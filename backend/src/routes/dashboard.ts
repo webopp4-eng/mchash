@@ -83,6 +83,115 @@ router.get('/mining', async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/rankings', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const [users, activePlans, sessions] = await Promise.all([
+      prisma.user.findMany({
+        where: { status: 'active' },
+        select: {
+          id: true,
+          username: true,
+          walletAddress: true,
+          platformBalance: true,
+          totalEarned: true,
+          totalDeposited: true,
+          createdAt: true,
+        },
+        orderBy: [{ totalEarned: 'desc' }, { platformBalance: 'desc' }],
+        take: 100,
+      }),
+      prisma.miningPurchase.findMany({
+        where: { status: 'active' },
+        include: { plan: true },
+      }),
+      prisma.miningSession.groupBy({
+        by: ['userId'],
+        _sum: { hashRate: true, totalMined: true },
+      }),
+    ]);
+
+    const activePlanMap = new Map(activePlans.map((purchase) => [purchase.userId, purchase]));
+    const sessionMap = new Map(sessions.map((session) => [session.userId, session]));
+
+    const rankings = users
+      .map((user) => {
+        const session = sessionMap.get(user.id);
+        const activePlan = activePlanMap.get(user.id);
+        const score =
+          Number(user.totalEarned || 0) * 10 +
+          Number(user.platformBalance || 0) +
+          Number(session?._sum.hashRate || 0) * 5 +
+          (activePlan ? 250 : 0);
+
+        return {
+          id: user.id,
+          username: user.username || `Miner ${user.walletAddress.slice(0, 6)}`,
+          walletAddress: user.walletAddress,
+          totalEarned: user.totalEarned,
+          platformBalance: user.platformBalance,
+          hashRate: session?._sum.hashRate || 0,
+          totalMined: session?._sum.totalMined || 0,
+          activePlan: activePlan?.plan.name || null,
+          score,
+          joinedAt: user.createdAt,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map((entry, index) => ({ ...entry, rank: index + 1 }));
+
+    res.json({
+      rankings,
+      currentUserRank: rankings.find((entry) => entry.id === userId) || null,
+      leaderboard: rankings.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('Rankings error:', error);
+    res.status(500).json({ error: 'Failed to load rankings' });
+  }
+});
+
+router.get('/atrs', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const [user, activePlan, sessions, transactions, referral] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId } }),
+      getActivePlan(userId),
+      getMiningSessions(userId),
+      prisma.transaction.findMany({
+        where: { userId, type: { in: ['mining', 'referral', 'hash_renting'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.referral.findUnique({ where: { userId } }),
+    ]);
+
+    const totalHashRate = sessions.reduce((sum, session) => sum + Number(session.hashRate || 0), 0);
+    const totalMined = sessions.reduce((sum, session) => sum + Number(session.totalMined || 0), 0);
+    const activeDailyReward = activePlan
+      ? calculateDailyEarnings(Number(activePlan.plan.hashRate), Number(activePlan.plan.dailyRate))
+      : 0;
+
+    res.json({
+      summary: {
+        availableRewards: user?.platformBalance || 0,
+        totalEarned: user?.totalEarned || 0,
+        totalHashRate,
+        totalMined,
+        activeDailyReward,
+        referralEarned: referral?.totalEarned || 0,
+        activePlan: activePlan?.plan.name || null,
+      },
+      activePlan,
+      sessions,
+      rewards: transactions,
+    });
+  } catch (error) {
+    console.error('ATRs error:', error);
+    res.status(500).json({ error: 'Failed to load ATRs' });
+  }
+});
+
 // ============ PLANS ============
 router.get('/plans', async (_req, res) => {
   try {

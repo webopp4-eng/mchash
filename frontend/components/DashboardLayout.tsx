@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import {
   FaHome, FaBolt, FaLayerGroup, FaWallet, FaChartLine, FaUsers,
-  FaExchangeAlt, FaArrowUp, FaHeadset, FaCogs, FaSignOutAlt, FaBell
+  FaExchangeAlt, FaArrowUp, FaHeadset, FaCogs, FaSignOutAlt, FaBell, FaTrophy
 } from 'react-icons/fa';
 import Logo from './Logo';
 import { useRouter } from 'next/navigation';
@@ -15,6 +15,8 @@ import { shortenAddress } from '@/lib/wallet';
 const navItems = [
   { href: '/dashboard', label: 'Home', icon: FaHome },
   { href: '/dashboard/mining', label: 'Mining', icon: FaBolt },
+  { href: '/dashboard/atrs', label: 'ATRs', icon: FaChartLine },
+  { href: '/dashboard/rankings', label: 'Rankings', icon: FaTrophy },
   { href: '/dashboard/plans', label: 'Plans', icon: FaLayerGroup },
   { href: '/dashboard/wallet', label: 'Wallet', icon: FaWallet },
   { href: '/dashboard/earnings', label: 'Earnings', icon: FaChartLine },
