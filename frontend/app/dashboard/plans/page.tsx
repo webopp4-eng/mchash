@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FaBolt, FaCheck, FaWallet, FaClock, FaGift, FaUsers, FaCube } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { getUser } from '@/lib/auth';
 
 export default function PlansPage() {
+  const router = useRouter();
   const [plans, setPlans] = useState<any[]>([]);
   const [hashRentingPlans, setHashRentingPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,13 +43,17 @@ export default function PlansPage() {
       const res = await apiFetch(`/api/plans/${plan.id}/purchase`, {
         method: 'POST',
         body: JSON.stringify({
-          txHash: `sim_${Date.now()}`,
           chain: user.chain,
         }),
       });
 
-      setSuccess(`${plan.name} plan activated successfully! Mining has started.`);
-      setTimeout(() => setSuccess(null), 5000);
+      if (res.platformBalance !== undefined) {
+        const updatedUser = { ...user, platformBalance: res.platformBalance };
+        localStorage.setItem('cmhash_user', JSON.stringify(updatedUser));
+      }
+
+      setSuccess(`${plan.name} plan activated successfully. Mining has started.`);
+      setTimeout(() => router.push('/dashboard/mining'), 800);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -64,11 +70,9 @@ export default function PlansPage() {
       const user = getUser();
       if (!user) throw new Error('Please connect your wallet first');
 
-      console.log('[PlansPage] Purchasing hash renting plan', plan.name);
       const res = await apiFetch(`/api/hash-renting/${plan.id}/purchase`, {
         method: 'POST',
         body: JSON.stringify({
-          txHash: `sim_${Date.now()}`,
           chain: user.chain,
         }),
       });
@@ -79,8 +83,8 @@ export default function PlansPage() {
         localStorage.setItem('cmhash_user', JSON.stringify(updatedUser));
       }
 
-      setSuccess(`${plan.name} hash renting activated! ${Number(plan.price).toFixed(2)} ${plan.currency} deducted.`);
-      setTimeout(() => setSuccess(null), 5000);
+      setSuccess(`${plan.name} hash renting activated. Mining has started.`);
+      setTimeout(() => router.push('/dashboard/mining'), 800);
     } catch (err: any) {
       setError(err.message);
     } finally {

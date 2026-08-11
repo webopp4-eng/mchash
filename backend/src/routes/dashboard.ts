@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
-import { getActivePlan, getMiningSessions, calculateDailyEarnings, calculateTotalEarnings } from '../services/mining';
+import { getActivePlan, getMiningSessions } from '../services/mining';
 
 const router = Router();
 
@@ -51,32 +51,7 @@ router.get('/mining', async (req: AuthRequest, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    let miningStats = null;
-    if (activePlan) {
-      const dailyEarnings = calculateDailyEarnings(Number(activePlan.plan.hashRate), Number(activePlan.plan.dailyRate));
-      const totalEarnings = calculateTotalEarnings(dailyEarnings, activePlan.plan.durationDays);
-      const now = new Date();
-      const totalMs = activePlan.endsAt.getTime() - activePlan.startedAt.getTime();
-      const elapsedMs = now.getTime() - activePlan.startedAt.getTime();
-      const progress = Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100));
-      const remainingMs = Math.max(0, activePlan.endsAt.getTime() - now.getTime());
-      const days = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((remainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-
-      miningStats = {
-        plan: activePlan.plan,
-        purchase: activePlan,
-        hashRate: activePlan.plan.hashRate,
-        dailyEarnings,
-        totalEarnings,
-        progress: Math.round(progress),
-        timeRemaining: `${days}d ${hours}h ${minutes}m`,
-        status: 'active',
-      };
-    }
-
-    res.json({ activePlan: miningStats, sessions, history });
+    res.json({ activePlan, sessions, history });
   } catch (error) {
     console.error('Mining error:', error);
     res.status(500).json({ error: 'Failed to load mining data' });
@@ -166,11 +141,11 @@ router.get('/atrs', async (req: AuthRequest, res) => {
       prisma.referral.findUnique({ where: { userId } }),
     ]);
 
-    const totalHashRate = sessions.reduce((sum, session) => sum + Number(session.hashRate || 0), 0);
+    const totalHashRate = sessions
+      .filter((session) => session.status === 'active')
+      .reduce((sum, session) => sum + Number(session.hashRate || 0), 0);
     const totalMined = sessions.reduce((sum, session) => sum + Number(session.totalMined || 0), 0);
-    const activeDailyReward = activePlan
-      ? calculateDailyEarnings(Number(activePlan.plan.hashRate), Number(activePlan.plan.dailyRate))
-      : 0;
+    const activeDailyReward = activePlan?.dailyEarnings || 0;
 
     res.json({
       summary: {
@@ -225,63 +200,74 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Check if user already has active plan
     const existing = await getActivePlan(userId);
     if (existing) {
-      return res.status(400).json({ error: 'You already have an active mining plan' });
+      return res.status(400).json({ error: 'You already have an active mining package' });
     }
 
-    // Create purchase
+    const platformBalance = Number(user.platformBalance);
+    const planPrice = Number(plan.price);
+    if (platformBalance < planPrice) {
+      return res.status(400).json({ error: `Insufficient platform balance. You need ${planPrice.toFixed(2)} ${plan.currency}.` });
+    }
+
     const now = new Date();
     const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
-    const purchase = await prisma.miningPurchase.create({
-      data: {
-        userId,
-        planId,
-        amount: plan.price,
-        currency: plan.currency,
-        chain: chain || plan.chain,
-        txHash: txHash || null,
-        status: 'active',
-        startedAt: now,
-        endsAt,
-      },
-    });
+    const [updatedUser, purchase] = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { platformBalance: { decrement: planPrice } },
+      });
 
-    // Create mining session
-    await prisma.miningSession.create({
-      data: {
-        userId,
-        purchaseId: purchase.id,
-        hashRate: plan.hashRate,
-        status: 'active',
-        startedAt: now,
-      },
-    });
+      const createdPurchase = await tx.miningPurchase.create({
+        data: {
+          userId,
+          planId,
+          amount: planPrice,
+          currency: plan.currency,
+          chain: chain || plan.chain,
+          txHash: txHash || null,
+          status: 'active',
+          startedAt: now,
+          endsAt,
+        },
+      });
 
-    // Create transaction
-    await prisma.transaction.create({
-      data: {
-        userId,
-        type: 'purchase',
-        amount: plan.price,
-        currency: plan.currency,
-        chain: chain || plan.chain,
-        txHash: txHash || null,
-        status: 'completed',
-        metadata: { planId: plan.id, planName: plan.name },
-      },
-    });
+      await tx.miningSession.create({
+        data: {
+          userId,
+          purchaseId: createdPurchase.id,
+          hashRate: plan.hashRate,
+          status: 'active',
+          startedAt: now,
+          lastPayoutAt: now,
+        },
+      });
 
-    // Create notification
-    await prisma.notification.create({
-      data: {
-        userId,
-        type: 'purchase',
-        title: 'Plan Activated',
-        message: `${plan.name} mining plan activated successfully. Mining has started!`,
-      },
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: 'purchase',
+          amount: -planPrice,
+          currency: plan.currency,
+          chain: chain || plan.chain,
+          txHash: txHash || null,
+          status: 'completed',
+          metadata: { planId: plan.id, planName: plan.name, packageType: 'mining' },
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId,
+          type: 'purchase',
+          title: 'Plan Activated',
+          message: `${plan.name} mining plan activated successfully. Mining has started!`,
+        },
+      });
+
+      return [updated, createdPurchase];
     });
 
     // Referral commission
@@ -317,7 +303,8 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
       }
     }
 
-    res.json({ success: true, purchase });
+    const activePlan = await getActivePlan(userId);
+    res.json({ success: true, purchase, activePlan, platformBalance: updatedUser.platformBalance });
   } catch (error) {
     console.error('Purchase error:', error);
     res.status(500).json({ error: 'Failed to purchase plan' });
@@ -352,6 +339,11 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const existing = await getActivePlan(userId);
+    if (existing) {
+      return res.status(400).json({ error: 'You already have an active mining package' });
+    }
+
     // Validate balance
     const platformBalance = Number(user.platformBalance);
     const planPrice = Number(plan.price);
@@ -359,55 +351,67 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    // Deduct from wallet
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        platformBalance: { decrement: planPrice },
-      },
-    });
-
     const now = new Date();
     const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
-    const purchase = await prisma.hashRentingPurchase.create({
-      data: {
-        userId,
-        planId,
-        amount: planPrice,
-        currency: plan.currency,
-        chain: chain || user.chain,
-        txHash: txHash || null,
-        status: 'active',
-        startedAt: now,
-        endsAt,
-      },
+    const [updatedUser, purchase] = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { platformBalance: { decrement: planPrice } },
+      });
+
+      const createdPurchase = await tx.hashRentingPurchase.create({
+        data: {
+          userId,
+          planId,
+          amount: planPrice,
+          currency: plan.currency,
+          chain: chain || user.chain,
+          txHash: txHash || null,
+          status: 'active',
+          startedAt: now,
+          endsAt,
+        },
+      });
+
+      await tx.miningSession.create({
+        data: {
+          userId,
+          purchaseId: createdPurchase.id,
+          hashRate: plan.hashPower,
+          status: 'active',
+          startedAt: now,
+          lastPayoutAt: now,
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          userId,
+          type: 'hash_renting',
+          amount: -planPrice,
+          currency: plan.currency,
+          chain: chain || user.chain,
+          txHash: txHash || null,
+          status: 'completed',
+          metadata: { planId: plan.id, planName: plan.name, packageType: 'hash_renting' },
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId,
+          type: 'hash_renting',
+          title: 'Hash Renting Activated',
+          message: `${plan.name} hash renting plan activated successfully. Mining has started!`,
+        },
+      });
+
+      return [updated, createdPurchase];
     });
 
-    // Log transaction
-    await prisma.transaction.create({
-      data: {
-        userId,
-        type: 'hash_renting',
-        amount: -planPrice,
-        currency: plan.currency,
-        chain: chain || user.chain,
-        txHash: txHash || null,
-        status: 'completed',
-        metadata: { planId: plan.id, planName: plan.name },
-      },
-    });
-
-    await prisma.notification.create({
-      data: {
-        userId,
-        type: 'hash_renting',
-        title: 'Hash Renting Activated',
-        message: `${plan.name} hash renting plan activated successfully.`,
-      },
-    });
-
-    res.json({ success: true, purchase, platformBalance: updatedUser.platformBalance });
+    const activePlan = await getActivePlan(userId);
+    res.json({ success: true, purchase, activePlan, platformBalance: updatedUser.platformBalance });
   } catch (error) {
     console.error('Hash renting purchase error:', error);
     res.status(500).json({ error: 'Failed to purchase hash renting plan' });

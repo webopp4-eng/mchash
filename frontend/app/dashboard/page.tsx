@@ -20,12 +20,18 @@ export default function DashboardHome() {
   useEffect(() => {
     setUser(getUser());
     loadDashboard();
+    const interval = setInterval(loadDashboard, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadDashboard = async () => {
     try {
       const res = await apiFetch('/api/dashboard');
       setData(res);
+      if (res.user) {
+        localStorage.setItem('cmhash_user', JSON.stringify(res.user));
+        setUser(res.user);
+      }
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -104,7 +110,7 @@ export default function DashboardHome() {
             <FaBolt className="h-4 w-4" />
             <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Hash Rate</span>
           </div>
-          <p className="mt-2 text-xl font-bold">{activePlan ? `${activePlan.plan.hashRate} TH/s` : '0 TH/s'}</p>
+          <p className="mt-2 text-xl font-bold">{activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s'}</p>
         </div>
         <div className="rounded-[20px] border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
           <div className="flex items-center gap-2 text-emerald-400">
@@ -158,7 +164,7 @@ export default function DashboardHome() {
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-700">
                 <div className="h-full rounded-full bg-gradient-to-r from-cmblue-500 to-cmblue-400" style={{ width: `${activePlan.progress}%` }} />
               </div>
-              <p className="mt-1 text-[10px] text-slate-400">{activePlan.progress}%</p>
+              <p className="mt-1 text-[10px] text-slate-400">{activePlan.progressPercent || Math.round(activePlan.progress || 0)}%</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/5 p-3">
               <p className="text-[10px] text-slate-500">Time Remaining</p>
