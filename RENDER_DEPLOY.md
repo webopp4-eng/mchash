@@ -59,10 +59,10 @@ This creates:
 ## Services to Deploy
 
 1. **Backend**: Render Web Service (Node.js)
-   - URL: `https://cm-hash-backend.onrender.com`
+   - URL: `https://mchash.onrender.com`
    
 2. **Frontend**: Vercel or Netlify (Next.js)
-   - URL: `https://cm-hash.vercel.app` (or your custom domain)
+   - URL: `https://mchash.vercel.app` (or your custom domain)
 
 3. **Database**: Render PostgreSQL (already created)
    - Name: `cmhast`

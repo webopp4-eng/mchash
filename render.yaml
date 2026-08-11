@@ -16,7 +16,7 @@ services:
         value: cmhash-super-secret-key-2026-change-in-production-to-something-very-long-and-random
       - key: FRONTEND_URL
         sync: false
-        value: https://your-frontend-domain.vercel.app
+        value: https://mchash.vercel.app
       - key: PORT
         value: 4000
       - key: NODE_ENV
