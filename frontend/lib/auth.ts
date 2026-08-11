@@ -11,7 +11,7 @@ export interface User {
   role: string;
 }
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://mchash.onrender.com';
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;

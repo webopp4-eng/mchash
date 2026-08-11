@@ -15,7 +15,12 @@ export function detectWalletProvider(chain: Chain): { available: boolean; provid
 
   if (chain === 'solana') {
     const solana = (window as any).solana;
-    if (solana) return { available: true, provider: solana.isPhantom ? 'Phantom' : solana.isSolflare ? 'Solflare' : 'Solana Wallet' };
+    if (solana) {
+      if (solana.isPhantom) return { available: true, provider: 'Phantom' };
+      if (solana.isSolflare) return { available: true, provider: 'Solflare' };
+      if (solana.isBackpack) return { available: true, provider: 'Backpack' };
+      return { available: true, provider: 'Solana Wallet' };
+    }
     return { available: false, provider: null };
   }
 
@@ -39,10 +44,11 @@ export async function connectSolanaWallet(): Promise<WalletInfo> {
   try {
     const response = await solana.connect();
     const address = response.publicKey.toString();
-    const walletType = solana.isPhantom ? 'Phantom' : solana.isSolflare ? 'Solflare' : 'Solana Wallet';
+    const walletType = solana.isPhantom ? 'Phantom' : solana.isSolflare ? 'Solflare' : solana.isBackpack ? 'Backpack' : 'Solana Wallet';
 
     return { address, chain: 'solana', walletType };
   } catch (error: any) {
+    console.error('[Wallet] Solana connect error:', error);
     throw new Error(error.message || 'Failed to connect Solana wallet');
   }
 }
@@ -81,30 +87,41 @@ export async function connectEvmWallet(chain: Chain): Promise<WalletInfo> {
 
     return { address, chain, walletType };
   } catch (error: any) {
+    console.error('[Wallet] EVM connect error:', error);
     throw new Error(error.message || 'Failed to connect EVM wallet');
   }
 }
 
 // Sign a message with Solana wallet
 export async function signSolanaMessage(message: string): Promise<string> {
-  const solana = (window as any).solana;
-  if (!solana) throw new Error('No Solana wallet found');
+  try {
+    const solana = (window as any).solana;
+    if (!solana) throw new Error('No Solana wallet found');
 
-  const encodedMessage = new TextEncoder().encode(message);
-  const signature = await solana.signMessage(encodedMessage, 'utf8');
-  return Buffer.from(signature.signature).toString('base64');
+    const encodedMessage = new TextEncoder().encode(message);
+    const signature = await solana.signMessage(encodedMessage, 'utf8');
+    return Buffer.from(signature.signature).toString('base64');
+  } catch (error: any) {
+    console.error('[Wallet] Solana sign error:', error);
+    throw new Error(error.message || 'Failed to sign message with Solana wallet');
+  }
 }
 
 // Sign a message with EVM wallet
 export async function signEvmMessage(message: string): Promise<string> {
-  const ethereum = (window as any).ethereum;
-  if (!ethereum) throw new Error('No EVM wallet found');
+  try {
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) throw new Error('No EVM wallet found');
 
-  const signature = await ethereum.request({
-    method: 'personal_sign',
-    params: [message, ethereum.selectedAddress],
-  });
-  return signature;
+    const signature = await ethereum.request({
+      method: 'personal_sign',
+      params: [message, ethereum.selectedAddress],
+    });
+    return signature;
+  } catch (error: any) {
+    console.error('[Wallet] EVM sign error:', error);
+    throw new Error(error.message || 'Failed to sign message with EVM wallet');
+  }
 }
 
 // Get wallet balance

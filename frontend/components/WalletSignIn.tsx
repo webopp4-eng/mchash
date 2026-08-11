@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { FaWallet, FaShieldAlt, FaExclamationTriangle, FaLock } from 'react-icons/fa';
 import Logo from './Logo';
-import { connectSolanaWallet, connectEvmWallet, signSolanaMessage, signEvmMessage, Chain } from '@/lib/wallet';
+import { connectSolanaWallet, connectEvmWallet, signSolanaMessage, signEvmMessage, detectWalletProvider, Chain } from '@/lib/wallet';
+import { API_URL } from '@/lib/auth';
 
 interface WalletOption {
   id: string;
@@ -56,7 +57,13 @@ export default function WalletSignIn() {
       }
 
       // Get nonce from backend
-      const nonceRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/nonce/${walletInfo.address}`);
+      console.log('[WalletSignIn] Fetching nonce for', walletInfo.address, 'from', `${API_URL}/api/auth/nonce/${walletInfo.address}`);
+      const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${walletInfo.address}`);
+      if (!nonceRes.ok) {
+        const errText = await nonceRes.text();
+        console.error('[WalletSignIn] Nonce fetch failed:', nonceRes.status, errText);
+        throw new Error(`Backend error (${nonceRes.status}): ${errText || 'Failed to get nonce'}`);
+      }
       const { nonce, message } = await nonceRes.json();
 
       // Sign message
@@ -68,7 +75,8 @@ export default function WalletSignIn() {
       }
 
       // Authenticate with backend
-      const authRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/auth/wallet`, {
+      console.log('[WalletSignIn] Authenticating with backend', `${API_URL}/api/auth/wallet`);
+      const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -82,8 +90,10 @@ export default function WalletSignIn() {
 
       const data = await authRes.json();
       if (!authRes.ok) {
-        throw new Error(data.error || 'Authentication failed');
+        console.error('[WalletSignIn] Auth failed:', data);
+        throw new Error(data.error || `Authentication failed (${authRes.status})`);
       }
+      console.log('[WalletSignIn] Auth success');
 
       // Store token and user
       localStorage.setItem('cmhash_token', data.token);
@@ -92,6 +102,7 @@ export default function WalletSignIn() {
       // Redirect to dashboard
       window.location.href = '/';
     } catch (err: any) {
+      console.error('[WalletSignIn] Connection error:', err);
       setError(err.message || 'Failed to connect wallet');
     } finally {
       setConnecting(false);
