@@ -91,7 +91,14 @@ model MiningPlan {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([name])
   purchases MiningPurchase[]
++++++++ REPLACE</arg_value><arg_key>task_progress</arg_key><arg_value>
+- [x] Fix seed script
+- [x] Add @@unique constraint on MiningPlan.name
+- [ ] Regenerate Prisma client
+- [ ] Run Prisma seed
+- [ ] Verify backend connects to database
 }
 
 model MiningPurchase {

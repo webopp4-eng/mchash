@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Create default mining plans
   const plans = [
     {
       name: 'Starter',
@@ -56,14 +55,12 @@ async function main() {
   ];
 
   for (const plan of plans) {
-    await prisma.miningPlan.upsert({
-      where: { id: plan.name.toLowerCase() },
-      update: plan,
-      create: { id: plan.name.toLowerCase(), ...plan },
-    });
+    const existing = await prisma.miningPlan.findUnique({ where: { name: plan.name } });
+    if (!existing) {
+      await prisma.miningPlan.create({ data: plan });
+    }
   }
 
-  // Create default admin settings
   const settings = [
     { key: 'min_withdrawal', value: '10' },
     { key: 'max_withdrawal', value: '10000' },
@@ -92,3 +89,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+</arg_value></tool_call>
