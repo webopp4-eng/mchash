@@ -7,10 +7,12 @@ import Logo from './Logo';
 import { connectSolanaWallet, connectEvmWallet, signSolanaMessage, signEvmMessage, detectWalletProvider, Chain, detectMobilePlatform, openMobileWallet, getWalletInstallUrl, mobileWallets } from '@/lib/wallet';
 import { API_URL } from '@/lib/auth';
 
+type WalletKind = Chain | 'multi' | 'walletconnect';
+
 interface WalletOption {
   id: string;
   name: string;
-  chain: Chain;
+  chain: WalletKind;
   icon: string;
   color: string;
 }
@@ -24,7 +26,9 @@ const wallets: WalletOption[] = [
   { id: 'trust', name: 'Trust Wallet', chain: 'ethereum', icon: '💎', color: 'from-blue-600 to-indigo-800' },
   { id: 'coinbase', name: 'Coinbase Wallet', chain: 'ethereum', icon: '🔵', color: 'from-blue-500 to-blue-700' },
   { id: 'rainbow', name: 'Rainbow', chain: 'ethereum', icon: '🌈', color: 'from-pink-500 to-purple-600' },
-  { id: 'binance', name: 'Binance Wallet', chain: 'bnb', icon: '🟡', color: 'from-yellow-600 to-amber-600' },
+  { id: 'binance-wallet', name: 'Binance Wallet', chain: 'bnb', icon: '🟡', color: 'from-yellow-600 to-amber-600' },
+  { id: 'okx-wallet', name: 'OKX Wallet', chain: 'multi', icon: '◆', color: 'from-sky-500 to-slate-900' },
+  { id: 'walletconnect', name: 'WalletConnect', chain: 'walletconnect', icon: '◎', color: 'from-violet-500 to-indigo-700' },
 ];
 
 type LoginMethod = 'wallet' | 'qr' | 'address';
@@ -52,36 +56,51 @@ export default function WalletSignIn() {
   const [walletAddress, setWalletAddress] = useState('');
   const [authStatus, setAuthStatus] = useState<string | null>(null);
   const [mobileWalletModalOpen, setMobileWalletModalOpen] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('Detecting Wallet');
 
   const allAgreed = agreed.terms && agreed.privacy && agreed.risk;
 
   const launchSelectedMobileWallet = (targetWalletId: string) => {
     const { isMobile, isIOS, isAndroid } = detectMobilePlatform();
+    const wallet = mobileWallets.find((w) => w.id === targetWalletId) || mobileWallets[0];
+
     if (!isMobile) {
+      setConnectionStatus('Opening Wallet');
       handleWalletConnect();
       return;
     }
 
-    const wallet = mobileWallets.find((w) => w.id === targetWalletId) || mobileWallets[0];
+    setConnectionStatus('Detecting Wallet');
     const launchResult = openMobileWallet(wallet.id, window.location.origin);
     const installUrl = getWalletInstallUrl(wallet.id);
 
     if (isIOS) {
+      setConnectionStatus('Opening Wallet');
       setError(`Opening ${wallet.name}. If the app is not installed, Apple App Store will open.`);
     } else if (isAndroid) {
+      setConnectionStatus('Opening Wallet');
       setError(`Opening ${wallet.name}. If the app is not installed, Google Play Store will open.`);
+    }
+
+    if (launchResult.started) {
+      setConnectionStatus('Awaiting Approval');
+      setMobileWalletModalOpen(false);
+    } else {
+      setConnectionStatus('Connection Failed');
+      setError(`${wallet.name} could not be opened. ${wallet.name} may not be installed on this device.`);
     }
 
     if (installUrl) {
       window.setTimeout(() => {
         if (typeof window !== 'undefined') {
-          window.location.href = installUrl;
+          // If this timeout is reached while the page still has not moved to wallet approval,
+          // the UI can offer a store install link and the user can install from there.
+          const currentUrl = window.location.href;
+          if (currentUrl.includes('login') || currentUrl.includes('wallet')) {
+            setConnectionStatus('Connection Failed');
+          }
         }
       }, 900);
-    }
-
-    if (launchResult.started) {
-      setMobileWalletModalOpen(false);
     }
   };
 
@@ -99,12 +118,25 @@ export default function WalletSignIn() {
     setError(null);
 
     try {
+      if (selectedWallet.chain === 'walletconnect' || selectedWallet.chain === 'multi') {
+        setConnectionStatus('Awaiting Approval');
+        const wcInstallUrl = getWalletInstallUrl('walletconnect');
+        setError('WalletConnect fallback is ready. Use the WalletConnect compatible wallet on your device or install a supported wallet from the store.');
+        if (wcInstallUrl) {
+          setConnectionStatus('Connection Failed');
+          setError(`WalletConnect fallback is available. Install a supported wallet from ${wcInstallUrl}.`);
+        }
+        return;
+      }
+
       let walletInfo;
       if (selectedWallet.chain === 'solana') {
         walletInfo = await connectSolanaWallet();
       } else {
-        walletInfo = await connectEvmWallet(selectedWallet.chain);
+        walletInfo = await connectEvmWallet(selectedWallet.chain as Exclude<Chain, 'solana'>);
       }
+
+      setConnectionStatus('Awaiting Approval');
 
       // Get nonce from backend
       console.log('[WalletSignIn] Fetching nonce for', walletInfo.address, 'from', `${API_URL}/api/auth/nonce/${walletInfo.address}`);
@@ -145,6 +177,8 @@ export default function WalletSignIn() {
       }
       console.log('[WalletSignIn] Auth success');
 
+      setConnectionStatus('Connected');
+
       // Store token and user
       localStorage.setItem('cmhash_token', data.token);
       localStorage.setItem('cmhash_user', JSON.stringify(data.user));
@@ -157,6 +191,7 @@ export default function WalletSignIn() {
       router.replace(target);
     } catch (err: any) {
       console.error('[WalletSignIn] Connection error:', err);
+      setConnectionStatus('Connection Failed');
       setError(err.message || 'Failed to connect wallet');
     } finally {
       setConnecting(false);
@@ -422,7 +457,7 @@ export default function WalletSignIn() {
                         </div>
                         <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[10px] font-bold text-emerald-700 shadow-sm">
                           <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                          {detectMobilePlatform().isMobile ? 'Open app' : 'Install wallet'}
+                          {connectionStatus}
                         </div>
                       </div>
                       <div className="mt-3 flex gap-2">
@@ -444,6 +479,11 @@ export default function WalletSignIn() {
                       </div>
                     </div>
                   )}
+
+                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50 px-3 py-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Status</span>
+                    <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-sky-700 shadow-sm">{connectionStatus}</span>
+                  </div>
 
                   <button
                     onClick={handleWalletConnect}

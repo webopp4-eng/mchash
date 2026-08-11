@@ -146,7 +146,7 @@ export interface MobileWalletInfo {
   deepLink: string;
   installUrl: string;
   playStoreUrl?: string;
-  chain: 'solana' | 'ethereum' | 'bnb';
+  chain: 'solana' | 'ethereum' | 'bnb' | 'walletconnect' | 'multi';
 }
 
 export const mobileWallets: MobileWalletInfo[] = [
@@ -167,12 +167,12 @@ export const mobileWallets: MobileWalletInfo[] = [
     chain: 'solana',
   },
   {
-    id: 'backpack',
-    name: 'Backpack',
-    deepLink: 'backpack://',
-    installUrl: 'https://apps.apple.com/app/backpack/id6472684877',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.backpack.app',
-    chain: 'solana',
+    id: 'binance-wallet',
+    name: 'Binance Wallet',
+    deepLink: 'bnc://',
+    installUrl: 'https://apps.apple.com/app/binance-buy-bitcoin/id1436799971',
+    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.binance.dev',
+    chain: 'bnb',
   },
   {
     id: 'metamask',
@@ -197,6 +197,22 @@ export const mobileWallets: MobileWalletInfo[] = [
     installUrl: 'https://apps.apple.com/app/coinbase-wallet/id1278383455',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=org.toshi',
     chain: 'ethereum',
+  },
+  {
+    id: 'okx-wallet',
+    name: 'OKX Wallet',
+    deepLink: 'okx://',
+    installUrl: 'https://apps.apple.com/app/okx-wallet/id1327268470',
+    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.okinc.okx',
+    chain: 'multi',
+  },
+  {
+    id: 'walletconnect',
+    name: 'WalletConnect',
+    deepLink: 'wc://',
+    installUrl: 'https://apps.apple.com/app/walletconnect/id1439917638',
+    playStoreUrl: 'https://play.google.com/store/apps/details?id=com.walletconnect.wallet.mobile',
+    chain: 'walletconnect',
   },
 ];
 
@@ -263,7 +279,7 @@ export async function isMobileWalletInstalled(walletId: string): Promise<boolean
 }
 
 // Open a wallet app via deep link
-export function openMobileWallet(walletId: string, deepLinkData?: string): { started: boolean; fallbackUrl?: string } {
+export function openMobileWallet(walletId: string, deepLinkData?: string): { started: boolean; fallbackUrl?: string; storeUrl?: string } {
   if (typeof window === 'undefined') return { started: false };
 
   const wallet = mobileWallets.find((w) => w.id === walletId);
@@ -276,26 +292,39 @@ export function openMobileWallet(walletId: string, deepLinkData?: string): { sta
     ? 'phantom://'
     : wallet.id === 'solflare'
     ? 'solflare://'
-    : wallet.id === 'backpack'
-    ? 'backpack://'
+    : wallet.id === 'binance-wallet'
+    ? 'bnc://'
     : wallet.id === 'metamask'
     ? 'metamask://'
     : wallet.id === 'trust'
     ? 'trust://'
     : wallet.id === 'coinbase'
     ? 'cbwallet://'
+    : wallet.id === 'okx-wallet'
+    ? 'okx://'
+    : wallet.id === 'walletconnect'
+    ? 'wc://'
     : wallet.deepLink;
 
-  const connectTarget = deepLinkData
-    ? walletProtocol + (wallet.id === 'phantom' ? 'connect' : '')
+  const baseUrl = wallet.id === 'walletconnect'
+    ? 'wc://'
     : walletProtocol;
 
   const opener = window.location.href;
+
   try {
-    window.location.href = connectTarget + (deepLinkData ? `?dappUrl=${encodeURIComponent(opener)}` : '');
-    return { started: true, fallbackUrl: installUrl };
+    const returnUrl = encodeURIComponent(opener);
+    const connectTarget = wallet.id === 'walletconnect'
+      ? `${baseUrl}wc?uri=${encodeURIComponent(`wc:${btoa(JSON.stringify({ url: opener }))}`)}`
+      : deepLinkData
+      ? `${baseUrl}?dappUrl=${returnUrl}`
+      : baseUrl;
+
+    window.localStorage.setItem('cmhash_return_url', opener);
+    window.location.href = connectTarget;
+    return { started: true, fallbackUrl: installUrl, storeUrl: installUrl };
   } catch {
-    return { started: false, fallbackUrl: installUrl };
+    return { started: false, fallbackUrl: installUrl, storeUrl: installUrl };
   }
 }
 
@@ -306,6 +335,34 @@ export function getWalletInstallUrl(walletId: string): string {
 
   const platform = detectMobilePlatform();
   return platform.isAndroid ? wallet.playStoreUrl || wallet.installUrl : wallet.installUrl;
+}
+
+export function resolveWalletProtocol(walletId: string): string {
+  const wallet = mobileWallets.find((w) => w.id === walletId);
+  if (!wallet) return '';
+
+  if (wallet.id === 'phantom') return 'phantom://';
+  if (wallet.id === 'solflare') return 'solflare://';
+  if (wallet.id === 'binance-wallet') return 'bnc://';
+  if (wallet.id === 'metamask') return 'metamask://';
+  if (wallet.id === 'trust') return 'trust://';
+  if (wallet.id === 'coinbase') return 'cbwallet://';
+  if (wallet.id === 'okx-wallet') return 'okx://';
+  if (wallet.id === 'walletconnect') return 'wc://';
+
+  return wallet.deepLink;
+}
+
+export function getWalletConnections(): Array<{ id: string; name: string; type: string; chain: string; protocol: string; installUrl: string; downloadUrl?: string }> {
+  return mobileWallets.map((wallet) => ({
+    id: wallet.id,
+    name: wallet.name,
+    type: wallet.id,
+    chain: wallet.chain,
+    protocol: resolveWalletProtocol(wallet.id),
+    installUrl: getWalletInstallUrl(wallet.id),
+    downloadUrl: getWalletInstallUrl(wallet.id),
+  }));
 }
 
 // Detect installed wallets on the current platform
