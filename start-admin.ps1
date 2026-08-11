@@ -22,7 +22,7 @@ $env:NEXT_PUBLIC_ADMIN_ROLE_REQUIRED = 'admin'
 
 Set-Location $frontendDir
 Write-Host 'Starting local admin application...'
-$adminProcess = Start-Process -FilePath 'npm' -ArgumentList 'run', 'dev', '--', '-H', 'localhost', '-p', '3001' -PassThru -WorkingDirectory $frontendDir
+Start-Process -FilePath 'npm' -ArgumentList 'run', 'dev', '--', '-H', 'localhost', '-p', '3001' -WorkingDirectory $frontendDir
 
 Start-Sleep -Seconds 2
 Write-Host "Opening local admin URL: $adminUrl"

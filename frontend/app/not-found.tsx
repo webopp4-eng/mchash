@@ -1,32 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { FaHome, FaTachometerAlt } from 'react-icons/fa';
 import Logo from '@/components/Logo';
-import { detectWalletBrowser } from '@/lib/wallet';
 
 export default function NotFound() {
-  const router = useRouter();
-
-  useEffect(() => {
-    if (detectWalletBrowser()) {
-      router.replace('/login?autoconnect=1');
-    }
-  }, [router]);
-
-  if (typeof window !== 'undefined' && detectWalletBrowser()) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0a0e1a] px-4 text-center text-white">
-        <div>
-          <Logo size={48} />
-          <p className="mt-4 text-sm text-slate-300">Opening wallet approval...</p>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0a0e1a] px-4 text-white">
       <div className="w-full max-w-md text-center">

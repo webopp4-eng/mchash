@@ -129,13 +129,16 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
   }
 
   if (shouldComplete) {
-    await Promise.all([
-      purchaseModel.update({ where: { id: purchase.id }, data: { status: 'completed' } }),
-      prisma.miningSession.updateMany({
-        where: { userId: purchase.userId, purchaseId: purchase.id },
-        data: { status: 'completed', lastPayoutAt: accrualEnd },
-      }),
-    ]);
+    if (packageType === 'mining') {
+      await prisma.miningPurchase.update({ where: { id: purchase.id }, data: { status: 'completed' } });
+    } else {
+      await prisma.hashRentingPurchase.update({ where: { id: purchase.id }, data: { status: 'completed' } });
+    }
+
+    await prisma.miningSession.updateMany({
+      where: { userId: purchase.userId, purchaseId: purchase.id },
+      data: { status: 'completed', lastPayoutAt: accrualEnd },
+    });
   }
 }
 

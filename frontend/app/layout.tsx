@@ -1,6 +1,8 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import SPARedirect from './SPARedirect';
+import WagmiProvider from '@/components/WagmiProvider';
+import '@rainbow-me/rainbowkit/styles.css';
 
 export const metadata: Metadata = {
   title: 'CM HASH',
@@ -11,8 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        {children}
-        <SPARedirect />
+        <WagmiProvider>
+          {children}
+          <SPARedirect />
+        </WagmiProvider>
       </body>
     </html>
   );
