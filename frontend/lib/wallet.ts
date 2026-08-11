@@ -127,10 +127,8 @@ export async function signEvmMessage(message: string): Promise<string> {
 // Get wallet balance
 export async function getWalletBalance(chain: Chain, address: string): Promise<string> {
   if (chain === 'solana') {
-    // Solana balance would require RPC call - return placeholder
     return '0';
   }
-  // EVM balance would require RPC call - return placeholder
   return '0';
 }
 
@@ -139,4 +137,108 @@ export function shortenAddress(address: string, chars = 4): string {
   if (!address) return '';
   if (address.length <= chars * 2 + 3) return address;
   return `${address.slice(0, chars)}...${address.slice(-chars)}`;
+}
+
+// Mobile deep linking for wallet apps
+export interface MobileWalletInfo {
+  id: string;
+  name: string;
+  deepLink: string;
+  installUrl: string;
+  chain: 'solana' | 'ethereum' | 'bnb';
+}
+
+export const mobileWallets: MobileWalletInfo[] = [
+  {
+    id: 'phantom',
+    name: 'Phantom',
+    deepLink: 'phantom:',
+    installUrl: 'https://apps.apple.com/app/phantom/id1438144202',
+    chain: 'solana',
+  },
+  {
+    id: 'backpack',
+    name: 'Backpack',
+    deepLink: 'backpack:',
+    installUrl: 'https://apps.apple.com/app/backpack/id6472684877',
+    chain: 'solana',
+  },
+  {
+    id: 'metamask',
+    name: 'MetaMask',
+    deepLink: 'metamask:',
+    installUrl: 'https://apps.apple.com/app/metamask/id1438144202',
+    chain: 'ethereum',
+  },
+];
+
+// Check if we are on a mobile device
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// Check if a wallet is installed on mobile
+export async function isMobileWalletInstalled(walletId: string): Promise<boolean> {
+  if (!isMobileDevice()) return false;
+
+  if (walletId === 'phantom') {
+    try {
+      window.location.href = 'phantom:unlock';
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+// Open a wallet app via deep link
+export function openMobileWallet(walletId: string, deepLinkData?: string): void {
+  if (typeof window === 'undefined') return;
+
+  const wallet = mobileWallets.find((w) => w.id === walletId);
+  if (!wallet) return;
+
+  if (deepLinkData) {
+    if (walletId === 'phantom') {
+      window.location.href = `phantom:connect?dappUrl=${encodeURIComponent(window.location.origin)}`;
+    } else if (walletId === 'backpack') {
+      window.location.href = `backpack://connect?dappUrl=${encodeURIComponent(window.location.origin)}`;
+    } else if (walletId === 'metamask') {
+      window.location.href = `metamask://connect?dappUrl=${encodeURIComponent(window.location.origin)}`;
+    }
+  } else {
+    window.location.href = wallet.deepLink;
+  }
+}
+
+// Get installation link for mobile wallet
+export function getWalletInstallUrl(walletId: string): string {
+  const wallet = mobileWallets.find((w) => w.id === walletId);
+  return wallet?.installUrl || '';
+}
+
+// Detect installed wallets on the current platform
+export function detectInstalledWallets(): string[] {
+  if (typeof window === 'undefined') return [];
+
+  const detected: string[] = [];
+  const solana = (window as any).solana;
+  const ethereum = (window as any).ethereum;
+
+  if (solana) {
+    if (solana.isPhantom) detected.push('Phantom');
+    if (solana.isSolflare) detected.push('Solflare');
+    if (solana.isBackpack) detected.push('Backpack');
+  }
+
+  if (ethereum) {
+    if (ethereum.isMetaMask) detected.push('MetaMask');
+    if (ethereum.isCoinbaseWallet) detected.push('Coinbase Wallet');
+    if (ethereum.isTrust) detected.push('Trust Wallet');
+  }
+
+  return detected;
 }

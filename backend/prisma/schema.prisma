@@ -30,6 +30,7 @@ model User {
   wallets        Wallet[]
   loginHistory   LoginHistory[]
   purchases      MiningPurchase[]
+  hashRentingPurchases HashRentingPurchase[]
   deposits       Deposit[]
   withdrawals    Withdrawal[]
   transactions   Transaction[]
@@ -127,6 +128,45 @@ model MiningSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ============ HASH RENTING ============
+
+model HashRentingPlan {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  description   String?
+  price         Decimal  @db.Decimal(18, 8)
+  currency      String   @default("USDT")
+  chain         String   @default("ethereum")
+  hashPower     Decimal  @db.Decimal(18, 8) // e.g., 500 TH/s
+  durationDays  Int
+  expectedYield Decimal  @default(0) @db.Decimal(18, 8) // estimated yield percentage
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  purchases HashRentingPurchase[]
+}
+
+model HashRentingPurchase {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  planId      String   @db.Uuid
+  amount      Decimal  @db.Decimal(18, 8)
+  currency    String
+  chain       String
+  txHash      String?
+  status      String   @default("active") // active, completed, expired
+  startedAt   DateTime @default(now())
+  endsAt      DateTime
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan HashRentingPlan @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+  @@index([planId])
 }
 
 // ============ FINANCIAL ============

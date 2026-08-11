@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
+import crypto from 'crypto';
 import {
   generateNonce,
   verifyNonce,
@@ -13,6 +14,26 @@ import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+// Store for QR code sessions
+const qrSessions = new Map<string, {
+  address?: string;
+  chain?: string;
+  walletType?: string;
+  nonce: string;
+  expiresAt: Date;
+  used: boolean;
+}>();
+
+// Clean up expired QR sessions periodically
+setInterval(() => {
+  const now = new Date();
+  for (const [id, session] of qrSessions.entries()) {
+    if (session.expiresAt < now) {
+      qrSessions.delete(id);
+    }
+  }
+}, 60000);
+
 // Get nonce for wallet signing
 router.get('/nonce/:address', (req, res) => {
   const { address } = req.params;
@@ -21,6 +42,130 @@ router.get('/nonce/:address', (req, res) => {
   }
   const nonce = generateNonce(address);
   res.json({ nonce, message: `Sign this message to authenticate with CM HASH:\n\n${nonce}` });
+});
+
+// Generate QR code session
+router.post('/qr/session', (req, res) => {
+  try {
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    const nonce = crypto.randomBytes(16).toString('base64');
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    qrSessions.set(sessionId, {
+      nonce,
+      expiresAt,
+      used: false,
+    });
+
+    res.json({
+      sessionId,
+      qrData: JSON.stringify({
+        sessionId,
+        nonce,
+        apiUrl: process.env.FRONTEND_URL || 'https://webopp4-eng.github.io/mchash',
+      }),
+      expiresAt,
+    });
+  } catch (error) {
+    console.error('QR session error:', error);
+    res.status(500).json({ error: 'Failed to create QR session' });
+  }
+});
+
+// Check QR session status
+router.get('/qr/session/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const session = qrSessions.get(sessionId);
+
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+
+  if (session.used) {
+    return res.json({ status: 'used', address: session.address });
+  }
+
+  if (session.expiresAt < new Date()) {
+    qrSessions.delete(sessionId);
+    return res.status(404).json({ error: 'Session expired' });
+  }
+
+  res.json({ status: 'pending' });
+});
+
+// Complete QR login
+router.post('/qr/session/:sessionId/complete', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { address, chain, signature, message, walletType } = req.body;
+
+    const session = qrSessions.get(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (session.used) {
+      return res.status(400).json({ error: 'Session already used' });
+    }
+
+    if (session.expiresAt < new Date()) {
+      qrSessions.delete(sessionId);
+      return res.status(400).json({ error: 'Session expired' });
+    }
+
+    // Verify signature
+    let valid = false;
+    if (chain === 'solana') {
+      valid = verifySolanaSignature(message, signature, address);
+    } else {
+      valid = verifyEvmSignature(message, signature, address);
+    }
+
+    if (!valid) {
+      return res.status(401).json({ error: 'Signature verification failed' });
+    }
+
+    // Mark session as used
+    session.used = true;
+    session.address = address;
+    session.chain = chain;
+    session.walletType = walletType;
+
+    // Find or create user
+    const user = await findOrCreateUser(address, chain, walletType);
+
+    // Generate JWT
+    const token = generateJWT(user.id);
+
+    // Record login
+    await prisma.loginHistory.create({
+      data: {
+        userId: user.id,
+        walletAddress: address,
+        chain,
+        deviceInfo: req.headers['user-agent'] || null,
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        walletAddress: user.walletAddress,
+        chain: user.chain,
+        walletType: user.walletType,
+        username: user.username,
+        referralCode: user.referralCode,
+        platformBalance: user.platformBalance,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('QR complete error:', error);
+    res.status(500).json({ error: 'Failed to complete QR login' });
+  }
 });
 
 // Wallet authentication

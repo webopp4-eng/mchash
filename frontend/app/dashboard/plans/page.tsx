@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaBolt, FaCheck, FaWallet, FaClock, FaGift, FaUsers } from 'react-icons/fa';
+import { FaBolt, FaCheck, FaWallet, FaClock, FaGift, FaUsers, FaCube } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { getUser } from '@/lib/auth';
 
 export default function PlansPage() {
   const [plans, setPlans] = useState<any[]>([]);
+  const [hashRentingPlans, setHashRentingPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export default function PlansPage() {
     try {
       const res = await apiFetch('/api/plans');
       setPlans(res.plans || []);
+      setHashRentingPlans(res.hashRentingPlans || []);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -36,8 +38,6 @@ export default function PlansPage() {
       const user = getUser();
       if (!user) throw new Error('Please connect your wallet first');
 
-      // In production, this would trigger a wallet transaction
-      // For now, simulate the purchase flow
       const res = await apiFetch(`/api/plans/${plan.id}/purchase`, {
         method: 'POST',
         body: JSON.stringify({
@@ -47,6 +47,39 @@ export default function PlansPage() {
       });
 
       setSuccess(`${plan.name} plan activated successfully! Mining has started.`);
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setPurchasing(null);
+    }
+  };
+
+  const handleHashRent = async (plan: any) => {
+    setPurchasing(plan.id);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const user = getUser();
+      if (!user) throw new Error('Please connect your wallet first');
+
+      console.log('[PlansPage] Purchasing hash renting plan', plan.name);
+      const res = await apiFetch(`/api/hash-renting/${plan.id}/purchase`, {
+        method: 'POST',
+        body: JSON.stringify({
+          txHash: `sim_${Date.now()}`,
+          chain: user.chain,
+        }),
+      });
+
+      if (res.platformBalance !== undefined) {
+        // Update user balance in localStorage
+        const updatedUser = { ...user, platformBalance: res.platformBalance };
+        localStorage.setItem('cmhash_user', JSON.stringify(updatedUser));
+      }
+
+      setSuccess(`${plan.name} hash renting activated! ${Number(plan.price).toFixed(2)} ${plan.currency} deducted.`);
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
       setError(err.message);
@@ -146,6 +179,76 @@ export default function PlansPage() {
           </div>
         ))}
       </div>
+
+      {/* Hash Renting Section */}
+      {hashRentingPlans.length > 0 && (
+        <div className="mt-8">
+          <div className="mb-4 flex items-center gap-2">
+            <FaCube className="h-5 w-5 text-cmblue-400" />
+            <h2 className="text-xl font-bold">Hash Renting</h2>
+          </div>
+          <p className="mb-4 text-sm text-slate-400">Rent hash power and earn yields directly to your wallet.</p>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {hashRentingPlans.map((plan) => (
+              <div
+                key={plan.id}
+                className="flex flex-col rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition-all hover:border-cmblue-500/30 hover:shadow-[0_0_30px_rgba(14,161,255,0.1)]"
+              >
+                <div className="mb-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold">{plan.name}</h3>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
+                      <FaCube className="h-4 w-4" />
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">{plan.description}</p>
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-3xl font-bold">${Number(plan.price).toFixed(2)}</p>
+                  <p className="text-[10px] text-slate-500">{plan.currency}</p>
+                </div>
+
+                <div className="mb-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <FaBolt className="h-3 w-3 text-cmblue-400" />
+                    <span>{Number(plan.hashPower).toFixed(2)} TH/s hash power</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <FaClock className="h-3 w-3 text-cmblue-400" />
+                    <span>{plan.durationDays} days duration</span>
+                  </div>
+                  {plan.expectedYield && Number(plan.expectedYield) > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <FaGift className="h-3 w-3 text-cmblue-400" />
+                      <span>{Number(plan.expectedYield).toFixed(1)}% expected yield</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => handleHashRent(plan)}
+                  disabled={purchasing === plan.id}
+                  className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-purple-500 px-4 py-3 text-sm font-semibold text-white transition-all hover:scale-[1.02] hover:shadow-[0_10px_30px_rgba(14,161,255,0.3)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {purchasing === plan.id ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <FaWallet className="h-4 w-4" />
+                      Rent Hash
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

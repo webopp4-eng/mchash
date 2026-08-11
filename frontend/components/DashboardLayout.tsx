@@ -8,6 +8,7 @@ import {
   FaExchangeAlt, FaArrowUp, FaHeadset, FaCogs, FaSignOutAlt, FaBell
 } from 'react-icons/fa';
 import Logo from './Logo';
+import { useRouter } from 'next/navigation';
 import { getUser, logout, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
 
@@ -26,6 +27,7 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -34,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const handleLogout = () => {
-    logout();
+    logout(router);
   };
 
   return (

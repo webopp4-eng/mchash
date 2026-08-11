@@ -90,7 +90,11 @@ router.get('/plans', async (_req, res) => {
       where: { active: true },
       orderBy: { price: 'asc' },
     });
-    res.json({ plans });
+    const hashRentingPlans = await prisma.hashRentingPlan.findMany({
+      where: { active: true },
+      orderBy: { price: 'asc' },
+    });
+    res.json({ plans, hashRentingPlans });
   } catch (error) {
     console.error('Plans error:', error);
     res.status(500).json({ error: 'Failed to load plans' });
@@ -208,6 +212,96 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Purchase error:', error);
     res.status(500).json({ error: 'Failed to purchase plan' });
+  }
+});
+
+// ============ HASH RENTING ============
+router.get('/hash-renting', async (_req, res) => {
+  try {
+    const plans = await prisma.hashRentingPlan.findMany({
+      where: { active: true },
+      orderBy: { price: 'asc' },
+    });
+    res.json({ plans });
+  } catch (error) {
+    console.error('Hash renting plans error:', error);
+    res.status(500).json({ error: 'Failed to load hash renting plans' });
+  }
+});
+
+router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { planId } = req.params;
+    const { txHash, chain } = req.body;
+
+    const plan = await prisma.hashRentingPlan.findUnique({ where: { id: planId } });
+    if (!plan || !plan.active) {
+      return res.status(404).json({ error: 'Hash renting plan not found' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Validate balance
+    const platformBalance = Number(user.platformBalance);
+    const planPrice = Number(plan.price);
+    if (platformBalance < planPrice) {
+      return res.status(400).json({ error: 'Insufficient balance' });
+    }
+
+    // Deduct from wallet
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        platformBalance: { decrement: planPrice },
+      },
+    });
+
+    const now = new Date();
+    const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
+
+    const purchase = await prisma.hashRentingPurchase.create({
+      data: {
+        userId,
+        planId,
+        amount: planPrice,
+        currency: plan.currency,
+        chain: chain || user.chain,
+        txHash: txHash || null,
+        status: 'active',
+        startedAt: now,
+        endsAt,
+      },
+    });
+
+    // Log transaction
+    await prisma.transaction.create({
+      data: {
+        userId,
+        type: 'hash_renting',
+        amount: -planPrice,
+        currency: plan.currency,
+        chain: chain || user.chain,
+        txHash: txHash || null,
+        status: 'completed',
+        metadata: { planId: plan.id, planName: plan.name },
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: 'hash_renting',
+        title: 'Hash Renting Activated',
+        message: `${plan.name} hash renting plan activated successfully.`,
+      },
+    });
+
+    res.json({ success: true, purchase, platformBalance: updatedUser.platformBalance });
+  } catch (error) {
+    console.error('Hash renting purchase error:', error);
+    res.status(500).json({ error: 'Failed to purchase hash renting plan' });
   }
 });
 

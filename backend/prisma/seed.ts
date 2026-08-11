@@ -65,6 +65,46 @@ async function main() {
     }
   }
 
+  const hashRentingPlans = [
+    {
+      name: 'Bronze Hash Pack',
+      description: 'Entry-level hash renting with modest yields.',
+      price: 100,
+      currency: 'USDT',
+      chain: 'ethereum',
+      hashPower: 200.0,
+      durationDays: 15,
+      expectedYield: 3.5,
+    },
+    {
+      name: 'Silver Hash Pack',
+      description: 'Mid-tier hash renting with enhanced returns.',
+      price: 500,
+      currency: 'USDT',
+      chain: 'ethereum',
+      hashPower: 1000.0,
+      durationDays: 30,
+      expectedYield: 4.2,
+    },
+    {
+      name: 'Gold Hash Pack',
+      description: 'High-performance hash renting with premium yields.',
+      price: 1500,
+      currency: 'USDT',
+      chain: 'ethereum',
+      hashPower: 3500.0,
+      durationDays: 60,
+      expectedYield: 5.0,
+    },
+  ];
+
+  for (const plan of hashRentingPlans) {
+    const existing = await prisma.hashRentingPlan.findUnique({ where: { name: plan.name } });
+    if (!existing) {
+      await prisma.hashRentingPlan.create({ data: plan });
+    }
+  }
+
   const settings = [
     { key: 'min_withdrawal', value: '10' },
     { key: 'max_withdrawal', value: '10000' },

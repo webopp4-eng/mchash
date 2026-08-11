@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaWallet, FaShieldAlt, FaExclamationTriangle, FaLock } from 'react-icons/fa';
+import { FaWallet, FaShieldAlt, FaExclamationTriangle, FaLock, FaQrcode, FaClipboard } from 'react-icons/fa';
 import Logo from './Logo';
 import { connectSolanaWallet, connectEvmWallet, signSolanaMessage, signEvmMessage, detectWalletProvider, Chain } from '@/lib/wallet';
 import { API_URL } from '@/lib/auth';
@@ -27,6 +27,8 @@ const wallets: WalletOption[] = [
   { id: 'binance', name: 'Binance Wallet', chain: 'bnb', icon: '🟡', color: 'from-yellow-500 to-amber-600' },
 ];
 
+type LoginMethod = 'wallet' | 'qr' | 'address';
+
 export default function WalletSignIn() {
   const router = useRouter();
   const [agreed, setAgreed] = useState({ terms: false, privacy: false, risk: false });
@@ -34,10 +36,14 @@ export default function WalletSignIn() {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showWallets, setShowWallets] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>('wallet');
+  const [qrSession, setQrSession] = useState<any>(null);
+  const [qrPolling, setQrPolling] = useState(false);
+  const [walletAddress, setWalletAddress] = useState('');
 
   const allAgreed = agreed.terms && agreed.privacy && agreed.risk;
 
-  const handleConnect = async () => {
+  const handleWalletConnect = async () => {
     if (!allAgreed) {
       setError('Please accept all terms and conditions to continue.');
       return;
@@ -113,6 +119,154 @@ export default function WalletSignIn() {
     }
   };
 
+  const createQRSession = async () => {
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/qr/session`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create QR session');
+      setQrSession(data);
+      setQrPolling(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to create QR session');
+    }
+  };
+
+  const handleAddressLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walletAddress || walletAddress.length < 10) {
+      setError('Please enter a valid wallet address');
+      return;
+    }
+
+    setConnecting(true);
+    setError(null);
+
+    try {
+      // Detect chain based on address format
+      let chain: Chain = 'ethereum';
+      if (walletAddress.startsWith('1') || walletAddress.startsWith('3') || walletAddress.startsWith('bc1')) {
+        chain = 'ethereum'; // BTC not supported yet, treat as EVM
+      } else if (walletAddress.length === 44) {
+        chain = 'solana';
+      }
+
+      // Get nonce
+      const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${walletAddress}`);
+      if (!nonceRes.ok) {
+        const errText = await nonceRes.text();
+        throw new Error(`Backend error (${nonceRes.status}): ${errText || 'Failed to get nonce'}`);
+      }
+      const { nonce, message } = await nonceRes.json();
+
+      // Prompt user to sign
+      setError('Please sign the message in your wallet to complete login');
+      
+      let signature;
+      if (chain === 'solana') {
+        signature = await signSolanaMessage(message);
+      } else {
+        signature = await signEvmMessage(message);
+      }
+
+      // Authenticate
+      const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: walletAddress,
+          chain,
+          signature,
+          message,
+          walletType: 'Address Login',
+        }),
+      });
+
+      const data = await authRes.json();
+      if (!authRes.ok) {
+        console.error('[WalletSignIn] Auth failed:', data);
+        throw new Error(data.error || `Authentication failed (${authRes.status})`);
+      }
+
+      // Store token and user
+      localStorage.setItem('cmhash_token', data.token);
+      localStorage.setItem('cmhash_user', JSON.stringify(data.user));
+
+      // Redirect based on role
+      const target = data.user.role === 'admin' ? '/admin' : '/';
+      console.log('[WalletSignIn] Redirecting to', target, 'for role', data.user.role);
+      router.replace(target);
+    } catch (err: any) {
+      console.error('[WalletSignIn] Connection error:', err);
+      setError(err.message || 'Failed to authenticate with wallet address');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  // Poll QR session status
+  useEffect(() => {
+    if (!qrPolling || !qrSession?.sessionId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/auth/qr/session/${qrSession.sessionId}`);
+        const data = await res.json();
+        
+        if (res.ok && data.status === 'used' && data.address) {
+          // QR login successful - complete authentication
+          clearInterval(interval);
+          setQrPolling(false);
+
+          // Get nonce and sign
+          const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${data.address}`);
+          const { message } = await nonceRes.json();
+
+          setError('Please sign the message in your wallet to complete login');
+
+          let signature;
+          if (data.chain === 'solana') {
+            signature = await signSolanaMessage(message);
+          } else {
+            signature = await signEvmMessage(message);
+          }
+
+          const authRes = await fetch(`${API_URL}/api/auth/qr/session/${qrSession.sessionId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              address: data.address,
+              chain: data.chain,
+              signature,
+              message,
+              walletType: data.walletType,
+            }),
+          });
+
+          const authData = await authRes.json();
+          if (!authRes.ok) {
+            throw new Error(authData.error || 'QR login failed');
+          }
+
+          localStorage.setItem('cmhash_token', authData.token);
+          localStorage.setItem('cmhash_user', JSON.stringify(authData.user));
+
+          const target = authData.user.role === 'admin' ? '/admin' : '/';
+          router.replace(target);
+        }
+      } catch (err: any) {
+        console.error('[WalletSignIn] QR polling error:', err);
+        setError(err.message || 'QR login failed');
+        clearInterval(interval);
+        setQrPolling(false);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [qrPolling, qrSession, router]);
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0a0e1a] text-white">
       {/* Background effects */}
@@ -136,8 +290,8 @@ export default function WalletSignIn() {
 
           {/* Main Card */}
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl">
-            {/* Wallet Selection */}
-            {!showWallets ? (
+            {/* Login Method Selection */}
+            {loginMethod === 'wallet' && !showWallets && !qrSession && (
               <div className="space-y-4">
                 <button
                   onClick={() => setShowWallets(true)}
@@ -146,11 +300,25 @@ export default function WalletSignIn() {
                   <FaWallet className="h-5 w-5" />
                   Connect Wallet
                 </button>
-                <p className="text-center text-[10px] text-slate-500">
-                  Supports Solana, Ethereum & BNB Smart Chain
-                </p>
+                <button
+                  onClick={createQRSession}
+                  className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white transition-all hover:bg-white/10"
+                >
+                  <FaQrcode className="h-5 w-5" />
+                  Scan QR Code
+                </button>
+                <button
+                  onClick={() => setLoginMethod('address')}
+                  className="flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white transition-all hover:bg-white/10"
+                >
+                  <FaClipboard className="h-5 w-5" />
+                  Paste Wallet Address
+                </button>
               </div>
-            ) : (
+            )}
+
+            {/* Wallet Selection */}
+            {showWallets && (
               <div className="space-y-3">
                 <div className="mb-2 flex items-center justify-between">
                   <h2 className="text-sm font-semibold text-slate-300">Select Wallet</h2>
@@ -176,50 +344,110 @@ export default function WalletSignIn() {
                     </button>
                   ))}
                 </div>
+                <button
+                  onClick={handleWalletConnect}
+                  disabled={!selectedWallet || connecting || !allAgreed}
+                  className="mt-4 w-full rounded-2xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {connecting ? 'Connecting...' : 'Connect'}
+                </button>
+              </div>
+            )}
+
+            {/* QR Code Session */}
+            {qrSession && (
+              <div className="space-y-4 text-center">
+                <h2 className="text-sm font-semibold text-slate-300">Scan QR Code</h2>
+                <div className="flex justify-center">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <pre className="text-xs text-slate-300 break-all whitespace-pre-wrap">
+                      {qrSession.qrData}
+                    </pre>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Scan this QR code with your wallet app to login
+                </p>
+                <button
+                  onClick={() => { setQrSession(null); setQrPolling(false); }}
+                  className="text-xs text-slate-500 hover:text-slate-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Address Login */}
+            {loginMethod === 'address' && (
+              <div className="space-y-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-300">Enter Wallet Address</h2>
+                  <button onClick={() => { setLoginMethod('wallet'); setWalletAddress(''); }} className="text-xs text-slate-500 hover:text-slate-300">
+                    Back
+                  </button>
+                </div>
+                <form onSubmit={handleAddressLogin}>
+                  <input
+                    type="text"
+                    value={walletAddress}
+                    onChange={(e) => setWalletAddress(e.target.value)}
+                    placeholder="Paste your wallet address"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-cmblue-500/50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={connecting || !walletAddress}
+                    className="mt-4 w-full rounded-2xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {connecting ? 'Processing...' : 'Continue'}
+                  </button>
+                </form>
               </div>
             )}
 
             {/* Checkboxes */}
-            <div className="mt-6 space-y-3">
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
-                <input
-                  type="checkbox"
-                  checked={agreed.terms}
-                  onChange={(e) => setAgreed({ ...agreed, terms: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-cmblue-500 focus:ring-cmblue-500"
-                />
-                <div>
-                  <p className="text-xs font-medium text-slate-300">Terms & Conditions</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">I agree to the platform terms and conditions</p>
-                </div>
-              </label>
+            {!qrSession && loginMethod !== 'address' && (
+              <div className="mt-6 space-y-3">
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
+                  <input
+                    type="checkbox"
+                    checked={agreed.terms}
+                    onChange={(e) => setAgreed({ ...agreed, terms: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-cmblue-500 focus:ring-cmblue-500"
+                  />
+                  <div>
+                    <p className="text-xs font-medium text-slate-300">Terms & Conditions</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">I agree to the platform terms and conditions</p>
+                  </div>
+                </label>
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
-                <input
-                  type="checkbox"
-                  checked={agreed.privacy}
-                  onChange={(e) => setAgreed({ ...agreed, privacy: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-cmblue-500 focus:ring-cmblue-500"
-                />
-                <div>
-                  <p className="text-xs font-medium text-slate-300">Privacy Policy</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">I agree to the privacy policy and data handling</p>
-                </div>
-              </label>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
+                  <input
+                    type="checkbox"
+                    checked={agreed.privacy}
+                    onChange={(e) => setAgreed({ ...agreed, privacy: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-cmblue-500 focus:ring-cmblue-500"
+                  />
+                  <div>
+                    <p className="text-xs font-medium text-slate-300">Privacy Policy</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">I agree to the privacy policy and data handling</p>
+                  </div>
+                </label>
 
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
-                <input
-                  type="checkbox"
-                  checked={agreed.risk}
-                  onChange={(e) => setAgreed({ ...agreed, risk: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-cmblue-500 focus:ring-cmblue-500"
-                />
-                <div>
-                  <p className="text-xs font-medium text-slate-300">Risk Acknowledgement</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">I understand the risks of cryptocurrency mining</p>
-                </div>
-              </label>
-            </div>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
+                  <input
+                    type="checkbox"
+                    checked={agreed.risk}
+                    onChange={(e) => setAgreed({ ...agreed, risk: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-800 text-cmblue-500 focus:ring-cmblue-500"
+                  />
+                  <div>
+                    <p className="text-xs font-medium text-slate-300">Risk Acknowledgement</p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">I understand the risks of cryptocurrency mining</p>
+                  </div>
+                </label>
+              </div>
+            )}
 
             {error && (
               <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-400">
@@ -227,29 +455,6 @@ export default function WalletSignIn() {
                 {error}
               </div>
             )}
-
-            {/* Continue Button */}
-            <button
-              onClick={handleConnect}
-              disabled={connecting || !allAgreed}
-              className={`mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-semibold transition-all ${
-                allAgreed && !connecting
-                  ? 'bg-gradient-to-r from-cmblue-600 to-cmblue-500 text-white shadow-[0_10px_30px_rgba(14,161,255,0.3)] hover:scale-[1.02]'
-                  : 'cursor-not-allowed bg-slate-800 text-slate-500'
-              }`}
-            >
-              {connecting ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <FaLock className="h-4 w-4" />
-                  Continue
-                </>
-              )}
-            </button>
           </div>
 
           {/* Security Note */}
