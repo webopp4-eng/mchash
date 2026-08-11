@@ -175,7 +175,7 @@ export default function WalletSignIn() {
                   <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-200">
                     <p className="font-semibold">Connected Wallet</p>
                     <p className="mt-1 break-words text-xs text-slate-400">{address}</p>
-                    <p className="mt-2 text-xs text-slate-500">Network: {walletChain ?? chain?.name ?? 'Unsupported'}</p>
+                    <p className="mt-2 text-xs text-slate-500">Network: {walletChain ?? 'Unsupported'}</p>
                   </div>
                 )}
 
