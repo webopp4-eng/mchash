@@ -320,28 +320,28 @@ export default function WalletSignIn() {
   }, [qrPolling, qrSession, router]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#FFFFFF_0%,#EAF6FF_100%)] text-slate-900">
+    <div className="relative min-h-screen overflow-hidden bg-[#0a0e1a] text-white">
       {/* Background effects */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-sky-200/60 blur-[100px]" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-emerald-100/70 blur-[100px]" />
-        <div className="absolute left-0 top-1/2 h-64 w-64 rounded-full bg-sky-100/90 blur-[80px]" />
+        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cmblue-500/20 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-purple-500/10 blur-[100px]" />
+        <div className="absolute left-0 top-1/2 h-64 w-64 rounded-full bg-blue-500/10 blur-[80px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
           {/* Logo & Branding */}
           <div className="mb-8 flex flex-col items-center text-center">
-            <div className="mb-4 rounded-3xl border border-sky-100 bg-white p-4 shadow-soft">
+            <div className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_0_40px_rgba(14,161,255,0.2)] backdrop-blur-xl">
               <Logo size={64} />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">CM HASH</h1>
-            <p className="mt-2 text-sm text-sky-700">Cloud Mining Platform</p>
+            <h1 className="text-3xl font-bold tracking-tight">CM HASH</h1>
+            <p className="mt-2 text-sm text-slate-400">Cloud Mining Platform</p>
             <p className="mt-1 text-xs text-slate-500">Connect your wallet to get started</p>
           </div>
 
           {/* Main Card */}
-          <div className="rounded-[2rem] border border-sky-100 bg-white/95 p-6 shadow-soft">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl">
             {/* Login Method Selection */}
             {loginMethod === 'wallet' && !showWallets && !qrSession && (
               <div className="space-y-4">
