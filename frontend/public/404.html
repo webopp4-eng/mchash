@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CM HASH - Loading...</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #0a0e1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .loader {
+      text-align: center;
+      color: white;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(14, 161, 255, 0.3);
+      border-top-color: #0ea1ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <p>Loading CM HASH...</p>
+  </div>
+
+  <script>
+    (function() {
+      // Get the current path and preserve it
+      const currentPath = window.location.pathname;
+      const currentSearch = window.location.search;
+      const currentHash = window.location.hash;
+      
+      // Determine basePath - this should match next.config.mjs
+      const basePath = '/mchash';
+      
+      // Calculate the relative path from basePath
+      let relativePath = currentPath;
+      if (currentPath.startsWith(basePath)) {
+        relativePath = currentPath.slice(basePath.length) || '/';
+      }
+      
+      // Redirect to index.html with the path preserved
+      // The SPA will read this and restore the route
+      const target = basePath + '/index.html' + relativePath + currentSearch + currentHash;
+      
+      // Replace the current history entry and redirect
+      window.history.replaceState(null, '', basePath + '/index.html');
+      
+      // Set redirect path for SPARedirect component
+      sessionStorage.setItem('cmhash_redirect', relativePath);
+      
+      // Reload to let the SPA initialize with the correct path
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    })();
+  </script>
+</body>
+</html>
