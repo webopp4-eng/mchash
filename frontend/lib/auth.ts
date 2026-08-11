@@ -33,10 +33,14 @@ export function isAuthenticated(): boolean {
   return Boolean(getToken());
 }
 
-export function logout(): void {
+export function logout(router?: ReturnType<typeof import('next/navigation').useRouter>): void {
   localStorage.removeItem('cmhash_token');
   localStorage.removeItem('cmhash_user');
-  window.location.href = '/login';
+  if (router) {
+    router.replace('/login');
+  } else {
+    window.location.href = '/login';
+  }
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}) {

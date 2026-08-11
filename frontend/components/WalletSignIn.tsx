@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FaWallet, FaShieldAlt, FaExclamationTriangle, FaLock } from 'react-icons/fa';
 import Logo from './Logo';
 import { connectSolanaWallet, connectEvmWallet, signSolanaMessage, signEvmMessage, detectWalletProvider, Chain } from '@/lib/wallet';
@@ -27,6 +28,7 @@ const wallets: WalletOption[] = [
 ];
 
 export default function WalletSignIn() {
+  const router = useRouter();
   const [agreed, setAgreed] = useState({ terms: false, privacy: false, risk: false });
   const [selectedWallet, setSelectedWallet] = useState<WalletOption | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -100,9 +102,9 @@ export default function WalletSignIn() {
       localStorage.setItem('cmhash_user', JSON.stringify(data.user));
 
       // Redirect based on role
-      const target = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      const target = data.user.role === 'admin' ? '/admin' : '/';
       console.log('[WalletSignIn] Redirecting to', target, 'for role', data.user.role);
-      window.location.href = target;
+      router.replace(target);
     } catch (err: any) {
       console.error('[WalletSignIn] Connection error:', err);
       setError(err.message || 'Failed to connect wallet');
