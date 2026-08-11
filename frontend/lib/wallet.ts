@@ -46,6 +46,15 @@ export const mobileWallets: MobileWalletInfo[] = [
     chain: 'solana',
   },
   {
+    id: 'backpack',
+    name: 'Backpack',
+    scheme: 'backpack://',
+    installUrl: 'https://apps.apple.com/app/backpack-crypto-wallet/id6445964121',
+    playStoreUrl: 'https://play.google.com/store/apps/details?id=app.backpack.mobile',
+    desktopInstallUrl: 'https://backpack.app/download',
+    chain: 'solana',
+  },
+  {
     id: 'binance-wallet',
     name: 'Binance Wallet',
     scheme: 'bnc://',
@@ -88,7 +97,8 @@ function getSolanaProvider(walletId?: string) {
   const w = window as any;
   if (walletId === 'phantom') return w.phantom?.solana || (w.solana?.isPhantom ? w.solana : null);
   if (walletId === 'solflare') return w.solflare || (w.solana?.isSolflare ? w.solana : null);
-  return w.solana || w.phantom?.solana || w.solflare || null;
+  if (walletId === 'backpack') return w.backpack?.solana || (w.solana?.isBackpack ? w.solana : null);
+  return w.solana || w.phantom?.solana || w.solflare || w.backpack?.solana || null;
 }
 
 function getEvmProvider(walletId?: string) {
@@ -137,14 +147,14 @@ export function detectWalletProvider(chain: Chain): { available: boolean; provid
 }
 
 export function isWalletProviderAvailable(walletId: string): boolean {
-  if (walletId === 'phantom' || walletId === 'solflare') return Boolean(getSolanaProvider(walletId));
+  if (walletId === 'phantom' || walletId === 'solflare' || walletId === 'backpack') return Boolean(getSolanaProvider(walletId));
   if (walletId === 'metamask' || walletId === 'trust' || walletId === 'binance-wallet') return Boolean(getEvmProvider(walletId));
   return false;
 }
 
 export async function connectSolanaWallet(walletId?: string): Promise<WalletInfo> {
   const solana = getSolanaProvider(walletId);
-  const walletName = walletId === 'solflare' ? 'Solflare' : 'Phantom';
+  const walletName = walletId === 'solflare' ? 'Solflare' : walletId === 'backpack' ? 'Backpack' : 'Phantom';
   if (!solana) throw new Error(`${walletName} is not available in this browser. Open the app or install it first.`);
 
   try {
@@ -276,15 +286,34 @@ export function isMobileDevice(): boolean {
   return detectMobilePlatform().isMobile;
 }
 
+const walletConnectionRoutes = new Set(['/login', '/', '/dashboard']);
+
+export function getSafeWalletRedirectUrl(routeOrUrl?: string): string {
+  if (typeof window === 'undefined') return '/login';
+  const origin = window.location.origin;
+  const fallback = `${origin}/login?autoconnect=1`;
+
+  try {
+    const candidate = new URL(routeOrUrl || '/login?autoconnect=1', origin);
+    if (candidate.origin !== origin) return fallback;
+    if (!walletConnectionRoutes.has(candidate.pathname)) return fallback;
+    if (!candidate.searchParams.has('autoconnect')) candidate.searchParams.set('autoconnect', '1');
+    return candidate.toString();
+  } catch {
+    return fallback;
+  }
+}
+
 export function getWalletOpenUrl(walletId: string, dappUrl?: string): string {
   const wallet = mobileWallets.find((w) => w.id === walletId);
   if (!wallet) return '';
-  const url = dappUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+  const url = typeof window !== 'undefined' ? getSafeWalletRedirectUrl(dappUrl) : dappUrl || '/login';
   const withoutProtocol = url.replace(/^https?:\/\//, '');
   const encoded = encodeURIComponent(url);
   const ref = encodeURIComponent(typeof window !== 'undefined' ? window.location.origin : url);
   if (walletId === 'phantom') return `https://phantom.app/ul/browse/${encoded}?ref=${ref}`;
   if (walletId === 'solflare') return `https://solflare.com/ul/v1/browse/${encoded}?ref=${ref}`;
+  if (walletId === 'backpack') return `https://backpack.app/ul/browse?url=${encoded}`;
   if (walletId === 'metamask') return `https://link.metamask.io/dapp/${withoutProtocol}`;
   if (walletId === 'trust') return `trust://browser_enable?url=${encoded}`;
   if (walletId === 'binance-wallet') return `bnc://app.binance.com/cedefi/dapp?url=${encoded}`;
@@ -302,7 +331,7 @@ export function openMobileWallet(
   if (!wallet) return { started: false };
 
   const installUrl = getWalletInstallUrl(wallet.id);
-  const opener = deepLinkData || window.location.href;
+  const opener = getSafeWalletRedirectUrl(deepLinkData);
 
   try {
     let leftPage = false;
@@ -357,8 +386,21 @@ export function detectInstalledWallets(): string[] {
   const detected: string[] = [];
   if (isWalletProviderAvailable('phantom')) detected.push('Phantom');
   if (isWalletProviderAvailable('solflare')) detected.push('Solflare');
+  if (isWalletProviderAvailable('backpack')) detected.push('Backpack');
   if (isWalletProviderAvailable('metamask')) detected.push('MetaMask');
   if (isWalletProviderAvailable('trust')) detected.push('Trust Wallet');
   if (isWalletProviderAvailable('binance-wallet')) detected.push('Binance Wallet');
   return detected;
+}
+
+export function detectWalletBrowser(): { walletId: string; name: string; chain: Chain } | null {
+  if (typeof window === 'undefined') return null;
+  const ua = navigator.userAgent || '';
+  const platform = detectMobilePlatform();
+  if (/Phantom/i.test(ua) || (platform.isMobile && isWalletProviderAvailable('phantom'))) return { walletId: 'phantom', name: 'Phantom', chain: 'solana' };
+  if (/Solflare/i.test(ua) || (platform.isMobile && isWalletProviderAvailable('solflare'))) return { walletId: 'solflare', name: 'Solflare', chain: 'solana' };
+  if (/Backpack/i.test(ua) || (platform.isMobile && isWalletProviderAvailable('backpack'))) return { walletId: 'backpack', name: 'Backpack', chain: 'solana' };
+  if (/MetaMask/i.test(ua) || (platform.isMobile && isWalletProviderAvailable('metamask'))) return { walletId: 'metamask', name: 'MetaMask', chain: 'ethereum' };
+  if (/Trust/i.test(ua) || (platform.isMobile && isWalletProviderAvailable('trust'))) return { walletId: 'trust', name: 'Trust Wallet', chain: 'ethereum' };
+  return null;
 }

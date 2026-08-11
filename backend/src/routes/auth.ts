@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 import {
   generateNonce,
-  verifyNonce,
+  verifyAndConsumeNonce,
   verifyEvmSignature,
   verifySolanaSignature,
   findOrCreateUser,
@@ -21,6 +21,7 @@ const qrSessions = new Map<string, {
   address?: string;
   chain?: string;
   walletType?: string;
+  connectionUri?: string;
   nonce: string;
   expiresAt: Date;
   used: boolean;
@@ -49,6 +50,11 @@ router.get('/nonce/:address', (req, res) => {
 // Generate QR code session
 router.post('/qr/session', async (req, res) => {
   try {
+    const connectionUri = typeof req.body?.connectionUri === 'string' ? req.body.connectionUri.trim() : '';
+    if (connectionUri && !connectionUri.startsWith('wc:')) {
+      return res.status(400).json({ error: 'Invalid WalletConnect URI' });
+    }
+
     const sessionId = crypto.randomBytes(32).toString('hex');
     const nonce = crypto.randomBytes(16).toString('base64');
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
@@ -57,14 +63,17 @@ router.post('/qr/session', async (req, res) => {
       type: 'cmhash_wallet_auth',
       sessionId,
       nonce,
-      walletAddress: '',
-      chain: 'ethereum',
-      walletType: 'qr-login',
-      apiUrl: process.env.FRONTEND_URL || 'https://webopp4-eng.github.io/mchash',
+      connectionUri: connectionUri || null,
+      metadata: {
+        name: 'CM HASH',
+        description: 'Wallet address sign-in for CM HASH',
+        url: process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL || 'https://mchash.vercel.app',
+      },
       issuedAt: new Date().toISOString(),
+      expiresAt: expiresAt.toISOString(),
     };
 
-    const qrData = JSON.stringify(qrPayload);
+    const qrData = connectionUri || JSON.stringify(qrPayload);
     const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
       width: 240,
       margin: 1,
@@ -75,6 +84,7 @@ router.post('/qr/session', async (req, res) => {
     });
 
     qrSessions.set(sessionId, {
+      connectionUri: connectionUri || undefined,
       nonce,
       expiresAt,
       used: false,
@@ -85,6 +95,8 @@ router.post('/qr/session', async (req, res) => {
       qrData,
       qrCodeDataUrl,
       expiresAt,
+      connectionUri: connectionUri || null,
+      metadata: qrPayload.metadata,
     });
   } catch (error) {
     console.error('QR session error:', error);
@@ -131,6 +143,11 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
     if (session.expiresAt < new Date()) {
       qrSessions.delete(sessionId);
       return res.status(400).json({ error: 'Session expired' });
+    }
+
+    const nonceMatch = typeof message === 'string' ? message.match(/Nonce:\s*([A-Za-z0-9+/=]+)$/) : null;
+    if (!nonceMatch || !verifyAndConsumeNonce(nonceMatch[1], address)) {
+      return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
 
     // Verify signature
@@ -220,8 +237,7 @@ router.post('/wallet', async (req, res) => {
     if (!nonceMatch) {
       return res.status(400).json({ error: 'Invalid message format' });
     }
-    const nonceData = verifyNonce(nonceMatch[1]);
-    if (!nonceData || nonceData.address.toLowerCase() !== address.toLowerCase()) {
+    if (!verifyAndConsumeNonce(nonceMatch[1], address)) {
       return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
 

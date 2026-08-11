@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaClipboard, FaExclamationTriangle, FaPaste, FaQrcode, FaShieldAlt, FaWallet } from 'react-icons/fa';
 import Logo from './Logo';
@@ -11,7 +11,10 @@ import {
   connectEvmWallet,
   connectSolanaWallet,
   detectMobilePlatform,
+  detectWalletBrowser,
+  getSafeWalletRedirectUrl,
   getWalletInstallUrl,
+  isWalletProviderAvailable,
   mobileWallets,
   openMobileWallet,
   signEvmMessage,
@@ -31,6 +34,7 @@ interface WalletOption {
 const wallets: WalletOption[] = [
   { id: 'phantom', name: 'Phantom', chain: 'solana', icon: 'PH' },
   { id: 'solflare', name: 'Solflare', chain: 'solana', icon: 'SF' },
+  { id: 'backpack', name: 'Backpack', chain: 'solana', icon: 'BP' },
   { id: 'metamask', name: 'MetaMask', chain: 'ethereum', icon: 'MM' },
   { id: 'trust', name: 'Trust Wallet', chain: 'ethereum', icon: 'TW' },
   { id: 'binance-wallet', name: 'Binance Wallet', chain: 'bnb', icon: 'BN' },
@@ -48,6 +52,10 @@ async function safeJson(res: Response): Promise<any> {
   }
 }
 
+function walletConnectProjectId() {
+  return process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '';
+}
+
 export default function WalletSignIn() {
   const router = useRouter();
   const [agreed, setAgreed] = useState({ terms: false, privacy: false, risk: false });
@@ -57,13 +65,23 @@ export default function WalletSignIn() {
   const [showWallets, setShowWallets] = useState(false);
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('wallet');
   const [qrSession, setQrSession] = useState<any>(null);
-  const [qrPolling, setQrPolling] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [authStatus, setAuthStatus] = useState<string | null>(null);
   const [mobileWalletModalOpen, setMobileWalletModalOpen] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<WalletConnectionState>('Detecting Wallet');
+  const wcClientRef = useRef<any>(null);
+  const qrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const qrRunRef = useRef(0);
 
   const allAgreed = agreed.terms && agreed.privacy && agreed.risk;
+  const availableWallets = useMemo(
+    () => wallets.filter((wallet) => wallet.chain !== 'walletconnect' && isWalletProviderAvailable(wallet.id)),
+    [showWallets, connecting],
+  );
+  const unavailableWallets = useMemo(
+    () => wallets.filter((wallet) => wallet.chain !== 'walletconnect' && !isWalletProviderAvailable(wallet.id)),
+    [showWallets, connecting],
+  );
 
   const completeAuth = (data: any) => {
     localStorage.setItem('cmhash_token', data.token);
@@ -75,7 +93,6 @@ export default function WalletSignIn() {
   };
 
   const authenticateWallet = async (walletInfo: { address: string; chain: Chain; walletType: string }, walletId?: string) => {
-    console.info('[WalletSignIn] Fetching nonce', { address: walletInfo.address, walletType: walletInfo.walletType });
     const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${walletInfo.address}`);
     const nonceData = await safeJson(nonceRes);
     if (!nonceRes.ok) throw new Error(nonceData.error || 'Failed to get wallet nonce');
@@ -101,6 +118,69 @@ export default function WalletSignIn() {
     completeAuth(data);
   };
 
+  const connectWalletOption = async (wallet: WalletOption, bypassAgreement = false) => {
+    if (!bypassAgreement && !allAgreed) {
+      setError('Please accept all terms and conditions to continue.');
+      return;
+    }
+    if (wallet.chain === 'walletconnect') {
+      await createQRSession();
+      return;
+    }
+
+    setConnecting(true);
+    setSelectedWallet(wallet);
+    setError(null);
+    setConnectionStatus('Detecting Wallet');
+
+    try {
+      setConnectionStatus('Opening Wallet');
+      const walletInfo = wallet.chain === 'solana'
+        ? await connectSolanaWallet(wallet.id)
+        : await connectEvmWallet(wallet.chain, wallet.id);
+      await authenticateWallet(walletInfo, wallet.id);
+    } catch (err: any) {
+      setConnectionStatus('Connection Failed');
+      setError(err.message || 'Failed to connect wallet');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleConnectClick = async () => {
+    setError(null);
+    const platform = detectMobilePlatform();
+
+    if (!allAgreed) {
+      setError('Please accept all terms and conditions to continue.');
+      return;
+    }
+
+    if (platform.isMobile) {
+      setShowWallets(true);
+      return;
+    }
+
+    if (availableWallets.length === 1) {
+      await connectWalletOption(availableWallets[0]);
+      return;
+    }
+
+    setShowWallets(true);
+  };
+
+  const handleWalletConnect = async () => {
+    if (!selectedWallet) {
+      setError('Please select a wallet to connect.');
+      return;
+    }
+    if (!detectMobilePlatform().isMobile && selectedWallet.chain !== 'walletconnect' && !isWalletProviderAvailable(selectedWallet.id)) {
+      window.location.href = getWalletInstallUrl(selectedWallet.id);
+      return;
+    }
+    await connectWalletOption(selectedWallet);
+  };
+
   const launchSelectedMobileWallet = (targetWalletId: string) => {
     const platform = detectMobilePlatform();
     const wallet = mobileWallets.find((w) => w.id === targetWalletId);
@@ -113,8 +193,8 @@ export default function WalletSignIn() {
 
     setError(`Opening ${wallet.name}. If it is not installed, the official install page will open.`);
     setConnectionStatus('Opening Wallet');
-    const launchResult = openMobileWallet(wallet.id, `${window.location.origin}/login`, (storeUrl) => {
-      console.warn('[WalletSignIn] Wallet did not open; using fallback', { walletId: wallet.id, storeUrl });
+    const returnUrl = getSafeWalletRedirectUrl(`/login?wallet=${encodeURIComponent(wallet.id)}&autoconnect=1`);
+    const launchResult = openMobileWallet(wallet.id, returnUrl, (storeUrl) => {
       setConnectionStatus('Connection Failed');
       setError(`${wallet.name} did not open. Redirecting to the official install page.`);
       window.location.href = storeUrl;
@@ -124,58 +204,109 @@ export default function WalletSignIn() {
       setConnectionStatus('Waiting for Approval');
       setMobileWalletModalOpen(false);
     } else {
-      console.error('[WalletSignIn] Wallet launch failed', { walletId: wallet.id });
       setConnectionStatus('Connection Failed');
       setError(`${wallet.name} could not be opened.`);
     }
   };
 
-  const handleWalletConnect = async () => {
-    if (!allAgreed) {
-      setError('Please accept all terms and conditions to continue.');
-      return;
-    }
-    if (!selectedWallet) {
-      setError('Please select a wallet to connect.');
+  const createQRSession = async () => {
+    setLoginMethod('qr');
+    setError(null);
+    setQrSession(null);
+
+    const projectId = walletConnectProjectId();
+    if (!projectId) {
+      setError('WalletConnect QR login needs NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID to be configured.');
       return;
     }
 
-    setConnecting(true);
-    setError(null);
-    setConnectionStatus('Detecting Wallet');
+    const runId = qrRunRef.current + 1;
+    qrRunRef.current = runId;
+    if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
 
     try {
-      if (selectedWallet.chain === 'walletconnect') {
-        setConnectionStatus('Opening Wallet');
-        window.location.href = getWalletInstallUrl('walletconnect');
-        return;
+      setConnectionStatus('Opening Wallet');
+      const SignClient = (await import('@walletconnect/sign-client')).default;
+      if (!wcClientRef.current) {
+        wcClientRef.current = await SignClient.init({
+          projectId,
+          metadata: {
+            name: 'CM HASH',
+            description: 'Wallet address sign-in for CM HASH',
+            url: window.location.origin,
+            icons: [`${window.location.origin}/favicon.ico`],
+          },
+        });
       }
 
-      setConnectionStatus('Opening Wallet');
-      const walletInfo = selectedWallet.chain === 'solana'
-        ? await connectSolanaWallet(selectedWallet.id)
-        : await connectEvmWallet(selectedWallet.chain, selectedWallet.id);
-      await authenticateWallet(walletInfo, selectedWallet.id);
-    } catch (err: any) {
-      console.error('[WalletSignIn] Connection error:', err);
-      setConnectionStatus('Connection Failed');
-      setError(err.message || 'Failed to connect wallet');
-    } finally {
-      setConnecting(false);
-    }
-  };
+      const { uri, approval } = await wcClientRef.current.connect({
+        requiredNamespaces: {
+          eip155: {
+            methods: ['personal_sign'],
+            chains: ['eip155:1', 'eip155:56'],
+            events: ['accountsChanged', 'chainChanged', 'disconnect'],
+          },
+        },
+      });
 
-  const createQRSession = async () => {
-    setError(null);
-    try {
-      const res = await fetch(`${API_URL}/api/auth/qr/session`, { method: 'POST' });
-      const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || 'Failed to create QR session');
-      setQrSession(data);
-      setQrPolling(true);
+      if (!uri) throw new Error('WalletConnect did not return a pairing URI.');
+
+      const qrRes = await fetch(`${API_URL}/api/auth/qr/session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionUri: uri }),
+      });
+      const qrData = await safeJson(qrRes);
+      if (!qrRes.ok) throw new Error(qrData.error || 'Failed to create QR session');
+
+      setQrSession({ ...qrData, status: 'Scan with your wallet app' });
+      setConnectionStatus('Waiting for Approval');
+      qrTimerRef.current = setTimeout(() => {
+        if (qrRunRef.current === runId) createQRSession();
+      }, Math.max(30_000, new Date(qrData.expiresAt).getTime() - Date.now() - 1000));
+
+      const session = await approval();
+      if (qrRunRef.current !== runId) return;
+
+      const account = session.namespaces?.eip155?.accounts?.[0];
+      if (!account) throw new Error('No EVM account was approved by the wallet.');
+      const [namespace, chainReference, address] = account.split(':');
+      const chainId = `${namespace}:${chainReference}`;
+      const chain: Chain = chainReference === '56' ? 'bnb' : 'ethereum';
+
+      const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${address}`);
+      const nonceData = await safeJson(nonceRes);
+      if (!nonceRes.ok) throw new Error(nonceData.error || 'Failed to get wallet nonce');
+
+      setConnectionStatus('Waiting for Approval');
+      const signature = await wcClientRef.current.request({
+        topic: session.topic,
+        chainId,
+        request: {
+          method: 'personal_sign',
+          params: [nonceData.message, address],
+        },
+      });
+
+      const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address,
+          chain,
+          signature,
+          message: nonceData.message,
+          walletType: 'WalletConnect',
+        }),
+      });
+      const authData = await safeJson(authRes);
+      if (!authRes.ok) throw new Error(authData.error || 'QR login failed');
+      completeAuth(authData);
     } catch (err: any) {
-      console.error('[WalletSignIn] QR session error:', err);
-      setError(err.message || 'Failed to create QR session');
+      if (qrRunRef.current === runId) {
+        setConnectionStatus('Connection Failed');
+        setError(err.message || 'QR login failed');
+      }
     }
   };
 
@@ -203,7 +334,6 @@ export default function WalletSignIn() {
 
       await authenticateWallet({ ...walletInfo, walletType: 'Address Login' });
     } catch (err: any) {
-      console.error('[WalletSignIn] Address login error:', err);
       setConnectionStatus('Connection Failed');
       setError(err.message || 'Failed to authenticate with wallet address');
     } finally {
@@ -212,47 +342,27 @@ export default function WalletSignIn() {
   };
 
   useEffect(() => {
-    if (!qrPolling || !qrSession?.sessionId) return;
+    const params = new URLSearchParams(window.location.search);
+    const requestedWallet = params.get('wallet');
+    const shouldAutoConnect = params.get('autoconnect') === '1' || Boolean(detectWalletBrowser());
+    if (!shouldAutoConnect || connecting || localStorage.getItem('cmhash_token')) return;
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/auth/qr/session/${qrSession.sessionId}`);
-        const data = await safeJson(res);
+    const detected = detectWalletBrowser();
+    const walletId = requestedWallet || detected?.walletId;
+    const wallet = wallets.find((item) => item.id === walletId);
+    if (!wallet || wallet.chain === 'walletconnect') return;
 
-        if (res.ok && data.status === 'used' && data.address) {
-          clearInterval(interval);
-          setQrPolling(false);
-          const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${data.address}`);
-          const nonceData = await safeJson(nonceRes);
-          if (!nonceRes.ok) throw new Error(nonceData.error || 'Failed to get nonce');
-          const signature = data.chain === 'solana'
-            ? await signSolanaMessage(nonceData.message)
-            : await signEvmMessage(nonceData.message);
-          const authRes = await fetch(`${API_URL}/api/auth/qr/session/${qrSession.sessionId}/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              address: data.address,
-              chain: data.chain,
-              signature,
-              message: nonceData.message,
-              walletType: data.walletType,
-            }),
-          });
-          const authData = await safeJson(authRes);
-          if (!authRes.ok) throw new Error(authData.error || 'QR login failed');
-          completeAuth(authData);
-        }
-      } catch (err: any) {
-        console.error('[WalletSignIn] QR polling error:', err);
-        setError(err.message || 'QR login failed');
-        clearInterval(interval);
-        setQrPolling(false);
-      }
-    }, 2000);
+    setAgreed({ terms: true, privacy: true, risk: true });
+    const timer = setTimeout(() => connectWalletOption(wallet, true), 700);
+    return () => clearTimeout(timer);
+  }, []);
 
-    return () => clearInterval(interval);
-  }, [qrPolling, qrSession]);
+  useEffect(() => {
+    return () => {
+      if (qrTimerRef.current) clearTimeout(qrTimerRef.current);
+      qrRunRef.current += 1;
+    };
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#0a0e1a] text-white">
@@ -271,7 +381,7 @@ export default function WalletSignIn() {
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl">
             {loginMethod === 'wallet' && !showWallets && !qrSession && (
               <div className="space-y-4">
-                <button onClick={() => setShowWallets(true)} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-6 py-4 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(14,161,255,0.3)] transition-all hover:scale-[1.02]">
+                <button onClick={handleConnectClick} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-6 py-4 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(14,161,255,0.3)] transition-all hover:scale-[1.02]">
                   <FaWallet className="h-5 w-5" />
                   Connect Wallet
                 </button>
@@ -299,26 +409,54 @@ export default function WalletSignIn() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    {wallets.map((wallet) => (
-                      <button
-                        key={wallet.id}
-                        onClick={() => {
-                          setSelectedWallet(wallet);
-                          setConnectionStatus('Detecting Wallet');
-                          if (detectMobilePlatform().isMobile) setMobileWalletModalOpen(true);
-                        }}
-                        className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all ${selectedWallet?.id === wallet.id ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50'}`}
-                      >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-100 to-sky-50 text-xs font-black text-sky-700 shadow-sm">
-                          {wallet.icon}
-                        </span>
-                        <span>
-                          <span className="block text-xs font-bold">{wallet.name}</span>
-                          <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{wallet.chain}</span>
-                        </span>
-                      </button>
-                    ))}
+                  <div className="space-y-4">
+                    {availableWallets.length > 0 && (
+                      <div>
+                        <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-emerald-700">Available</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {availableWallets.map((wallet) => (
+                            <button
+                              key={wallet.id}
+                              onClick={() => {
+                                setSelectedWallet(wallet);
+                                setConnectionStatus('Detecting Wallet');
+                                if (detectMobilePlatform().isMobile) setMobileWalletModalOpen(true);
+                              }}
+                              className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all ${selectedWallet?.id === wallet.id ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50'}`}
+                            >
+                              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-100 to-sky-50 text-xs font-black text-sky-700 shadow-sm">{wallet.icon}</span>
+                              <span>
+                                <span className="block text-xs font-bold">{wallet.name}</span>
+                                <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-600">Detected</span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">Install or open app</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        {unavailableWallets.map((wallet) => (
+                          <button
+                            key={wallet.id}
+                            onClick={() => {
+                              setSelectedWallet(wallet);
+                              setConnectionStatus('Detecting Wallet');
+                              if (detectMobilePlatform().isMobile) setMobileWalletModalOpen(true);
+                            }}
+                            className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all ${selectedWallet?.id === wallet.id ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50'}`}
+                          >
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xs font-black text-slate-600 shadow-sm">{wallet.icon}</span>
+                            <span>
+                              <span className="block text-xs font-bold">{wallet.name}</span>
+                              <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Unavailable</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   {mobileWalletModalOpen && selectedWallet && (
@@ -326,7 +464,7 @@ export default function WalletSignIn() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-700">{selectedWallet.name}</p>
-                          <p className="mt-1 text-xs text-slate-600">{detectMobilePlatform().isIOS ? 'iOS wallet detection' : 'Android wallet detection'}</p>
+                          <p className="mt-1 text-xs text-slate-600">{detectMobilePlatform().isIOS ? 'iOS wallet launch' : 'Android wallet launch'}</p>
                         </div>
                         <span className="rounded-full bg-white px-3 py-1 text-[10px] font-bold text-emerald-700 shadow-sm">{connectionStatus}</span>
                       </div>
@@ -347,7 +485,7 @@ export default function WalletSignIn() {
                   </div>
 
                   <button onClick={handleWalletConnect} disabled={!selectedWallet || connecting || !allAgreed} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-sky-600 to-sky-500 px-6 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(33,150,243,0.24)] disabled:cursor-not-allowed disabled:opacity-50">
-                    {connecting ? 'Connecting...' : 'Connect'}
+                    {connecting ? 'Connecting...' : selectedWallet && !isWalletProviderAvailable(selectedWallet.id) && !detectMobilePlatform().isMobile ? 'Install Wallet' : 'Connect'}
                   </button>
                 </div>
               </div>
@@ -359,14 +497,14 @@ export default function WalletSignIn() {
                 <div className="flex justify-center">
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     {qrSession.qrCodeDataUrl ? (
-                      <img src={qrSession.qrCodeDataUrl} alt="CM HASH wallet authentication QR code" className="h-56 w-56 rounded-xl bg-white object-contain p-2 shadow-2xl shadow-cmblue-900/30" onError={() => setError('Unable to render QR code image')} />
+                      <img src={qrSession.qrCodeDataUrl} alt="CM HASH WalletConnect login QR code" className="h-56 w-56 rounded-xl bg-white object-contain p-2 shadow-2xl shadow-cmblue-900/30" onError={() => setError('Unable to render QR code image')} />
                     ) : (
                       <div className="flex h-56 w-56 items-center justify-center rounded-xl bg-slate-900/80 text-xs text-slate-400">Generating QR...</div>
                     )}
                   </div>
                 </div>
-                <p className="text-xs text-slate-500">Scan this QR code with your wallet app to login</p>
-                <button onClick={() => { setQrSession(null); setQrPolling(false); }} className="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
+                <p className="text-xs text-slate-500">{qrSession.status || 'Scan with a WalletConnect-compatible wallet'}</p>
+                <button onClick={() => { qrRunRef.current += 1; setQrSession(null); setLoginMethod('wallet'); if (qrTimerRef.current) clearTimeout(qrTimerRef.current); }} className="text-xs text-slate-500 hover:text-slate-300">Cancel</button>
               </div>
             )}
 
@@ -396,8 +534,7 @@ export default function WalletSignIn() {
                         setWalletAddress(text.trim());
                         const validation = validateWalletAddress(text.trim());
                         setError(validation.valid ? null : validation.error || 'Invalid wallet address');
-                      } catch (err) {
-                        console.error('[WalletSignIn] Paste failed:', err);
+                      } catch {
                         setError('Clipboard paste is blocked by this browser. Paste the address manually.');
                       }
                     }}

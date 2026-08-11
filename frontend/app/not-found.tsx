@@ -1,15 +1,39 @@
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { FaHome, FaTachometerAlt } from 'react-icons/fa';
 import Logo from '@/components/Logo';
+import { detectWalletBrowser } from '@/lib/wallet';
 
 export default function NotFound() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (detectWalletBrowser()) {
+      router.replace('/login?autoconnect=1');
+    }
+  }, [router]);
+
+  if (typeof window !== 'undefined' && detectWalletBrowser()) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#0a0e1a] px-4 text-center text-white">
+        <div>
+          <Logo size={48} />
+          <p className="mt-4 text-sm text-slate-300">Opening wallet approval...</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#0a0e1a] px-4 text-white">
       <div className="w-full max-w-md text-center">
         <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-white/10 bg-white/5">
           <Logo size={42} />
         </div>
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-cmblue-300">404</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-cmblue-300">Route</p>
         <h1 className="mt-2 text-3xl font-bold">Page not found</h1>
         <p className="mt-3 text-sm text-slate-400">This route does not exist or has moved.</p>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">

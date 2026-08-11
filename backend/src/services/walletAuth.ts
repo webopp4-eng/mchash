@@ -1,16 +1,30 @@
 import { ethers } from 'ethers';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import bs58 from 'bs58';
+import nacl from 'tweetnacl';
 import prisma from '../lib/prisma';
+
+const issuedNonces = new Map<string, { address: string; timestamp: number; used: boolean }>();
+
+function cleanupNonces(maxAgeMs = 5 * 60 * 1000) {
+  const now = Date.now();
+  for (const [nonce, record] of issuedNonces.entries()) {
+    if (record.used || now - record.timestamp > maxAgeMs) issuedNonces.delete(nonce);
+  }
+}
 
 // Generate a nonce for wallet signing
 export function generateNonce(address: string): string {
+  cleanupNonces();
   const payload = {
     address,
     timestamp: Date.now(),
     random: crypto.randomBytes(16).toString('hex'),
   };
-  return Buffer.from(JSON.stringify(payload)).toString('base64');
+  const nonce = Buffer.from(JSON.stringify(payload)).toString('base64');
+  issuedNonces.set(nonce, { address, timestamp: payload.timestamp, used: false });
+  return nonce;
 }
 
 export function verifyNonce(nonce: string, maxAgeMs = 5 * 60 * 1000): { address: string; timestamp: number } | null {
@@ -22,6 +36,18 @@ export function verifyNonce(nonce: string, maxAgeMs = 5 * 60 * 1000): { address:
   } catch {
     return null;
   }
+}
+
+export function verifyAndConsumeNonce(nonce: string, address: string, maxAgeMs = 5 * 60 * 1000): boolean {
+  cleanupNonces(maxAgeMs);
+  const record = issuedNonces.get(nonce);
+  const payload = verifyNonce(nonce, maxAgeMs);
+  if (!record || record.used || !payload) return false;
+  if (record.address.toLowerCase() !== address.toLowerCase()) return false;
+  if (payload.address.toLowerCase() !== address.toLowerCase()) return false;
+  record.used = true;
+  issuedNonces.delete(nonce);
+  return true;
 }
 
 // Solana address validation (58-char base58, starts with specific patterns)
@@ -41,12 +67,16 @@ export function isValidWalletAddress(address: string, chain?: string): boolean {
   return isValidSolanaAddress(address) || isValidEvmAddress(address);
 }
 
-// Solana signature verification - returns true if address format is valid
-// Full ed25519 verification happens client-side via Phantom/Solflare SDKs
 export function verifySolanaSignature(message: string, signature: string, address: string): boolean {
-  if (!isValidSolanaAddress(address)) return false;
-  if (!signature || signature.length < 10) return false;
-  return message.includes(address);
+  try {
+    if (!isValidSolanaAddress(address)) return false;
+    const publicKey = bs58.decode(address);
+    const signatureBytes = Buffer.from(signature, 'base64');
+    const messageBytes = new TextEncoder().encode(message);
+    return nacl.sign.detached.verify(messageBytes, signatureBytes, publicKey);
+  } catch {
+    return false;
+  }
 }
 
 // Ethereum/EVM signature verification
