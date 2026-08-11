@@ -1,5 +1,5 @@
-import WalletPage from '@/components/WalletPage';
+import { redirect } from 'next/navigation';
 
-export default function Wallet() {
-  return <WalletPage />;
+export default function WalletRedirect() {
+  redirect('/dashboard/wallet');
 }

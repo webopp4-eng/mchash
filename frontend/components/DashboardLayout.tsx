@@ -1,66 +1,135 @@
-import type { ReactNode } from 'react';
+'use client';
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import {
+  FaHome, FaBolt, FaLayerGroup, FaWallet, FaChartLine, FaUsers,
+  FaExchangeAlt, FaArrowUp, FaHeadset, FaCogs, FaSignOutAlt, FaBell
+} from 'react-icons/fa';
+import Logo from './Logo';
+import { getUser, logout, User } from '@/lib/auth';
+import { shortenAddress } from '@/lib/wallet';
+
+const navItems = [
+  { href: '/dashboard', label: 'Home', icon: FaHome },
+  { href: '/dashboard/mining', label: 'Mining', icon: FaBolt },
+  { href: '/dashboard/plans', label: 'Plans', icon: FaLayerGroup },
+  { href: '/dashboard/wallet', label: 'Wallet', icon: FaWallet },
+  { href: '/dashboard/earnings', label: 'Earnings', icon: FaChartLine },
+  { href: '/dashboard/referrals', label: 'Referrals', icon: FaUsers },
+  { href: '/dashboard/transactions', label: 'Transactions', icon: FaExchangeAlt },
+  { href: '/dashboard/withdrawals', label: 'Withdrawals', icon: FaArrowUp },
+  { href: '/dashboard/support', label: 'Support', icon: FaHeadset },
+  { href: '/dashboard/settings', label: 'Settings', icon: FaCogs },
+];
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [user, setUser] = useState<User | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setUser(getUser());
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+  };
+
   return (
-    <div className="min-h-screen bg-[#07111c] text-slate-100">
-      <div className="flex min-h-screen">
-        <aside className="hidden w-80 border-r border-white/10 bg-slate-950/70 p-6 lg:block">
-          <div className="mb-10 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cmblue-500 text-xl font-black text-white">
-              CM
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-cmblue-300">CM HASH</p>
-              <h1 className="text-2xl font-bold tracking-tight text-white">Control</h1>
-            </div>
-          </div>
-
-          <nav className="space-y-2">
-            <a className="flex items-center justify-between rounded-2xl border border-cmblue-400/40 bg-cmblue-500/10 px-4 py-3 text-sm font-semibold text-cmblue-100" href="/dashboard">
-              <span>Overview</span>
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            </a>
-            <a className="flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white" href="/dashboard">
-              <span>Mining</span>
-              <span className="text-xs text-slate-500">Live</span>
-            </a>
-            <a className="flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white" href="/dashboard">
-              <span>Wallets</span>
-              <span className="text-xs text-slate-500">2</span>
-            </a>
-            <a className="flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold text-slate-400 transition hover:bg-white/5 hover:text-white" href="/admin">
-              <span>Admin</span>
-              <span className="text-xs text-slate-500">Panel</span>
-            </a>
-          </nav>
-
-          <div className="mt-10 rounded-3xl border border-cmblue-300/30 bg-cmblue-500/10 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cmblue-200">Hash Output</p>
-            <div className="mt-4 flex items-end justify-between">
-              <div>
-                <p className="text-3xl font-bold text-white">2.45</p>
-                <p className="text-[10px] text-slate-400">TH/s</p>
-              </div>
-              <span className="rounded-full border border-emerald-300/50 bg-emerald-300/10 px-3 py-1 text-[10px] font-bold text-emerald-300">Online</span>
-            </div>
-          </div>
-        </aside>
-
-        <main className="flex-1 p-5 lg:p-8">
-          <header className="mb-8 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-slate-500">Mining Dashboard</p>
-              <h2 className="mt-2 text-3xl font-bold tracking-tight text-white">CM HASH Admin Console</h2>
-            </div>
-            <div className="hidden items-center gap-4 lg:flex">
-              <button className="rounded-2xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white">Notifications</button>
-              <button className="rounded-2xl bg-cmblue-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cmblue-400">Create contract</button>
-            </div>
-          </header>
-
-          {children}
-        </main>
+    <div className="min-h-screen bg-[#0a0e1a] text-white">
+      {/* Background effects */}
+      <div className="pointer-events-none fixed inset-0">
+        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cmblue-500/10 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-purple-500/5 blur-[100px]" />
       </div>
+
+      {/* Mobile Top Bar */}
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between border-b border-white/10 bg-[#0a0e1a]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
+        <div className="flex items-center gap-2">
+          <Logo size={32} />
+          <span className="text-sm font-bold">CM HASH</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="relative rounded-xl border border-white/10 bg-white/5 p-2 text-slate-400 hover:text-white">
+            <FaBell className="h-4 w-4" />
+            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-cmblue-500" />
+          </button>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-400 hover:text-white"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Sidebar Overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed top-0 left-0 z-50 flex h-screen w-72 flex-col border-r border-white/10 bg-[#0d1226]/95 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center gap-3 border-b border-white/10 p-5">
+          <Logo size={40} />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cmblue-400">CM HASH</p>
+            <p className="text-[10px] text-slate-500">Cloud Mining</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-gradient-to-r from-cmblue-600/30 to-cmblue-500/10 text-cmblue-300 shadow-[0_0_20px_rgba(14,161,255,0.15)]'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+                {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cmblue-400" />}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-white/10 p-4">
+          <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cmblue-500 to-cmblue-700 text-sm font-bold">
+              {user?.username?.slice(0, 2).toUpperCase() || 'CM'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold">{user?.username || 'User'}</p>
+              <p className="truncate text-[10px] text-slate-500">{user ? shortenAddress(user.walletAddress) : ''}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20"
+          >
+            <FaSignOutAlt className="h-3.5 w-3.5" />
+            Disconnect Wallet
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="relative z-10 min-h-screen lg:pl-72">
+        <div className="px-4 pb-10 pt-16 sm:px-6 lg:px-8 lg:pt-6">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

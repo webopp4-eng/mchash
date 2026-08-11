@@ -3,17 +3,13 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'CM HASH',
-  description: 'CM HASH cloud mining platform demo',
+  description: 'CM HASH cloud mining platform',
 };
-
-import Layout from '@/components/Layout';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <Layout>{children}</Layout>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

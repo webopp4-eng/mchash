@@ -1,5 +1,5 @@
-import SettingsPage from '@/components/SettingsPage';
+import { redirect } from 'next/navigation';
 
-export default function Settings() {
-  return <SettingsPage />;
+export default function SettingsRedirect() {
+  redirect('/dashboard/settings');
 }

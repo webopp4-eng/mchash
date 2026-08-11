@@ -1,5 +1,23 @@
-import HomePage from '@/components/HomePage';
+'use client';
 
-export default function Page() {
-  return <HomePage />;
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { isAuthenticated } from '@/lib/auth';
+
+export default function RootPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      router.replace('/dashboard');
+    } else {
+      router.replace('/login');
+    }
+  }, [router]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a]">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
+    </div>
+  );
 }

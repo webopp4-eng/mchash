@@ -1,5 +1,5 @@
-import MinePage from '@/components/MinePage';
+import { redirect } from 'next/navigation';
 
-export default function Mine() {
-  return <MinePage />;
+export default function MineRedirect() {
+  redirect('/dashboard/mining');
 }
