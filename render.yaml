@@ -13,12 +13,14 @@ services:
         value: postgresql://cmhast_user:R3DvCyQyGFCzxiQI5z4i0VcQgNOb06RU@dpg-d9t7tdh42hec73fi3vtg-a.oregon-postgres.render.com/cmhast
       - key: JWT_SECRET
         sync: false
-        value: change-this-to-a-very-long-random-secret
+        value: cmhash-super-secret-key-2026-change-in-production-to-something-very-long-and-random
       - key: FRONTEND_URL
         sync: false
-        value: https://your-frontend-url.com
+        value: https://your-frontend-domain.vercel.app
       - key: PORT
         value: 4000
+      - key: NODE_ENV
+        value: production
 
 databases:
   - name: cmhash-db
