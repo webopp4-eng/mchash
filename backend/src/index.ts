@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import dashboardRoutes from './routes/dashboard';
@@ -33,31 +32,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 
-// Rate limiting
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per window
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req, res) => {
-    res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
-  },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 50, // Relaxed to prevent blocking legitimate login retries
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (_req, res) => {
-    res.status(429).json({ error: 'Too many requests. Please wait a few minutes and try again.' });
-  },
-});
-
-// Apply rate limiting
-app.use('/api/', apiLimiter);
-app.use('/api/auth/', authLimiter);
-
+// Demo mode: wallet-auth and onboarding requests should not be throttled.
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', dashboardRoutes);
