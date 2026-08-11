@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaWallet, FaShieldAlt, FaExclamationTriangle, FaLock, FaQrcode, FaClipboard } from 'react-icons/fa';
 import Logo from './Logo';
-import { connectSolanaWallet, connectEvmWallet, signSolanaMessage, signEvmMessage, detectWalletProvider, Chain } from '@/lib/wallet';
+import { connectSolanaWallet, connectEvmWallet, signSolanaMessage, signEvmMessage, detectWalletProvider, Chain, detectMobilePlatform, openMobileWallet, getWalletInstallUrl, mobileWallets } from '@/lib/wallet';
 import { API_URL } from '@/lib/auth';
 
 interface WalletOption {
@@ -51,8 +51,39 @@ export default function WalletSignIn() {
   const [qrPolling, setQrPolling] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
   const [authStatus, setAuthStatus] = useState<string | null>(null);
+  const [mobileWalletModalOpen, setMobileWalletModalOpen] = useState(false);
 
   const allAgreed = agreed.terms && agreed.privacy && agreed.risk;
+
+  const launchSelectedMobileWallet = (targetWalletId: string) => {
+    const { isMobile, isIOS, isAndroid } = detectMobilePlatform();
+    if (!isMobile) {
+      handleWalletConnect();
+      return;
+    }
+
+    const wallet = mobileWallets.find((w) => w.id === targetWalletId) || mobileWallets[0];
+    const launchResult = openMobileWallet(wallet.id, window.location.origin);
+    const installUrl = getWalletInstallUrl(wallet.id);
+
+    if (isIOS) {
+      setError(`Opening ${wallet.name}. If the app is not installed, Apple App Store will open.`);
+    } else if (isAndroid) {
+      setError(`Opening ${wallet.name}. If the app is not installed, Google Play Store will open.`);
+    }
+
+    if (installUrl) {
+      window.setTimeout(() => {
+        if (typeof window !== 'undefined') {
+          window.location.href = installUrl;
+        }
+      }, 900);
+    }
+
+    if (launchResult.started) {
+      setMobileWalletModalOpen(false);
+    }
+  };
 
   const handleWalletConnect = async () => {
     if (!allAgreed) {
@@ -289,28 +320,28 @@ export default function WalletSignIn() {
   }, [qrPolling, qrSession, router]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0a0e1a] text-white">
+    <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(180deg,#FFFFFF_0%,#EAF6FF_100%)] text-slate-900">
       {/* Background effects */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cmblue-500/20 blur-[100px]" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-purple-500/10 blur-[100px]" />
-        <div className="absolute left-0 top-1/2 h-64 w-64 rounded-full bg-blue-500/10 blur-[80px]" />
+        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-sky-200/60 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-emerald-100/70 blur-[100px]" />
+        <div className="absolute left-0 top-1/2 h-64 w-64 rounded-full bg-sky-100/90 blur-[80px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
           {/* Logo & Branding */}
           <div className="mb-8 flex flex-col items-center text-center">
-            <div className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4 shadow-[0_0_40px_rgba(14,161,255,0.2)] backdrop-blur-xl">
+            <div className="mb-4 rounded-3xl border border-sky-100 bg-white p-4 shadow-soft">
               <Logo size={64} />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">CM HASH</h1>
-            <p className="mt-2 text-sm text-slate-400">Cloud Mining Platform</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">CM HASH</h1>
+            <p className="mt-2 text-sm text-sky-700">Cloud Mining Platform</p>
             <p className="mt-1 text-xs text-slate-500">Connect your wallet to get started</p>
           </div>
 
           {/* Main Card */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+          <div className="rounded-[2rem] border border-sky-100 bg-white/95 p-6 shadow-soft">
             {/* Login Method Selection */}
             {loginMethod === 'wallet' && !showWallets && !qrSession && (
               <div className="space-y-4">
@@ -340,38 +371,88 @@ export default function WalletSignIn() {
 
             {/* Wallet Selection */}
             {showWallets && (
-              <div className="space-y-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-300">Select Wallet</h2>
-                  <button onClick={() => setShowWallets(false)} className="text-xs text-slate-500 hover:text-slate-300">
-                    Back
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6 backdrop-blur-sm">
+                <div className="w-full max-w-md rounded-[2rem] border border-sky-100 bg-white p-5 shadow-[0_25px_90px_rgba(33,150,243,0.2)]">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-sky-600">Mobile wallet</p>
+                      <h2 className="text-lg font-bold text-slate-900">Connect Wallet</h2>
+                    </div>
+                    <button onClick={() => setShowWallets(false)} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-sky-50 hover:text-sky-700">
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {wallets.map((wallet) => (
+                      <button
+                        key={wallet.id}
+                        onClick={() => {
+                          setSelectedWallet(wallet);
+                          const mobileEnv = detectMobilePlatform();
+                          if (mobileEnv.isMobile) {
+                            setMobileWalletModalOpen(true);
+                          }
+                        }}
+                        className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-all ${
+                          selectedWallet?.id === wallet.id
+                            ? 'border-sky-400 bg-sky-50 shadow-sm'
+                            : 'border-slate-200 bg-white hover:border-sky-300 hover:bg-sky-50/50'
+                        }`}
+                      >
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-100 to-sky-50 text-lg text-sky-700 shadow-sm">
+                          {wallet.icon}
+                        </span>
+                        <span>
+                          <span className="block text-xs font-bold text-slate-900">{wallet.name}</span>
+                          <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{wallet.chain}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {mobileWalletModalOpen && selectedWallet && (
+                    <div className="mt-4 rounded-2xl border border-sky-100 bg-sky-50 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.24em] text-sky-700">{selectedWallet.name}</p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {detectMobilePlatform().isIOS ? 'iOS wallet detection' : detectMobilePlatform().isAndroid ? 'Android wallet detection' : 'Desktop browser mode'}
+                          </p>
+                        </div>
+                        <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[10px] font-bold text-emerald-700 shadow-sm">
+                          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                          {detectMobilePlatform().isMobile ? 'Open app' : 'Install wallet'}
+                        </div>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => launchSelectedMobileWallet(selectedWallet.id)}
+                          className="flex-1 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700"
+                        >
+                          {detectMobilePlatform().isMobile ? 'Open Wallet' : 'Connect Wallet'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            const installUrl = getWalletInstallUrl(selectedWallet.id);
+                            if (installUrl) window.location.href = installUrl;
+                          }}
+                          className="flex-1 rounded-xl border border-sky-200 bg-white px-4 py-2 text-xs font-bold text-sky-700 transition hover:bg-sky-50"
+                        >
+                          Install
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleWalletConnect}
+                    disabled={!selectedWallet || connecting || !allAgreed}
+                    className="mt-4 w-full rounded-2xl bg-gradient-to-r from-sky-600 to-sky-500 px-6 py-3 text-sm font-bold text-white shadow-[0_10px_30px_rgba(33,150,243,0.24)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {connecting ? 'Connecting...' : 'Connect'}
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {wallets.map((wallet) => (
-                    <button
-                      key={wallet.id}
-                      onClick={() => setSelectedWallet(wallet)}
-                      className={`flex flex-col items-center gap-2 rounded-2xl border p-3 transition-all ${
-                        selectedWallet?.id === wallet.id
-                          ? 'border-cmblue-400 bg-cmblue-500/20 shadow-[0_0_20px_rgba(14,161,255,0.3)]'
-                          : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
-                      }`}
-                    >
-                      <span className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${wallet.color} text-lg`}>
-                        {wallet.icon}
-                      </span>
-                      <span className="text-[10px] font-medium text-slate-300">{wallet.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={handleWalletConnect}
-                  disabled={!selectedWallet || connecting || !allAgreed}
-                  className="mt-4 w-full rounded-2xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {connecting ? 'Connecting...' : 'Connect'}
-                </button>
               </div>
             )}
 
