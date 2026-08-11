@@ -51,14 +51,34 @@ export function verifyEvmSignature(message: string, signature: string, address: 
 
 // Create or find user by wallet
 export async function findOrCreateUser(walletAddress: string, chain: string, walletType?: string, referredBy?: string) {
-  const existing = await prisma.user.findUnique({ where: { walletAddress } });
+  const normalizedAddress = walletAddress.trim().toLowerCase();
+
+  const existing = await prisma.user.findFirst({
+    where: {
+      walletAddress: {
+        equals: normalizedAddress,
+        mode: 'insensitive',
+      },
+    },
+  });
 
   if (existing) {
     await prisma.user.update({
       where: { id: existing.id },
-      data: { lastLoginAt: new Date(), walletType },
+      data: {
+        lastLoginAt: new Date(),
+        walletType,
+        chain,
+        status: existing.status || 'active',
+      },
     });
-    return existing;
+
+    const refreshedUser = await prisma.user.findUnique({ where: { id: existing.id } });
+    if (!refreshedUser) {
+      throw new Error('Wallet lookup succeeded but the refreshed user record is missing');
+    }
+
+    return { user: refreshedUser, created: false };
   }
 
   // Generate unique referral code
@@ -69,12 +89,14 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
 
   const user = await prisma.user.create({
     data: {
-      walletAddress,
+      walletAddress: normalizedAddress,
       chain,
       walletType,
       referralCode,
-      username: `User_${walletAddress.slice(0, 6)}`,
+      username: `User_${normalizedAddress.slice(0, 6)}`,
       referredBy: referredBy || null,
+      status: 'active',
+      platformBalance: 0,
     },
   });
 
@@ -86,7 +108,7 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
     },
   });
 
-  return user;
+  return { user, created: true };
 }
 
 // Generate JWT token

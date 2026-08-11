@@ -50,6 +50,7 @@ export default function WalletSignIn() {
   const [qrSession, setQrSession] = useState<any>(null);
   const [qrPolling, setQrPolling] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
+  const [authStatus, setAuthStatus] = useState<string | null>(null);
 
   const allAgreed = agreed.terms && agreed.privacy && agreed.risk;
 
@@ -116,6 +117,8 @@ export default function WalletSignIn() {
       // Store token and user
       localStorage.setItem('cmhash_token', data.token);
       localStorage.setItem('cmhash_user', JSON.stringify(data.user));
+      localStorage.setItem('cmhash_created', String(Boolean(data.created)));
+      setAuthStatus(data.created ? 'New Account Created' : 'Welcome Back');
 
       // Redirect based on role
       const target = data.user.role === 'admin' ? '/admin' : '/';
@@ -203,6 +206,8 @@ export default function WalletSignIn() {
       // Store token and user
       localStorage.setItem('cmhash_token', data.token);
       localStorage.setItem('cmhash_user', JSON.stringify(data.user));
+      localStorage.setItem('cmhash_created', String(Boolean(data.created)));
+      setAuthStatus(data.created ? 'New Account Created' : 'Welcome Back');
 
       // Redirect based on role
       const target = data.user.role === 'admin' ? '/admin' : '/';
@@ -266,6 +271,8 @@ export default function WalletSignIn() {
 
           localStorage.setItem('cmhash_token', authData.token);
           localStorage.setItem('cmhash_user', JSON.stringify(authData.user));
+          localStorage.setItem('cmhash_created', String(Boolean(authData.created)));
+          setAuthStatus(authData.created ? 'New Account Created' : 'Welcome Back');
 
           const target = authData.user.role === 'admin' ? '/admin' : '/';
           router.replace(target);
@@ -374,9 +381,18 @@ export default function WalletSignIn() {
                 <h2 className="text-sm font-semibold text-slate-300">Scan QR Code</h2>
                 <div className="flex justify-center">
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <pre className="text-xs text-slate-300 break-all whitespace-pre-wrap">
-                      {qrSession.qrData}
-                    </pre>
+                    {qrSession.qrCodeDataUrl ? (
+                      <img
+                        src={qrSession.qrCodeDataUrl}
+                        alt="CM HASH wallet authentication QR code"
+                        className="h-56 w-56 rounded-xl bg-white object-contain p-2 shadow-2xl shadow-cmblue-900/30"
+                        onError={() => setError('Unable to render QR code image')}
+                      />
+                    ) : (
+                      <div className="flex h-56 w-56 items-center justify-center rounded-xl bg-slate-900/80 text-xs text-slate-400">
+                        Generating QR...
+                      </div>
+                    )}
                   </div>
                 </div>
                 <p className="text-xs text-slate-500">
@@ -460,6 +476,12 @@ export default function WalletSignIn() {
                     <p className="mt-0.5 text-[10px] text-slate-500">I understand the risks of cryptocurrency mining</p>
                   </div>
                 </label>
+              </div>
+            )}
+
+            {authStatus && (
+              <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center text-xs font-semibold text-emerald-300">
+                {authStatus}
               </div>
             )}
 

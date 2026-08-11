@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import crypto from 'crypto';
+import QRCode from 'qrcode';
 import {
   generateNonce,
   verifyNonce,
@@ -45,11 +46,32 @@ router.get('/nonce/:address', (req, res) => {
 });
 
 // Generate QR code session
-router.post('/qr/session', (req, res) => {
+router.post('/qr/session', async (req, res) => {
   try {
     const sessionId = crypto.randomBytes(32).toString('hex');
     const nonce = crypto.randomBytes(16).toString('base64');
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    const qrPayload = {
+      type: 'cmhash_wallet_auth',
+      sessionId,
+      nonce,
+      walletAddress: '',
+      chain: 'ethereum',
+      walletType: 'qr-login',
+      apiUrl: process.env.FRONTEND_URL || 'https://webopp4-eng.github.io/mchash',
+      issuedAt: new Date().toISOString(),
+    };
+
+    const qrData = JSON.stringify(qrPayload);
+    const qrCodeDataUrl = await QRCode.toDataURL(qrData, {
+      width: 240,
+      margin: 1,
+      color: {
+        dark: '#1c9aff',
+        light: '#ffffff',
+      },
+    });
 
     qrSessions.set(sessionId, {
       nonce,
@@ -59,11 +81,8 @@ router.post('/qr/session', (req, res) => {
 
     res.json({
       sessionId,
-      qrData: JSON.stringify({
-        sessionId,
-        nonce,
-        apiUrl: process.env.FRONTEND_URL || 'https://webopp4-eng.github.io/mchash',
-      }),
+      qrData,
+      qrCodeDataUrl,
       expiresAt,
     });
   } catch (error) {
@@ -132,7 +151,10 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
     session.walletType = walletType;
 
     // Find or create user
-    const user = await findOrCreateUser(address, chain, walletType);
+    const { user, created } = await findOrCreateUser(address, chain, walletType);
+    if (!user) {
+      return res.status(500).json({ error: 'Unable to materialize wallet account' });
+    }
 
     // Generate JWT
     const token = generateJWT(user.id);
@@ -141,7 +163,7 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
     await prisma.loginHistory.create({
       data: {
         userId: user.id,
-        walletAddress: address,
+        walletAddress: address.toLowerCase(),
         chain,
         deviceInfo: req.headers['user-agent'] || null,
         ipAddress: req.ip || null,
@@ -151,6 +173,7 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
 
     res.json({
       token,
+      created,
       user: {
         id: user.id,
         walletAddress: user.walletAddress,
@@ -210,13 +233,16 @@ router.post('/wallet', async (req, res) => {
     }
 
     // Find or create user
-    const user = await findOrCreateUser(address, chain, walletType, referredBy);
+    const { user, created } = await findOrCreateUser(address, chain, walletType, referredBy);
+    if (!user) {
+      return res.status(500).json({ error: 'Unable to materialize wallet account' });
+    }
 
     // Record login history
     await prisma.loginHistory.create({
       data: {
         userId: user.id,
-        walletAddress: address,
+        walletAddress: address.toLowerCase(),
         chain,
         deviceInfo: req.headers['user-agent'] || null,
         ipAddress: req.ip || null,
@@ -229,8 +255,10 @@ router.post('/wallet', async (req, res) => {
       data: {
         userId: user.id,
         type: 'login',
-        title: 'New Login',
-        message: `Successfully logged in with ${chain} wallet.`,
+        title: created ? 'New Account Created' : 'Welcome Back',
+        message: created
+          ? `New wallet account created for ${chain} wallet.`
+          : `Successfully logged in with ${chain} wallet.`,
       },
     });
 
@@ -239,6 +267,7 @@ router.post('/wallet', async (req, res) => {
 
     res.json({
       token,
+      created,
       user: {
         id: user.id,
         walletAddress: user.walletAddress,
