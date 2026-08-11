@@ -1,15 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  FaHome, FaUsers, FaLayerGroup, FaWallet, FaArrowUp, FaArrowDown, FaCogs, FaSignOutAlt, FaChartLine, FaBell
-} from 'react-icons/fa';
+import { FaHome, FaUsers, FaLayerGroup, FaWallet, FaArrowUp, FaArrowDown, FaCogs, FaSignOutAlt, FaChartLine } from 'react-icons/fa';
 import Logo from '@/components/Logo';
-import { getUser, isAuthenticated, logout } from '@/lib/auth';
-import { shortenAddress } from '@/lib/wallet';
+import { getUser, isAuthenticated } from '@/lib/auth';
 
 const adminNav = [
   { href: '/admin', label: 'Dashboard', icon: FaHome },
@@ -25,7 +22,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const user = getUser();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -40,10 +36,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [router, user]);
 
-  const handleLogout = () => {
-    logout(router);
-  };
-
   if (!isAuthenticated() || !user || user.role !== 'admin') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
@@ -56,107 +48,58 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white">
-      {/* Background effects */}
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cmblue-500/10 blur-[100px]" />
         <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-purple-500/5 blur-[100px]" />
       </div>
 
-      {/* Mobile Top Bar */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between border-b border-white/10 bg-[#0a0e1a]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
-        <div className="flex items-center gap-2">
-          <Logo size={32} />
-          <span className="text-sm font-bold">CM HASH</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="relative rounded-xl border border-white/10 bg-white/5 p-2 text-slate-400 hover:text-white">
-            <FaBell className="h-4 w-4" />
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-cmblue-500" />
-          </button>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-400 hover:text-white"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Admin Sidebar */}
-      <aside className={`fixed top-0 left-0 z-50 flex h-screen w-72 flex-col border-r border-white/10 bg-[#0d1226]/95 backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center gap-3 border-b border-white/10 p-5">
-          <Logo size={40} />
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cmblue-400">Admin</p>
-            <p className="text-[10px] text-slate-500">CM HASH Panel</p>
-          </div>
-        </div>
-
-        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-          {adminNav.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-gradient-to-r from-cmblue-600/30 to-cmblue-500/10 text-cmblue-300 shadow-[0_0_20px_rgba(14,161,255,0.15)]'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-                {isActive && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cmblue-400" />}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-white/10 p-4">
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cmblue-500 to-cmblue-700 text-sm font-bold">
-              {user?.username?.slice(0, 2).toUpperCase() || 'CM'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold">{user?.username || 'Admin'}</p>
-              <p className="truncate text-[10px] text-slate-500">{user ? shortenAddress(user.walletAddress) : ''}</p>
+      <div className="relative z-10 flex min-h-screen">
+        {/* Admin Sidebar */}
+        <aside className="fixed top-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-white/10 bg-[#0d1226]/95 backdrop-blur-xl">
+          <div className="flex items-center gap-3 border-b border-white/10 p-5">
+            <Logo size={36} />
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cmblue-400">Admin</p>
+              <p className="text-[10px] text-slate-500">CM HASH Panel</p>
             </div>
           </div>
-          <div className="flex gap-2">
+
+          <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+            {adminNav.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-gradient-to-r from-cmblue-600/30 to-cmblue-500/10 text-cmblue-300'
+                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="border-t border-white/10 p-4">
             <Link
               href="/dashboard"
-              onClick={() => setSidebarOpen(false)}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/10"
+              className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/10"
             >
               <FaChartLine className="h-3.5 w-3.5" />
-              User Site
+              Back to User Dashboard
             </Link>
-            <button
-              onClick={handleLogout}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20"
-            >
-              <FaSignOutAlt className="h-3.5 w-3.5" />
-              Disconnect
-            </button>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* Main Content */}
-      <main className="relative z-10 min-h-screen lg:pl-72">
-        <div className="px-4 pb-10 pt-16 sm:px-6 lg:px-8 lg:pt-6">
+        {/* Main Content */}
+        <main className="ml-64 flex-1 px-4 py-6 sm:px-6 lg:px-8">
           {children}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

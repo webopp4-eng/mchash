@@ -12,16 +12,16 @@ import { getUser, logout, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
 
 const navItems = [
-  { href: '/', label: 'Home', icon: FaHome },
-  { href: '/mining', label: 'Mining', icon: FaBolt },
-  { href: '/plans', label: 'Plans', icon: FaLayerGroup },
-  { href: '/wallet', label: 'Wallet', icon: FaWallet },
-  { href: '/earnings', label: 'Earnings', icon: FaChartLine },
-  { href: '/referrals', label: 'Referrals', icon: FaUsers },
-  { href: '/transactions', label: 'Transactions', icon: FaExchangeAlt },
-  { href: '/withdrawals', label: 'Withdrawals', icon: FaArrowUp },
-  { href: '/support', label: 'Support', icon: FaHeadset },
-  { href: '/settings', label: 'Settings', icon: FaCogs },
+  { href: '/dashboard', label: 'Home', icon: FaHome },
+  { href: '/dashboard/mining', label: 'Mining', icon: FaBolt },
+  { href: '/dashboard/plans', label: 'Plans', icon: FaLayerGroup },
+  { href: '/dashboard/wallet', label: 'Wallet', icon: FaWallet },
+  { href: '/dashboard/earnings', label: 'Earnings', icon: FaChartLine },
+  { href: '/dashboard/referrals', label: 'Referrals', icon: FaUsers },
+  { href: '/dashboard/transactions', label: 'Transactions', icon: FaExchangeAlt },
+  { href: '/dashboard/withdrawals', label: 'Withdrawals', icon: FaArrowUp },
+  { href: '/dashboard/support', label: 'Support', icon: FaHeadset },
+  { href: '/dashboard/settings', label: 'Settings', icon: FaCogs },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
