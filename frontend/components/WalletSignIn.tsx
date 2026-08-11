@@ -99,8 +99,10 @@ export default function WalletSignIn() {
       localStorage.setItem('cmhash_token', data.token);
       localStorage.setItem('cmhash_user', JSON.stringify(data.user));
 
-      // Redirect to dashboard
-      window.location.href = '/';
+      // Redirect based on role
+      const target = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      console.log('[WalletSignIn] Redirecting to', target, 'for role', data.user.role);
+      window.location.href = target;
     } catch (err: any) {
       console.error('[WalletSignIn] Connection error:', err);
       setError(err.message || 'Failed to connect wallet');

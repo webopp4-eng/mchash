@@ -1,9 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { FaHome, FaUsers, FaLayerGroup, FaWallet, FaArrowUp, FaArrowDown, FaCogs, FaSignOutAlt, FaChartLine } from 'react-icons/fa';
 import Logo from '@/components/Logo';
+import { getUser, isAuthenticated } from '@/lib/auth';
 
 const adminNav = [
   { href: '/admin', label: 'Dashboard', icon: FaHome },
@@ -17,6 +20,31 @@ const adminNav = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const user = getUser();
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      console.log('[AdminLayout] Not authenticated, redirecting to /login');
+      router.replace('/login');
+      return;
+    }
+    if (!user || user.role !== 'admin') {
+      console.log('[AdminLayout] Non-admin access blocked, redirecting to /dashboard');
+      router.replace('/dashboard');
+      return;
+    }
+  }, [router, user]);
+
+  if (!isAuthenticated() || !user || user.role !== 'admin') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
+        <div className="text-center">
+          <p className="text-sm text-slate-400">Checking admin access...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0e1a] text-white">
