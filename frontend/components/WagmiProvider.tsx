@@ -1,50 +1,47 @@
 'use client';
 
 import type { PropsWithChildren } from 'react';
+import { useMemo } from 'react';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { WagmiConfig, configureChains, createConfig } from 'wagmi';
-import { publicProvider } from 'wagmi/providers/public';
+import { WagmiConfig, createConfig } from 'wagmi';
+import { metaMask, walletConnect } from '@wagmi/connectors';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { http } from 'viem';
 import { mainnet, bsc } from 'wagmi/chains';
-import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
-import { WalletConnectConnector } from 'wagmi/connectors/walletConnect';
 
 const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+const chains = [mainnet, bsc] as const;
 
-const { chains, publicClient, webSocketPublicClient } = configureChains(
-  [mainnet, bsc],
-  [publicProvider()],
-);
+const queryClient = new QueryClient();
 
 const connectors = [
-  new MetaMaskConnector({
-    chains,
-    options: { shimDisconnect: true },
-  }),
+  metaMask(),
   ...(walletConnectProjectId
     ? [
-        new WalletConnectConnector({
-          chains,
-          options: {
-            projectId: walletConnectProjectId,
-          },
+        walletConnect({
+          projectId: walletConnectProjectId,
         }),
       ]
     : []),
 ];
 
 const wagmiConfig = createConfig({
-  autoConnect: true,
+  chains,
   connectors,
-  publicClient,
-  webSocketPublicClient,
+  transports: {
+    [mainnet.id]: http(),
+    [bsc.id]: http(),
+  },
 });
 
 export default function WagmiProvider({ children }: PropsWithChildren) {
   return (
-    <WagmiConfig config={wagmiConfig}>
-      <RainbowKitProvider chains={chains} theme={darkTheme()}>
-        {children}
-      </RainbowKitProvider>
-    </WagmiConfig>
+    <QueryClientProvider client={queryClient}>
+      <WagmiConfig config={wagmiConfig}>
+        <RainbowKitProvider initialChain={mainnet.id} theme={darkTheme()}>
+          {children}
+        </RainbowKitProvider>
+      </WagmiConfig>
+    </QueryClientProvider>
   );
 }
