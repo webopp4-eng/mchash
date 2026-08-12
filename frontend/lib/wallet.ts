@@ -343,6 +343,21 @@ export function openMobileWallet(
     window.localStorage.setItem('cmhash_return_url', opener);
     window.location.href = getWalletOpenUrl(wallet.id, opener);
 
+    // Set up listener for wallet app to redirect back
+    const handleIncomingRedirect = (e: PopStateEvent) => {
+      const returnUrl = window.localStorage.getItem('cmhash_return_url');
+      if (returnUrl && e.state?.fromWallet) {
+        // Process the wallet connection callback
+        window.localStorage.removeItem('cmhash_return_url');
+        window.removeEventListener('popstate', handleIncomingRedirect);
+        // Trigger re-authentication
+        window.dispatchEvent(new CustomEvent('cmhash:wallet-auth', {
+          detail: { fromWallet: true, returnUrl }
+        }));
+      }
+    };
+    window.addEventListener('popstate', handleIncomingRedirect, { once: true });
+
     window.setTimeout(() => {
       if (!leftPage && !document.hidden && wallet.id !== 'walletconnect') {
         console.warn('[Wallet] Mobile wallet fallback triggered:', wallet.id, installUrl);

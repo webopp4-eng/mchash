@@ -104,6 +104,23 @@ export default function WalletSignIn() {
       .finally(() => setConnecting(false));
   }, [isConnected, allAgreed, address, walletChain, walletType]);
 
+  // Handle wallet app redirect callback
+  useEffect(() => {
+    const handleWalletAuth = (e: PopStateEvent) => {
+      // Check if this was triggered from wallet app redirect
+      const returnUrl = window.localStorage.getItem('cmhash_return_url');
+      if (returnUrl && !connecting) {
+        setConnectionStatus('Processing wallet connection...');
+        // Navigate back to dashboard with the authenticated session
+        // The backend will handle the referral code from the original URL
+        window.localStorage.removeItem('cmhash_return_url');
+        router.replace('/dashboard');
+      }
+    };
+    window.addEventListener('popstate', handleWalletAuth);
+    return () => window.removeEventListener('popstate', handleWalletAuth);
+  }, [connecting, router]);
+
   const handleConnectClick = async () => {
     setError(null);
     if (!allAgreed) {
