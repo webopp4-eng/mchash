@@ -64,6 +64,14 @@ export default function EmailSignUp({ onBack, onLoginClick }: EmailSignUpProps) 
         return;
       }
 
+      // Store user data in localStorage
+      if (data.user) {
+        localStorage.setItem('cmhash_user', JSON.stringify(data.user));
+      }
+      if (data.token) {
+        localStorage.setItem('cmhash_token', data.token);
+      }
+
       // Success - redirect to dashboard
       router.push('/dashboard');
     } catch (err) {

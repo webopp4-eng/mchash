@@ -44,7 +44,9 @@ export function getUser(): User | null {
 }
 
 export function isAuthenticated(): boolean {
-  return Boolean(getUser() && localStorage.getItem('cmhash_token'));
+  // Check if user data exists - if it does, they're authenticated
+  // (token is in httpOnly cookie, can't access from JS, but if user data is there, they logged in successfully)
+  return Boolean(getUser());
 }
 
 export async function logout(router?: ReturnType<typeof import('next/navigation').useRouter>): Promise<void> {

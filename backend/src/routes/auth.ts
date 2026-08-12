@@ -450,23 +450,42 @@ router.post('/logout', (req, res) => {
 // Email signup
 router.post('/email/register', async (req, res) => {
   try {
-    const signupData = {
-      email: req.body.email?.trim() || '',
-      password: req.body.password || '',
-      confirmPassword: req.body.confirmPassword || '',
-      fullName: req.body.fullName?.trim() || '',
-      username: req.body.username?.trim() || '',
-      country: req.body.country?.trim() || '',
-    };
+    const { email, password, confirmPassword, fullName, username, country } = req.body;
 
-    // Validate input
-    const validation = await validateSignupData(signupData);
-    if (!validation.valid) {
-      return res.status(400).json({ error: 'Validation failed', errors: validation.errors });
+    // Basic validation - only require email and password
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
     }
 
     // Hash password
-    const passwordHash = await hashPassword(signupData.password);
+    const passwordHash = await hashPassword(password);
+
+    // Generate unique username if not provided
+    let finalUsername = username || email.split('@')[0];
+    let usernameAttempt = finalUsername;
+    let usernameTaken = await prisma.user.findUnique({ where: { username: usernameAttempt } });
+    let counter = 1;
+    while (usernameTaken) {
+      usernameAttempt = `${finalUsername}${counter}`;
+      counter++;
+      usernameTaken = await prisma.user.findUnique({ where: { username: usernameAttempt } });
+    }
+    finalUsername = usernameAttempt;
 
     // Generate unique referral code
     let referralCode = '';
@@ -478,11 +497,11 @@ router.post('/email/register', async (req, res) => {
     const user = await prisma.user.create({
       data: {
         id: uuid(),
-        email: normalizeEmail(signupData.email),
+        email: normalizedEmail,
         passwordHash,
-        fullName: signupData.fullName,
-        username: signupData.username.toLowerCase(),
-        country: signupData.country,
+        fullName: fullName || email.split('@')[0],
+        username: finalUsername,
+        country: country || 'Not specified',
         authMethod: 'EMAIL',
         referralCode,
         status: 'active',
