@@ -402,23 +402,25 @@ export default function WalletSignIn() {
                 </button>
 
                 {isMobile && (
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                    <p className="mb-3 text-xs font-semibold text-slate-300">Or choose a mobile wallet:</p>
+                  <div className="rounded-2xl border border-cmblue-500/30 bg-gradient-to-b from-cmblue-500/10 to-cmblue-500/5 p-4 shadow-[0_0_20px_rgba(14,161,255,0.1)]">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-cmblue-300">Mobile Wallets Available</p>
                     <div className="grid grid-cols-2 gap-2">
                       {getAvailableMobileWallets().map((wallet) => (
                         <button
                           key={wallet.id}
                           onClick={() => handleMobileWallet(wallet.id)}
                           disabled={connecting}
-                          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs font-medium text-slate-200 transition hover:border-cmblue-500/40 hover:bg-white/10 disabled:opacity-50"
+                          className="group relative flex items-center gap-2 overflow-hidden rounded-xl border border-cmblue-500/20 bg-gradient-to-br from-cmblue-500/15 to-cmblue-500/5 px-3 py-2.5 text-xs font-medium text-slate-200 transition-all duration-200 hover:border-cmblue-500/50 hover:from-cmblue-500/25 hover:to-cmblue-500/15 hover:shadow-[0_0_15px_rgba(14,161,255,0.2)] disabled:opacity-50"
                         >
-                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-cmblue-500/20 text-[10px] font-bold text-cmblue-300">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-cmblue-400 to-cmblue-600 text-[10px] font-bold text-white shadow-lg group-hover:shadow-xl">
                             {wallet.name.charAt(0)}
                           </span>
-                          {wallet.name}
+                          <span className="truncate">{wallet.name}</span>
+                          <span className="absolute right-2 opacity-0 transition-opacity group-hover:opacity-100">→</span>
                         </button>
                       ))}
                     </div>
+                    <p className="mt-2 text-[10px] text-slate-500">Tap to open wallet or install</p>
                   </div>
                 )}
 
@@ -473,9 +475,12 @@ export default function WalletSignIn() {
             )}
 
             {loginMethod === 'mobile' && (
-              <div className="space-y-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-slate-300">Choose a Wallet</h2>
+              <div className="space-y-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-slate-300">Connect Mobile Wallet</h2>
+                    <p className="mt-1 text-xs text-slate-500">Choose from available wallet apps</p>
+                  </div>
                   <button
                     onClick={() => {
                       setLoginMethod('wallet');
@@ -486,35 +491,37 @@ export default function WalletSignIn() {
                     Back
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
                   {getAvailableMobileWallets().map((wallet) => (
                     <button
                       key={wallet.id}
                       onClick={() => handleMobileWallet(wallet.id)}
                       disabled={connecting}
-                      className="flex flex-col items-start gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-cmblue-500/40 hover:bg-white/10 disabled:opacity-50"
+                      className="group relative flex w-full items-center gap-4 overflow-hidden rounded-xl border border-cmblue-500/20 bg-gradient-to-r from-cmblue-500/10 to-transparent p-4 transition-all duration-200 hover:border-cmblue-500/50 hover:from-cmblue-500/20 hover:shadow-[0_0_20px_rgba(14,161,255,0.15)] disabled:opacity-50"
                     >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-cmblue-500/20 text-sm font-bold text-cmblue-300">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cmblue-400 to-cmblue-600 text-lg font-bold text-white shadow-lg">
                         {wallet.name.charAt(0)}
-                      </span>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-200">{wallet.name}</p>
-                        <p className="text-[10px] capitalize text-slate-500">{wallet.chain}</p>
                       </div>
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-semibold text-slate-200">{wallet.name}</p>
+                        <p className="text-xs capitalize text-slate-500">{wallet.chain} Wallet</p>
+                      </div>
+                      <FaWallet className="h-4 w-4 text-slate-500 transition-transform group-hover:translate-x-1" />
                     </button>
                   ))}
                 </div>
 
                 {mobileFallback && (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-                    <p>Wallet not detected. Install it to continue:</p>
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-300">
+                    <p className="font-semibold mb-2">Wallet Not Installed</p>
+                    <p className="text-xs mb-3">Download the wallet app to continue:</p>
                     <a
                       href={mobileFallback}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-500/20 px-3 py-1.5 font-semibold text-amber-200 transition hover:bg-amber-500/30"
+                      className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500/30 to-amber-500/20 px-4 py-2 text-xs font-semibold text-amber-200 transition hover:from-amber-500/40 hover:to-amber-500/30"
                     >
-                      Install Wallet
+                      Install from App Store
                     </a>
                   </div>
                 )}

@@ -184,7 +184,7 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
       return res.status(400).json({ error: 'Session expired' });
     }
 
-    const nonceMatch = typeof message === 'string' ? message.match(/Nonce:\s*([A-Za-z0-9+/=]+)$/) : null;
+    const nonceMatch = typeof message === 'string' ? message.match(/Nonce:\s*([A-Za-z0-9+/=]+)/) : null;
     if (!nonceMatch || !verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
       return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
@@ -282,9 +282,9 @@ router.post('/wallet', async (req, res) => {
       return res.status(400).json({ error: 'Invalid wallet address' });
     }
 
-    const nonceMatch = message.match(/Nonce:\s*([A-Za-z0-9+/=]+)$/);
+    const nonceMatch = message.match(/Nonce:\s*([A-Za-z0-9+/=]+)/);
     if (!nonceMatch) {
-      return res.status(400).json({ error: 'Invalid message format' });
+      return res.status(400).json({ error: 'Invalid message format. Missing nonce.' });
     }
     if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
       return res.status(400).json({ error: 'Invalid or expired nonce' });
