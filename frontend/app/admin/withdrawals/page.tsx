@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaArrowUp, FaCheck, FaTimes, FaClock } from 'react-icons/fa';
+import { FaArrowUp, FaCheck, FaCheckCircle, FaTimes, FaClock } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
 
@@ -44,14 +44,31 @@ export default function AdminWithdrawals() {
     );
   }
 
+  const pendingCount = withdrawals.filter((wd) => wd.status === 'pending').length;
+  const approvedCount = withdrawals.filter((wd) => wd.status === 'approved').length;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Withdrawal Management</h1>
-        <p className="mt-1 text-sm text-slate-400">Approve or reject withdrawal requests</p>
+      <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl shadow-soft">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white">Withdrawal Requests</h1>
+            <p className="mt-2 max-w-2xl text-sm text-slate-400">Review pending withdrawals, approve requests, and complete payouts manually.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-3xl border border-white/10 bg-cmblue-500/10 p-4">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Pending</p>
+              <p className="mt-2 text-2xl font-semibold text-cmblue-100">{pendingCount}</p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-emerald-500/10 p-4">
+              <p className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Approved</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-100">{approvedCount}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-white/5 backdrop-blur-xl">
+      <div className="overflow-x-auto rounded-[28px] border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
         <table className="w-full min-w-[800px] text-left">
           <thead>
             <tr className="border-b border-white/10">

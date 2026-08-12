@@ -180,35 +180,127 @@ router.patch('/withdrawals/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { status, adminNote, txHash } = req.body;
-    if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
-    }
+      const validStatuses = ['pending', 'approved', 'rejected', 'completed'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
 
-    const withdrawal = await prisma.withdrawal.update({
-      where: { id },
-      data: {
-        status,
-        adminNote: adminNote || undefined,
-        txHash: txHash || undefined,
-        processedAt: status === 'completed' || status === 'rejected' ? new Date() : undefined,
-      },
-    });
+      const withdrawal = await prisma.withdrawal.findUnique({ where: { id } });
+      if (!withdrawal) {
+        return res.status(404).json({ error: 'Withdrawal not found' });
+      }
 
-    // Notify user
-    await prisma.notification.create({
-      data: {
+      const user = await prisma.user.findUnique({ where: { id: withdrawal.userId } });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const transactionWhere = {
         userId: withdrawal.userId,
         type: 'withdrawal',
-        title: `Withdrawal ${status}`,
-        message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} has been ${status}.`,
-      },
-    });
+        metadata: { equals: { withdrawalId: withdrawal.id } },
+      } as const;
 
-    res.json({ success: true, withdrawal });
-  } catch (error) {
-    console.error('Withdrawal update error:', error);
-    res.status(500).json({ error: 'Failed to update withdrawal' });
-  }
+      if (status === 'approved') {
+        const updatedWithdrawal = await prisma.withdrawal.update({
+          where: { id },
+          data: {
+            status: 'approved',
+            adminNote: adminNote || undefined,
+          },
+        });
+
+        await prisma.notification.create({
+          data: {
+            userId: withdrawal.userId,
+            type: 'withdrawal',
+            title: 'Withdrawal Approved',
+            message: `Your withdrawal request for ${withdrawal.amount} ${withdrawal.currency} is approved and awaiting completion.`,
+          },
+        });
+
+        await prisma.transaction.updateMany({
+          where: transactionWhere,
+          data: {
+            status: 'pending',
+          },
+        });
+
+        return res.json({ success: true, withdrawal: updatedWithdrawal });
+      }
+
+      if (status === 'rejected') {
+        await prisma.$transaction([
+          prisma.user.update({
+            where: { id: user.id },
+            data: {
+              platformBalance: { increment: withdrawal.amount },
+              totalWithdrawn: { decrement: withdrawal.amount },
+            },
+          }),
+          prisma.withdrawal.update({
+            where: { id },
+            data: {
+              status: 'rejected',
+              adminNote: adminNote || undefined,
+              processedAt: new Date(),
+            },
+          }),
+          prisma.transaction.updateMany({
+            where: transactionWhere,
+            data: {
+              status: 'failed',
+            },
+          }),
+          prisma.notification.create({
+            data: {
+              userId: withdrawal.userId,
+              type: 'withdrawal',
+              title: 'Withdrawal Rejected',
+              message: `Your withdrawal request for ${withdrawal.amount} ${withdrawal.currency} was rejected. Funds have been returned to your account.`,
+            },
+          }),
+        ]);
+
+        return res.json({ success: true, withdrawal: { ...withdrawal, status: 'rejected' } });
+      }
+
+      if (status === 'completed') {
+        if (!txHash) {
+          return res.status(400).json({ error: 'Transaction hash is required to complete a withdrawal' });
+        }
+
+        const updatedWithdrawal = await prisma.withdrawal.update({
+          where: { id },
+          data: {
+            status: 'completed',
+            txHash,
+            adminNote: adminNote || undefined,
+            processedAt: new Date(),
+          },
+        });
+
+        await prisma.transaction.updateMany({
+          where: transactionWhere,
+          data: {
+            status: 'completed',
+            txHash,
+          },
+        });
+
+        await prisma.notification.create({
+          data: {
+            userId: withdrawal.userId,
+            type: 'withdrawal',
+            title: 'Withdrawal Completed',
+            message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} is complete.`,
+          },
+        });
+
+        return res.json({ success: true, withdrawal: updatedWithdrawal });
+      }
+
+      res.status(400).json({ error: 'Unsupported status transition' });
 });
 
 // ============ TREASURY WALLET MANAGEMENT ============
