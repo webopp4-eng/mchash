@@ -103,15 +103,37 @@ export default function WalletSignIn() {
     }
   }, [searchParams]);
 
-  const completeAuth = (data: any) => {
-    localStorage.setItem('cmhash_token', data.token);
-    localStorage.setItem('cmhash_user', JSON.stringify(data.user));
-    localStorage.setItem('cmhash_created', String(Boolean(data.created)));
-    window.localStorage.removeItem('cmhash_return_url');
-    setAuthStatus(data.created ? 'New Account Created' : 'Welcome Back');
-    setConnectionStatus('Connected');
-    router.replace(data.user.role === 'admin' ? '/admin' : '/dashboard');
-  };
+  const completeAuth = useCallback((data: any) => {
+    try {
+      // Store authentication data
+      localStorage.setItem('cmhash_token', data.token);
+      localStorage.setItem('cmhash_user', JSON.stringify(data.user));
+      localStorage.setItem('cmhash_created', String(Boolean(data.created)));
+      localStorage.removeItem('cmhash_return_url');
+      
+      // Verify data was stored
+      const storedUser = localStorage.getItem('cmhash_user');
+      if (!storedUser) {
+        console.error('[completeAuth] Failed to store user data');
+        setError('Failed to save authentication data');
+        return;
+      }
+      
+      setAuthStatus(data.created ? 'New Account Created' : 'Welcome Back');
+      setConnectionStatus('Connected');
+      
+      // Redirect after a short delay to ensure localStorage is synced
+      const redirectUrl = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      console.log('[completeAuth] Redirecting to:', redirectUrl);
+      
+      setTimeout(() => {
+        router.replace(redirectUrl);
+      }, 100);
+    } catch (err) {
+      console.error('[completeAuth] Error during auth completion:', err);
+      setError('Failed to complete authentication');
+    }
+  }, [router]);
 
   const authenticatePhantomWallet = useCallback(async () => {
     const wallet = await connectPhantomWallet();

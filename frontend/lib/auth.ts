@@ -81,7 +81,11 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   };
 
   try {
-    const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+    const res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      credentials: 'include', // Include httpOnly cookies with every request
+      headers,
+    });
     if (res.status === 401) {
       console.error('[apiFetch] Unauthorized access detected, logging out', path);
       logout();
