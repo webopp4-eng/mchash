@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaWallet, FaTrash, FaPlus, FaCheckCircle, FaExclamationTriangle, FaLink } from 'react-icons/fa';
+import { FaWallet, FaTrash, FaPlus, FaCheckCircle, FaExclamationTriangle } from 'react-icons/fa';
 import { API_URL } from '@/lib/auth';
 
 interface Wallet {
@@ -200,16 +200,237 @@ function ConnectWalletModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const [step, setStep] = useState<'select' | 'connect' | 'sign'>('select');
+  const [selectedChain, setSelectedChain] = useState<'ethereum' | 'bnb' | 'solana'>('ethereum');
+  const [selectedWallet, setSelectedWallet] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string>('');
+  const [signature, setSignature] = useState<string>('');
+  const [message, setMessage] = useState<string>('');
+
+  const chains = [
+    { id: 'ethereum', label: 'Ethereum', icon: '⟠' },
+    { id: 'bnb', label: 'BNB Smart Chain', icon: '🟡' },
+    { id: 'solana', label: 'Solana', icon: '◎' },
+  ];
+
+  const walletOptions = {
+    ethereum: ['MetaMask', 'Trust Wallet', 'Coinbase Wallet'],
+    bnb: ['MetaMask', 'Trust Wallet', 'Binance Wallet'],
+    solana: ['Phantom', 'Solflare', 'Backpack'],
+  };
+
+  const handleChainSelect = (chain: any) => {
+    setSelectedChain(chain);
+    setSelectedWallet('');
+    setStep('connect');
+    setError(null);
+  };
+
+  const handleConnectWallet = async () => {
+    if (!selectedWallet || !walletAddress) {
+      setError('Please select a wallet and provide address');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Request nonce from backend
+      const nonceResponse = await fetch(
+        `${API_URL}/api/auth/nonce/${walletAddress}?chain=${selectedChain}`,
+        {
+          credentials: 'include',
+        }
+      );
+
+      if (!nonceResponse.ok) {
+        setError('Failed to generate authentication nonce');
+        return;
+      }
+
+      const nonceData = await nonceResponse.json();
+      setMessage(nonceData.message);
+      setStep('sign');
+    } catch (err) {
+      console.error('Error:', err);
+      setError('Failed to connect wallet');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignMessage = async () => {
+    if (!signature) {
+      setError('Please provide the signed message');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Submit signature to backend
+      const response = await fetch(`${API_URL}/api/auth/wallet/connect`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          address: walletAddress,
+          chain: selectedChain,
+          signature,
+          message,
+          walletType: selectedWallet,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || 'Failed to connect wallet');
+        return;
+      }
+
+      onSuccess();
+    } catch (err) {
+      console.error('Error:', err);
+      setError('Failed to verify wallet signature');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-800 rounded-lg max-w-md w-full border border-slate-700 p-6">
-        <h3 className="text-xl font-bold text-white mb-4">Connect Wallet</h3>
-        <p className="text-slate-400 text-sm mb-6">
-          Wallet connection UI coming soon. For now, please use the wallet connection flow from your device.
-        </p>
+        {step === 'select' && (
+          <>
+            <h3 className="text-xl font-bold text-white mb-4">Select Blockchain</h3>
+            <div className="space-y-3 mb-6">
+              {chains.map((chain) => (
+                <button
+                  key={chain.id}
+                  onClick={() => handleChainSelect(chain.id)}
+                  className="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-lg transition text-left flex items-center gap-3"
+                >
+                  <span className="text-2xl">{chain.icon}</span>
+                  {chain.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {step === 'connect' && (
+          <>
+            <h3 className="text-xl font-bold text-white mb-4">Connect {selectedChain} Wallet</h3>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-slate-300 text-sm font-semibold block mb-2">Select Wallet</label>
+                <select
+                  value={selectedWallet}
+                  onChange={(e) => setSelectedWallet(e.target.value)}
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                >
+                  <option value="">Choose wallet...</option>
+                  {walletOptions[selectedChain as keyof typeof walletOptions].map((wallet) => (
+                    <option key={wallet} value={wallet}>
+                      {wallet}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-slate-300 text-sm font-semibold block mb-2">Wallet Address</label>
+                <input
+                  type="text"
+                  value={walletAddress}
+                  onChange={(e) => setWalletAddress(e.target.value)}
+                  placeholder="0x..."
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-sm mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep('select')}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleConnectWallet}
+                disabled={!selectedWallet || !walletAddress || loading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                {loading ? 'Connecting...' : 'Connect'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'sign' && (
+          <>
+            <h3 className="text-xl font-bold text-white mb-4">Sign Message</h3>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-slate-300 text-sm font-semibold block mb-2">Message to Sign</label>
+                <textarea
+                  readOnly
+                  value={message}
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600 text-xs h-24"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 text-sm font-semibold block mb-2">Signature</label>
+                <textarea
+                  value={signature}
+                  onChange={(e) => setSignature(e.target.value)}
+                  placeholder="Paste your signed message here..."
+                  className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 border border-slate-600 text-xs h-24"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-sm mb-4">
+                {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep('connect')}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleSignMessage}
+                disabled={!signature || loading}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                {loading ? 'Verifying...' : 'Verify'}
+              </button>
+            </div>
+          </>
+        )}
+
         <button
           onClick={onClose}
-          className="w-full bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+          className="w-full mt-4 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
         >
           Close
         </button>

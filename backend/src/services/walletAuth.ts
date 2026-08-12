@@ -209,33 +209,44 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
     throw new Error('Invalid wallet address');
   }
 
-  const existing = await prisma.user.findFirst({
+  // First, look up the wallet record using the Wallet model
+  // This is the source of truth for wallet identity
+  let wallet = await prisma.wallet.findFirst({
     where: {
-      walletAddress: {
-        equals: normalizedAddress,
-        mode: 'insensitive',
-      },
+      address: normalizedAddress,
+      chain: chain,
     },
+    include: { User: true },
   });
 
-  if (existing) {
-    await prisma.user.update({
-      where: { id: existing.id },
+  // If wallet exists, load the associated user
+  if (wallet) {
+    console.log(`[findOrCreateUser] Wallet ${normalizedAddress} found on chain ${chain}, user: ${wallet.userId}`);
+    
+    // Update the user's last login and wallet type
+    const updatedUser = await prisma.user.update({
+      where: { id: wallet.userId },
       data: {
         lastLoginAt: new Date(),
-        walletType,
-        chain,
-        status: existing.status || 'active',
+        walletType: walletType || wallet.User?.walletType,
+        // Keep walletAddress in sync with primary wallet
+        ...(wallet.isPrimary ? { walletAddress: normalizedAddress, chain } : {}),
       },
     });
 
-    const refreshedUser = await prisma.user.findUnique({ where: { id: existing.id } });
-    if (!refreshedUser) {
-      throw new Error('Wallet lookup succeeded but the refreshed user record is missing');
+    // Mark wallet as verified if not already
+    if (!wallet.verifiedAt) {
+      await prisma.wallet.update({
+        where: { id: wallet.id },
+        data: { verifiedAt: new Date() },
+      });
     }
 
-    return { user: refreshedUser, created: false };
+    return { user: updatedUser, created: false };
   }
+
+  // Wallet doesn't exist - create new user and wallet
+  console.log(`[findOrCreateUser] Creating new user for wallet ${normalizedAddress} on chain ${chain}`);
 
   // Generate unique referral code
   let referralCode = '';
@@ -243,21 +254,38 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
     referralCode = 'CMH' + crypto.randomBytes(4).toString('hex').toUpperCase();
   } while (await prisma.referral.findUnique({ where: { code: referralCode } }));
 
+  // Create user
   const user = await prisma.user.create({
     data: {
       id: uuid(),
       walletAddress: normalizedAddress,
       chain,
-      walletType,
+      walletType: walletType || undefined,
       referralCode,
       username: `User_${normalizedAddress.slice(0, 6)}`,
       referredBy: referredBy || null,
       status: 'active',
       role: 'user',
       platformBalance: 0,
+      authMethod: 'WALLET',
       updatedAt: new Date(),
     },
   });
+
+  // Create wallet record
+  const newWallet = await prisma.wallet.create({
+    data: {
+      id: uuid(),
+      userId: user.id,
+      chain,
+      address: normalizedAddress,
+      isPrimary: true,
+      verifiedAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+
+  console.log(`[findOrCreateUser] Created user ${user.id} with wallet ${newWallet.id}`);
 
   // Create referral record
   await prisma.referral.create({

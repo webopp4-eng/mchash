@@ -379,6 +379,133 @@ router.post('/wallet', async (req, res) => {
   }
 });
 
+// Connect wallet to existing email account
+const connectWalletSchema = z.object({
+  address: z.string().min(1),
+  chain: z.enum(['solana', 'ethereum', 'bnb']),
+  signature: z.string().min(1),
+  message: z.string(),
+  walletType: z.string().optional(),
+});
+
+router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const parsed = connectWalletSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
+    }
+
+    const { address, chain, signature, message, walletType } = parsed.data;
+
+    // Validate wallet address
+    if (!isValidWalletAddress(address, chain)) {
+      return res.status(400).json({ error: 'Invalid wallet address' });
+    }
+
+    // Verify nonce from message
+    const nonceMatch = message.match(/Nonce:\s*([A-Za-z0-9+/=]+)/);
+    if (!nonceMatch) {
+      return res.status(400).json({ error: 'Invalid message format. Missing nonce.' });
+    }
+    if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
+      return res.status(400).json({ error: 'Invalid or expired nonce' });
+    }
+
+    // Verify signature based on chain
+    let valid = false;
+    if (chain === 'solana') {
+      valid = verifySolanaSignature(message, signature, address);
+    } else {
+      valid = verifyEvmSignature(message, signature, address);
+    }
+
+    if (!valid) {
+      return res.status(401).json({ error: 'Signature verification failed' });
+    }
+
+    const normalizedAddress = address.toLowerCase();
+
+    // Check if this wallet is already associated with another account
+    const existingWallet = await prisma.wallet.findFirst({
+      where: {
+        address: normalizedAddress,
+        chain: chain,
+      },
+    });
+
+    if (existingWallet && existingWallet.userId !== user.id) {
+      return res.status(400).json({ 
+        error: 'This wallet is already connected to another account' 
+      });
+    }
+
+    // If wallet exists and belongs to this user, just mark it verified and return success
+    if (existingWallet) {
+      console.log(`[connectWallet] Wallet ${normalizedAddress} already connected to user ${user.id}`);
+      
+      if (!existingWallet.verifiedAt) {
+        await prisma.wallet.update({
+          where: { id: existingWallet.id },
+          data: { verifiedAt: new Date() },
+        });
+      }
+
+      return res.json({
+        message: 'Wallet already connected',
+        wallet: {
+          id: existingWallet.id,
+          address: existingWallet.address,
+          chain: existingWallet.chain,
+          isPrimary: existingWallet.isPrimary,
+          verifiedAt: existingWallet.verifiedAt,
+        },
+      });
+    }
+
+    // Create new wallet record for this user
+    console.log(`[connectWallet] Connecting wallet ${normalizedAddress} on chain ${chain} to user ${user.id}`);
+    
+    const wallet = await prisma.wallet.create({
+      data: {
+        id: uuid(),
+        userId: user.id,
+        chain,
+        address: normalizedAddress,
+        verifiedAt: new Date(),
+        isPrimary: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Update user to reflect they have a connected wallet
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        walletType: walletType || undefined,
+      },
+    });
+
+    res.status(201).json({
+      message: 'Wallet successfully connected',
+      wallet: {
+        id: wallet.id,
+        address: wallet.address,
+        chain: wallet.chain,
+        isPrimary: wallet.isPrimary,
+        verifiedAt: wallet.verifiedAt,
+      },
+    });
+  } catch (error) {
+    console.error('[connectWallet] Error:', error);
+    res.status(500).json({ error: 'Failed to connect wallet' });
+  }
+});
+
 // Get current user
 router.get('/me', authenticateToken, loadUser, async (req: AuthRequest, res) => {
   try {
