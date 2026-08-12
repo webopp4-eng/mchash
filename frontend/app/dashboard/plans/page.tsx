@@ -20,12 +20,15 @@ export default function PlansPage() {
   }, []);
 
   const loadPlans = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await apiFetch('/api/plans');
       setPlans(res.plans || []);
       setHashRentingPlans(res.hashRentingPlans || []);
     } catch (err: any) {
-      setError(err.message);
+      console.error('[Plans] Failed to load plans:', err);
+      setError(err.message || 'Failed to load plans');
     } finally {
       setLoading(false);
     }
@@ -108,8 +111,21 @@ export default function PlansPage() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-400">
-          {error}
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-400">
+          <p>{error}</p>
+          <button
+            onClick={loadPlans}
+            className="rounded-lg bg-rose-500/20 px-4 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/30"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!error && plans.length === 0 && hashRentingPlans.length === 0 && (
+        <div className="rounded-[24px] border border-dashed border-white/20 p-8 text-center">
+          <p className="text-sm text-slate-400">No mining plans available yet</p>
+          <p className="mt-1 text-xs text-slate-500">Please check back later or contact support.</p>
         </div>
       )}
 

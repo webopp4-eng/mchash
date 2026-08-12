@@ -487,9 +487,22 @@ router.get('/referrals', async (req: AuthRequest, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Build the production/public referral URL — never default to localhost.
+    const publicOrigin =
+      process.env.PUBLIC_FRONTEND_URL ||
+      process.env.RENDER_FRONTEND_URL ||
+      process.env.FRONTEND_URL ||
+      process.env.NEXTAUTH_URL ||
+      '';
+    // If no production env var is configured, fall back to the request origin.
+    const requestOrigin = req.protocol + '://' + req.get('host');
+    const origin = publicOrigin && publicOrigin !== 'http://localhost:3000'
+      ? publicOrigin.replace(/\/$/, '')
+      : requestOrigin;
+
     res.json({
       referralCode: user?.referralCode,
-      referralLink: `${process.env.FRONTEND_URL || 'http://localhost:3000'}?ref=${user?.referralCode}`,
+      referralLink: `${origin}/?ref=${user?.referralCode}`,
       totalReferrals: referral?.totalReferrals || 0,
       activeReferrals: referral?.activeReferrals || 0,
       totalEarned: referral?.totalEarned || 0,

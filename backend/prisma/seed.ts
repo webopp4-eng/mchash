@@ -59,7 +59,7 @@ async function main() {
   ];
 
   for (const plan of plans) {
-    const existing = await prisma.miningPlan.findUnique({ where: { name: plan.name } });
+    const existing = await prisma.miningPlan.findFirst({ where: { name: plan.name } });
     if (!existing) {
       await prisma.miningPlan.create({ data: plan });
     }
@@ -99,7 +99,7 @@ async function main() {
   ];
 
   for (const plan of hashRentingPlans) {
-    const existing = await prisma.hashRentingPlan.findUnique({ where: { name: plan.name } });
+    const existing = await prisma.hashRentingPlan.findFirst({ where: { name: plan.name } });
     if (!existing) {
       await prisma.hashRentingPlan.create({ data: plan });
     }

@@ -10,6 +10,7 @@ export default function WalletPage() {
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -18,11 +19,14 @@ export default function WalletPage() {
   }, []);
 
   const loadWallet = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await apiFetch('/api/wallet');
       setData(res);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load wallet:', err);
+      setError(err.message || 'Failed to load wallet');
     } finally {
       setLoading(false);
     }
@@ -39,6 +43,22 @@ export default function WalletPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4">
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-center text-sm text-rose-400">
+          <p>{error}</p>
+        </div>
+        <button
+          onClick={loadWallet}
+          className="rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500"
+        >
+          Retry
+        </button>
       </div>
     );
   }

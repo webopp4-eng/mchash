@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { FaBolt, FaClock, FaCoins, FaChartLine, FaCalendarAlt, FaCheckCircle } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 
@@ -96,7 +97,7 @@ export default function MiningPage() {
 
       <div className="rounded-[24px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
         <div className="flex flex-col items-center gap-4">
-          <div className="relative flex h-40 w-40 items-center justify-center rounded-full bg-gradient-to-br from-cmblue-500 to-cmblue-300 shadow-[0_0_40px_rgba(14,161,255,0.3)]">
+          <div className={`relative flex h-40 w-40 items-center justify-center rounded-full bg-gradient-to-br from-cmblue-500 to-cmblue-300 ${activePlan && !activePlan.isExpired ? 'mining-glow' : 'shadow-[0_0_40px_rgba(14,161,255,0.3)]'}`}>
             <div className="absolute inset-0 rounded-full border-2 border-dashed border-white/40 spin-slow" />
             {activePlan && !activePlan.isExpired && <div className="absolute inset-4 rounded-full border border-white/50 bg-white/20 pulse-ring" />}
             <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cmblue-200 spin-reverse" />
@@ -173,10 +174,10 @@ export default function MiningPage() {
         ) : (
           <div className="mt-6 rounded-xl border border-dashed border-white/20 p-6 text-center">
             <p className="text-sm text-slate-400">No active mining package</p>
-            <a href="/dashboard/plans" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500">
+            <Link href="/dashboard/plans" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500">
               <FaBolt className="h-3.5 w-3.5" />
               Buy Mining Time
-            </a>
+            </Link>
           </div>
         )}
       </div>

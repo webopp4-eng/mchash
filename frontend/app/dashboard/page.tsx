@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { FaBolt, FaWallet, FaArrowUp, FaArrowDown, FaCoins, FaUsers, FaExchangeAlt } from 'react-icons/fa';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
@@ -174,10 +175,10 @@ export default function DashboardHome() {
         ) : (
           <div className="rounded-xl border border-dashed border-white/20 p-6 text-center">
             <p className="text-sm text-slate-400">No active mining plan</p>
-            <a href="/dashboard/plans" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500">
+            <Link href="/dashboard/plans" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500">
               <FaBolt className="h-3.5 w-3.5" />
               View Plans
-            </a>
+            </Link>
           </div>
         )}
       </div>
@@ -189,7 +190,7 @@ export default function DashboardHome() {
             <h2 className="text-sm font-semibold text-cmblue-300">Recent Transactions</h2>
             <p className="text-[10px] text-slate-500">Your latest activity</p>
           </div>
-          <a href="/dashboard/transactions" className="text-xs font-medium text-cmblue-400 hover:text-cmblue-300">View All</a>
+          <Link href="/dashboard/transactions" className="text-xs font-medium text-cmblue-400 hover:text-cmblue-300">View All</Link>
         </div>
 
         {recentTx.length > 0 ? (

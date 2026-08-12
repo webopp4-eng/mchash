@@ -8,6 +8,7 @@ import {
   FaExchangeAlt, FaArrowUp, FaHeadset, FaCogs, FaSignOutAlt, FaBell, FaTrophy
 } from 'react-icons/fa';
 import Logo from './Logo';
+import BottomNav from './BottomNav';
 import { useRouter } from 'next/navigation';
 import { getUser, logout, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
@@ -130,10 +131,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main Content */}
       <main className="relative z-10 min-h-screen lg:pl-72">
-        <div className="px-4 pb-10 pt-16 sm:px-6 lg:px-8 lg:pt-6">
+        <div className="px-4 pb-24 pt-16 sm:px-6 lg:px-8 lg:pb-10 lg:pt-6">
           {children}
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }

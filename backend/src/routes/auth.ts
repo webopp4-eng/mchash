@@ -253,8 +253,20 @@ router.post('/wallet', async (req, res) => {
       return res.status(401).json({ error: 'Signature verification failed' });
     }
 
+    // Resolve referral code to referrer user ID if provided
+    let referrerId: string | undefined;
+    if (referredBy) {
+      const referrer = await prisma.user.findUnique({
+        where: { referralCode: referredBy },
+        select: { id: true },
+      });
+      if (referrer) {
+        referrerId = referrer.id;
+      }
+    }
+
     // Find or create user
-    const { user, created } = await findOrCreateUser(address, chain, walletType, referredBy);
+    const { user, created } = await findOrCreateUser(address, chain, walletType, referrerId);
     if (!user) {
       return res.status(500).json({ error: 'Unable to materialize wallet account' });
     }

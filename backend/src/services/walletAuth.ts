@@ -152,6 +152,17 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
     },
   });
 
+  // Increment referrer's referral count if this user was referred
+  if (referredBy) {
+    await prisma.referral.updateMany({
+      where: { userId: referredBy },
+      data: {
+        totalReferrals: { increment: 1 },
+        activeReferrals: { increment: 1 },
+      },
+    });
+  }
+
   return { user, created: true };
 }
 
