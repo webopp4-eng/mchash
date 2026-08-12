@@ -28,7 +28,7 @@ export default function WalletsManagement() {
   const fetchWallets = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/auth/wallets`, {
+      const response = await fetch(`${API_URL}/api/auth/wallets`, {
         credentials: 'include',
       });
 
@@ -56,7 +56,7 @@ export default function WalletsManagement() {
 
     try {
       setDeletingId(walletId);
-      const response = await fetch(`${API_URL}/auth/wallet/${walletId}`, {
+      const response = await fetch(`${API_URL}/api/auth/wallet/${walletId}`, {
         method: 'DELETE',
         credentials: 'include',
       });

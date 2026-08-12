@@ -46,7 +46,7 @@ export default function EmailSignUp({ onBack, onLoginClick }: EmailSignUpProps) 
     setFieldErrors({});
 
     try {
-      const response = await fetch(`${API_URL}/auth/email/register`, {
+      const response = await fetch(`${API_URL}/api/auth/email/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

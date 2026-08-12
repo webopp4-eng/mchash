@@ -33,7 +33,7 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/auth/email/login`, {
+      const response = await fetch(`${API_URL}/api/auth/email/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

@@ -107,7 +107,7 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
 
       // Get nonce
       setAuthStatus('Requesting authentication challenge...');
-      const nonceRes = await fetch(`${API_URL}/auth/nonce/${address}?chain=${chain}`, {
+      const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${address}?chain=${chain}`, {
         credentials: 'include',
       });
 
@@ -127,7 +127,7 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
 
       // Authenticate
       setAuthStatus('Verifying signature...');
-      const authRes = await fetch(`${API_URL}/auth/wallet`, {
+      const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -176,7 +176,7 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
 
       // Get nonce
       setAuthStatus('Requesting authentication challenge...');
-      const nonceRes = await fetch(`${API_URL}/auth/nonce/${walletAddress}?chain=${chain}`, {
+      const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${walletAddress}?chain=${chain}`, {
         credentials: 'include',
       });
 
