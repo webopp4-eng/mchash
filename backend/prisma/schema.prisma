@@ -90,12 +90,14 @@ model MiningPlan {
   durationDays  Int
   bonusReward   Decimal  @default(0) @db.Decimal(18, 8)
   referralBonus Decimal  @default(0) @db.Decimal(18, 8) // percentage
+  expectedReturn Decimal @default(0) @db.Decimal(18, 8) // expected total return for the package
   active        Boolean  @default(true)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   purchases MiningPurchase[]
 }
+
 model MiningPurchase {
   id          String   @id @default(uuid()) @db.Uuid
   userId      String   @db.Uuid
@@ -104,9 +106,10 @@ model MiningPurchase {
   currency    String
   chain       String
   txHash      String?
-  status      String   @default("active") // active, completed, paused
+  status      String   @default("active") // active, completed, expired
   startedAt   DateTime @default(now())
   endsAt      DateTime
+  completedAt DateTime?
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -162,6 +165,7 @@ model HashRentingPurchase {
   status      String   @default("active") // active, completed, expired
   startedAt   DateTime @default(now())
   endsAt      DateTime
+  completedAt DateTime?
   createdAt   DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -313,6 +317,7 @@ model TreasuryWallet {
   address   String
   label     String?
   active    Boolean  @default(true)
+  supportedCurrency String @default("USDT")
   balance   Decimal  @default(0) @db.Decimal(18, 8)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -327,7 +332,7 @@ model TreasuryTransaction {
   txHash    String
   fromAddress String?
   toAddress  String?
-  amount    Decimal  @db.Decimal(18, 8)
+  amount    Decimal @db.Decimal(18, 8)
   currency  String
   status    String   @default("confirmed")
   createdAt DateTime @default(now())

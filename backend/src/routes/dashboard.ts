@@ -5,7 +5,41 @@ import { getActivePlan, getMiningSessions } from '../services/mining';
 
 const router = Router();
 
-// All dashboard routes require auth
+// ============ PUBLIC ROUTES (no auth required) ============
+
+// Plans - public endpoint so Home page and unauthenticated users can browse
+router.get('/plans', async (_req, res) => {
+  try {
+    const plans = await prisma.miningPlan.findMany({
+      where: { active: true },
+      orderBy: { price: 'asc' },
+    });
+    const hashRentingPlans = await prisma.hashRentingPlan.findMany({
+      where: { active: true },
+      orderBy: { price: 'asc' },
+    });
+    res.json({ plans, hashRentingPlans });
+  } catch (error) {
+    console.error('Plans error:', error);
+    res.status(500).json({ error: 'Failed to load plans' });
+  }
+});
+
+// Hash Renting - public endpoint
+router.get('/hash-renting', async (_req, res) => {
+  try {
+    const plans = await prisma.hashRentingPlan.findMany({
+      where: { active: true },
+      orderBy: { price: 'asc' },
+    });
+    res.json({ plans });
+  } catch (error) {
+    console.error('Hash renting plans error:', error);
+    res.status(500).json({ error: 'Failed to load hash renting plans' });
+  }
+});
+
+// All remaining dashboard routes require auth
 router.use(authenticateToken, loadUser);
 
 // ============ DASHBOARD ============
@@ -167,23 +201,7 @@ router.get('/atrs', async (req: AuthRequest, res) => {
   }
 });
 
-// ============ PLANS ============
-router.get('/plans', async (_req, res) => {
-  try {
-    const plans = await prisma.miningPlan.findMany({
-      where: { active: true },
-      orderBy: { price: 'asc' },
-    });
-    const hashRentingPlans = await prisma.hashRentingPlan.findMany({
-      where: { active: true },
-      orderBy: { price: 'asc' },
-    });
-    res.json({ plans, hashRentingPlans });
-  } catch (error) {
-    console.error('Plans error:', error);
-    res.status(500).json({ error: 'Failed to load plans' });
-  }
-});
+// ============ PURCHASE ============
 
 // Purchase a plan
 router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
@@ -311,20 +329,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
   }
 });
 
-// ============ HASH RENTING ============
-router.get('/hash-renting', async (_req, res) => {
-  try {
-    const plans = await prisma.hashRentingPlan.findMany({
-      where: { active: true },
-      orderBy: { price: 'asc' },
-    });
-    res.json({ plans });
-  } catch (error) {
-    console.error('Hash renting plans error:', error);
-    res.status(500).json({ error: 'Failed to load hash renting plans' });
-  }
-});
-
+// Hash Renting purchase
 router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;

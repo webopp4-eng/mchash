@@ -1,14 +1,91 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaHeadset, FaTicketAlt, FaQuestionCircle, FaBook, FaPaperPlane } from 'react-icons/fa';
-import { apiFetch } from '@/lib/auth';
+import {
+  FaHeadset, FaTicketAlt, FaQuestionCircle, FaBook, FaPaperPlane,
+  FaWallet, FaChartLine, FaGift, FaClock, FaShieldAlt, FaMobileAlt, FaDesktop, FaQrcode, FaCube, FaServer, FaCoins
+} from 'react-icons/fa';
+import { apiFetch, getUser } from '@/lib/auth';
 
 const faqs = [
-  { q: 'How do I start mining?', a: 'Connect your wallet, purchase a mining plan from the Plans page, and mining starts instantly.' },
-  { q: 'When can I withdraw earnings?', a: 'You can request withdrawals anytime from the Withdrawals page. Funds are sent to your connected wallet.' },
-  { q: 'How are rewards calculated?', a: 'Daily earnings are calculated based on your plan hash rate and daily rate percentage.' },
-  { q: 'What wallets are supported?', a: 'We support Solana, Ethereum, and BNB Smart Chain wallets including Phantom, MetaMask, Trust Wallet, and more.' },
+  {
+    q: 'How do I start mining?',
+    a: 'Connect your wallet, navigate to the Plans page from the dashboard, select a mining package, and purchase it using your platform balance or wallet.',
+  },
+  {
+    q: 'When can I withdraw earnings?',
+    a: 'You can request withdrawals anytime from the Withdrawals page. Funds are sent to your connected wallet within 24 hours after admin approval.',
+  },
+  {
+    q: 'How are mining rewards calculated?',
+    a: 'Daily earnings are calculated based on your plan hash rate and daily rate percentage. Rewards accrue in real-time and can be seen in your mining dashboard.',
+  },
+  {
+    q: 'What wallets are supported?',
+    a: 'We support Solana, Ethereum, and BNB Smart Chain wallets including Phantom, MetaMask, Trust Wallet, and WalletConnect.',
+  },
+  {
+    q: 'What is the minimum withdrawal amount?',
+    a: 'The minimum withdrawal is 10 USDT. There are no fees for internal mining withdrawals.',
+  },
+  {
+    q: 'How does the referral program work?',
+    a: 'Share your unique referral link from the Referrals page. You earn 3-8% commission on each referred user purchase, depending on your package.',
+  },
+  {
+    q: 'What happens when my mining plan expires?',
+    a: 'Your plan automatically completes and mining stops. You receive a bonus reward at completion. You can purchase a new plan from the Plans page.',
+  },
+  {
+    q: 'Can I mine multiple plans at once?',
+    a: 'No, you can only have one active mining package at a time. When it completes, you may start another.',
+  },
+];
+
+const tutorials = [
+  {
+    title: 'Connect Your Wallet',
+    icon: FaWallet,
+    steps: [
+      'Go to the homepage and click "Connect Wallet"',
+      'Select your preferred wallet (MetaMask, Phantom, Trust Wallet, etc.)',
+      'On mobile, click the wallet app icon to open your wallet app',
+      'Sign the message to verify ownership',
+      'Your wallet is now connected and you can access the dashboard',
+    ],
+  },
+  {
+    title: 'Buy a Mining Plan',
+    icon: FaChartLine,
+    steps: [
+      'Ensure you have sufficient platform balance (USDT)',
+      'Navigate to Dashboard → Plans',
+      'Select the plan that fits your budget and duration',
+      'Click "Buy Plan" — your balance is deducted and mining starts instantly',
+      'Track progress on the Mining page in real-time',
+    ],
+  },
+  {
+    title: 'Withdraw Earnings',
+    icon: FaGift,
+    steps: [
+      'Go to Dashboard → Withdrawals',
+      'Enter the amount and select your chain',
+      'Submit the withdrawal request',
+      'Wait for admin approval (usually within 24 hours)',
+      'Funds are sent to your connected wallet address',
+    ],
+  },
+  {
+    title: 'Use Hash Renting',
+    icon: FaChartLine,
+    steps: [
+      'Navigate to Dashboard → Plans and scroll to Hash Renting',
+      'Choose a hash renting package with your desired hash power',
+      'Rent the hash power — mining starts immediately',
+      'Earn yields directly to your platform balance',
+    ],
+  },
 ];
 
 export default function SupportPage() {
@@ -16,8 +93,9 @@ export default function SupportPage() {
   const [loading, setLoading] = useState(true);
   const [subject, setSubject] = useState('');
   const [category, setCategory] = useState('general');
+  const [priority, setPriority] = useState('normal');
   const [message, setMessage] = useState('');
-  const [showTickets, setShowTickets] = useState(false);
+  const [activeTab, setActiveTab] = useState<'faq' | 'knowledge' | 'tutorial' | 'tickets'>('faq');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -45,12 +123,13 @@ export default function SupportPage() {
     try {
       await apiFetch('/api/support/tickets', {
         method: 'POST',
-        body: JSON.stringify({ subject, category, message }),
+        body: JSON.stringify({ subject, category, priority, message }),
       });
-      setSuccess('Support ticket created successfully!');
+      setSuccess('Support ticket created successfully! Our team will respond shortly.');
       setSubject('');
       setMessage('');
       setCategory('general');
+      setPriority('normal');
       loadTickets();
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
@@ -63,49 +142,31 @@ export default function SupportPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Support</h1>
-        <p className="mt-1 text-sm text-slate-400">We are here to help you</p>
+        <h1 className="text-2xl font-bold">Support Center</h1>
+        <p className="mt-1 text-sm text-slate-400">Get help, find answers, and contact support</p>
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <button
-          onClick={() => setShowTickets(false)}
-          className={`flex items-center gap-3 rounded-[20px] border p-4 text-left transition-all ${
-            !showTickets ? 'border-cmblue-500/30 bg-cmblue-500/10' : 'border-white/10 bg-white/5 hover:bg-white/10'
-          }`}
-        >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
-            <FaQuestionCircle className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">FAQ</p>
-            <p className="text-[10px] text-slate-500">Common questions</p>
-          </div>
-        </button>
-        <button
-          onClick={() => setShowTickets(true)}
-          className={`flex items-center gap-3 rounded-[20px] border p-4 text-left transition-all ${
-            showTickets ? 'border-cmblue-500/30 bg-cmblue-500/10' : 'border-white/10 bg-white/5 hover:bg-white/10'
-          }`}
-        >
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/20 text-purple-400">
-            <FaTicketAlt className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Tickets</p>
-            <p className="text-[10px] text-slate-500">{tickets.length} tickets</p>
-          </div>
-        </button>
-        <button className="flex items-center gap-3 rounded-[20px] border border-white/10 bg-white/5 p-4 text-left transition-all hover:bg-white/10">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
-            <FaBook className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Knowledge Base</p>
-            <p className="text-[10px] text-slate-500">Guides & tutorials</p>
-          </div>
-        </button>
+      {/* Tab Navigation */}
+      <div className="flex flex-wrap gap-1 rounded-[20px] border border-white/10 bg-white/5 p-1.5 backdrop-blur-xl">
+        {[
+          { id: 'faq', label: 'FAQ', icon: FaQuestionCircle },
+          { id: 'knowledge', label: 'Knowledge Base', icon: FaBook },
+          { id: 'tutorial', label: 'Tutorial', icon: FaMobileAlt },
+          { id: 'tickets', label: 'My Tickets', icon: FaTicketAlt },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-all ${
+              activeTab === tab.id
+                ? 'bg-cmblue-500/20 text-cmblue-400 shadow-[0_0_15px_rgba(14,161,255,0.2)]'
+                : 'text-slate-400 hover:text-slate-200'
+            }}`}
+          >
+            <tab.icon className="h-3 w-3" />
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -115,24 +176,150 @@ export default function SupportPage() {
         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-400">{success}</div>
       )}
 
-      {!showTickets ? (
-        /* FAQ View */
+      {/* FAQ Tab */}
+      {activeTab === 'faq' && (
         <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
           <h2 className="text-sm font-semibold text-cmblue-300">Frequently Asked Questions</h2>
           <div className="mt-4 space-y-3">
             {faqs.map((faq) => (
-              <details key={faq.q} className="group rounded-xl border border-white/10 bg-white/5 p-4">
+              <details key={faq.q} className="group rounded-xl border border-white/10 bg-white/5 p-4 open:bg-white/10">
                 <summary className="flex cursor-pointer items-center justify-between text-sm font-medium">
                   {faq.q}
                   <span className="text-slate-500 transition-transform group-open:rotate-45">+</span>
                 </summary>
-                <p className="mt-3 text-xs text-slate-400">{faq.a}</p>
+                <p className="mt-3 text-xs text-slate-400 leading-relaxed">{faq.a}</p>
               </details>
             ))}
           </div>
         </div>
-      ) : (
-        /* Tickets View */
+      )}
+
+      {/* Knowledge Base Tab */}
+      {activeTab === 'knowledge' && (
+        <div className="space-y-6">
+          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <h2 className="text-sm font-semibold text-cmblue-300">Knowledge Base</h2>
+            <p className="mt-1 text-xs text-slate-500">Guides and articles to help you get the most from CM HASH</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="mb-3 flex items-center gap-2">
+                <FaShieldAlt className="h-4 w-4 text-cmblue-400" />
+                <h3 className="text-sm font-semibold">Security Best Practices</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li>• Never share your private key or seed phrase</li>
+                <li>• Always verify you are on the official CM Hash site</li>
+                <li>• Enable 2FA on your wallet app when available</li>
+                <li>• Use strong, unique passwords for your accounts</li>
+                <li>• Never click suspicious links in emails or messages</li>
+              </ul>
+            </div>
+
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="mb-3 flex items-center gap-2">
+                <FaWallet className="h-4 w-4 text-purple-400" />
+                <h3 className="text-sm font-semibold">Supported Wallets</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li>• <span className="text-slate-300">Ethereum:</span> MetaMask, Rainbow, Coinbase Wallet</li>
+                <li>• <span className="text-slate-300">Solana:</span> Phantom, Solflare, Trust Wallet</li>
+                <li>• <span className="text-slate-300">BNB Chain:</span> MetaMask, Trust Wallet</li>
+                <li>• <span className="text-slate-300">Mobile:</span> WalletConnect deep linking</li>
+              </ul>
+            </div>
+
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="mb-3 flex items-center gap-2">
+                <FaClock className="h-4 w-4 text-emerald-400" />
+                <h3 className="text-sm font-semibold">Mining Rewards Schedule</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li>• Rewards accrue every block in real-time</li>
+                <li>• Daily payouts are processed automatically</li>
+                <li>• Minimum payout: 0.001 USDT per session</li>
+                <li>• Bonus rewards are credited on plan completion</li>
+                <li>• Referral commissions are credited instantly</li>
+              </ul>
+            </div>
+
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="mb-3 flex items-center gap-2">
+                <FaCube className="h-4 w-4 text-amber-400" />
+                <h3 className="text-sm font-semibold">Supported Chains</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li>• <span className="text-slate-300">Ethereum (ETH):</span> ERC-20 USDT</li>
+                <li>• <span className="text-slate-300">Solana (SOL):</span> SPL USDT</li>
+                <li>• <span className="text-slate-300">BNB Smart Chain:</span> BEP-20 USDT</li>
+              </ul>
+            </div>
+
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="mb-3 flex items-center gap-2">
+                <FaCoins className="h-4 w-4 text-cmblue-400" />
+                <h3 className="text-sm font-semibold">Earning Methods</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li>• <span className="text-slate-300">Mining:</span> Earn from your active plan</li>
+                <li>• <span className="text-slate-300">Referrals:</span> 3-8% commission on referred purchases</li>
+                <li>• <span className="text-slate-300">Hash Renting:</span> Rent hash power for yields</li>
+                <li>• <span className="text-slate-300">Bonus Rewards:</span> Extra rewards on plan completion</li>
+              </ul>
+            </div>
+
+            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="mb-3 flex items-center gap-2">
+                <FaServer className="h-4 w-4 text-sky-400" />
+                <h3 className="text-sm font-semibold">Platform Fees</h3>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li>• No fees for mining plan purchases</li>
+                <li>• Withdrawal fee: 0.5% (min 1 USDT)</li>
+                <li>• Hash renting management: Free</li>
+                <li>• Support: Free 24/7 via ticket system</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tutorial Tab */}
+      {activeTab === 'tutorial' && (
+        <div className="space-y-6">
+          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <h2 className="text-sm font-semibold text-cmblue-300">Step-by-Step Tutorials</h2>
+            <p className="mt-1 text-xs text-slate-500">Walkthroughs to help you get started fast</p>
+          </div>
+
+          <div className="space-y-4">
+            {tutorials.map((tutorial) => (
+              <div key={tutorial.title} className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+                <div className="mb-4 flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
+                    <tutorial.icon className="h-4 w-4" />
+                  </span>
+                  <h3 className="text-lg font-semibold">{tutorial.title}</h3>
+                </div>
+                <ol className="space-y-3">
+                  {tutorial.steps.map((step, i) => (
+                    <li key={i} className="flex items-start gap-2.5">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cmblue-500/20 text-xs font-bold text-cmblue-400">
+                        {i + 1}
+                      </span>
+                      <span className="text-xs text-slate-300 leading-relaxed">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Tickets Tab */}
+      {activeTab === 'tickets' && (
         <div className="space-y-4">
           {/* Create Ticket */}
           <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
@@ -145,21 +332,35 @@ export default function SupportPage() {
                 placeholder="Subject"
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
               />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
-              >
-                <option value="general">General</option>
-                <option value="mining">Mining</option>
-                <option value="withdrawal">Withdrawal</option>
-                <option value="deposit">Deposit</option>
-                <option value="technical">Technical</option>
-              </select>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
+                >
+                  <option value="general">General</option>
+                  <option value="mining">Mining</option>
+                  <option value="withdrawal">Withdrawal</option>
+                  <option value="deposit">Deposit</option>
+                  <option value="referral">Referral</option>
+                  <option value="technical">Technical</option>
+                  <option value="billing">Billing</option>
+                </select>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value)}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Describe your issue..."
+                placeholder="Describe your issue in detail..."
                 rows={4}
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
               />
@@ -194,18 +395,24 @@ export default function SupportPage() {
                       <p className="text-xs font-semibold">{ticket.subject}</p>
                       <span className={`text-[10px] font-medium ${
                         ticket.status === 'open' ? 'text-emerald-400' :
-                        ticket.status === 'pending' ? 'text-amber-400' : 'text-slate-400'
+                        ticket.status === 'pending' ? 'text-amber-400' :
+                        ticket.status === 'resolved' || ticket.status === 'closed' ? 'text-slate-400' : 'text-cmblue-400'
                       }`}>
                         {ticket.status}
                       </span>
                     </div>
-                    <p className="mt-1 text-[10px] text-slate-500">{ticket.category} • {new Date(ticket.createdAt).toLocaleString()}</p>
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      {ticket.category} • Priority: {ticket.priority || 'Normal'} • {new Date(ticket.createdAt).toLocaleString()}
+                    </p>
                     {ticket.messages && ticket.messages.length > 0 && (
                       <div className="mt-2 space-y-1.5">
                         {ticket.messages.map((msg: any) => (
-                          <div key={msg.id} className={`rounded-lg bg-white/5 p-2 text-xs ${
-                            msg.senderRole === 'user' ? 'ml-6' : 'mr-6 border border-cmblue-500/20'
-                          }`}>
+                          <div
+                            key={msg.id}
+                            className={`rounded-lg bg-white/5 p-2 text-xs ${
+                              msg.senderRole === 'user' ? 'ml-6' : 'mr-6 border border-cmblue-500/20'
+                            }`}
+                          >
                             <p className="text-[10px] text-slate-500 capitalize">{msg.senderRole}</p>
                             <p className="mt-0.5 text-slate-300">{msg.message}</p>
                           </div>
@@ -216,7 +423,7 @@ export default function SupportPage() {
                 ))}
               </div>
             ) : (
-              <p className="py-6 text-center text-sm text-slate-500">No tickets yet</p>
+              <p className="py-6 text-center text-sm text-slate-500">No tickets yet. Create one above if you need help.</p>
             )}
           </div>
         </div>

@@ -54,6 +54,7 @@ export function buildMiningStats(purchase: any, session?: any) {
     timeRemaining: formatRemainingTime(remainingMs),
     startedAt,
     endsAt,
+    completedAt: purchase.completedAt || null,
     status: remainingMs > 0 ? 'active' : 'completed',
     packageType: purchase.packageType || 'mining',
   };
@@ -89,7 +90,6 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
   const elapsedMs = msBetween(lastAccruedAt, accrualEnd);
   const earned = (dailyEarnings * elapsedMs) / DAY_MS;
   const shouldComplete = purchase.endsAt <= now;
-  const purchaseModel = packageType === 'mining' ? prisma.miningPurchase : prisma.hashRentingPurchase;
 
   if (earned > MIN_ACCRUAL) {
     await prisma.$transaction([
@@ -130,15 +130,66 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
 
   if (shouldComplete) {
     if (packageType === 'mining') {
-      await prisma.miningPurchase.update({ where: { id: purchase.id }, data: { status: 'completed' } });
+      await prisma.miningPurchase.update({
+        where: { id: purchase.id },
+        data: {
+          status: 'completed',
+          completedAt: now,
+        },
+      });
     } else {
-      await prisma.hashRentingPurchase.update({ where: { id: purchase.id }, data: { status: 'completed' } });
+      await prisma.hashRentingPurchase.update({
+        where: { id: purchase.id },
+        data: {
+          status: 'completed',
+          completedAt: now,
+        },
+      });
     }
 
     await prisma.miningSession.updateMany({
       where: { userId: purchase.userId, purchaseId: purchase.id },
       data: { status: 'completed', lastPayoutAt: accrualEnd },
     });
+
+    // Credit bonus reward if not yet credited
+    const bonusReward = Number(plan.bonusReward || 0);
+    if (bonusReward > 0) {
+      const alreadyCredited = await prisma.transaction.findFirst({
+        where: {
+          userId: purchase.userId,
+          type: 'mining',
+          metadata: { path: ['bonusCredited'], equals: true },
+        },
+      });
+      if (!alreadyCredited) {
+        await prisma.$transaction([
+          prisma.user.update({
+            where: { id: purchase.userId },
+            data: {
+              platformBalance: { increment: bonusReward },
+              totalEarned: { increment: bonusReward },
+            },
+          }),
+          prisma.transaction.create({
+            data: {
+              userId: purchase.userId,
+              type: 'mining',
+              amount: bonusReward,
+              currency: plan.currency || 'USDT',
+              chain: purchase.chain || plan.chain,
+              status: 'completed',
+              metadata: {
+                purchaseId: purchase.id,
+                planName: plan.name,
+                packageType,
+                bonusCredited: true,
+              },
+            },
+          }),
+        ]);
+      }
+    }
   }
 }
 
@@ -213,4 +264,12 @@ export async function processDailyPayouts() {
     orderBy: { createdAt: 'desc' },
     take: users.length,
   });
+}
+
+export async function getReceivingWallet(chain: string): Promise<string | null> {
+  const wallet = await prisma.treasuryWallet.findFirst({
+    where: { network: chain, active: true },
+    select: { address: true },
+  });
+  return wallet?.address || null;
 }

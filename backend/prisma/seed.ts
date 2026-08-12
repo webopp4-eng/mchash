@@ -10,51 +10,81 @@ async function main() {
   const plans = [
     {
       name: 'Starter',
-      description: 'Perfect for beginners. Start mining with a small investment.',
+      description: 'Perfect entry-level package. Low investment with quick returns.',
+      price: 10,
+      currency: 'USDT',
+      chain: 'ethereum',
+      hashRate: 0.50,
+      dailyRate: 0.10,
+      durationDays: 3,
+      bonusReward: 0,
+      referralBonus: 3,
+      expectedReturn: 12,
+    },
+    {
+      name: 'Bronze',
+      description: 'Short-term mining with reliable returns. 3-day package.',
+      price: 15,
+      currency: 'USDT',
+      chain: 'ethereum',
+      hashRate: 0.90,
+      dailyRate: 0.09,
+      durationDays: 3,
+      bonusReward: 1,
+      referralBonus: 3,
+      expectedReturn: 18,
+    },
+    {
+      name: 'Silver',
+      description: '7-day mining package with solid daily returns.',
+      price: 20,
+      currency: 'USDT',
+      chain: 'ethereum',
+      hashRate: 1.40,
+      dailyRate: 0.10,
+      durationDays: 7,
+      bonusReward: 2,
+      referralBonus: 4,
+      expectedReturn: 42,
+    },
+    {
+      name: 'Gold',
+      description: 'Two-week premium mining with enhanced hash power.',
       price: 50,
       currency: 'USDT',
       chain: 'ethereum',
-      hashRate: 1.0,
-      dailyRate: 0.02,
-      durationDays: 7,
+      hashRate: 3.20,
+      dailyRate: 0.12,
+      durationDays: 14,
       bonusReward: 5,
       referralBonus: 5,
+      expectedReturn: 120,
     },
     {
-      name: 'Pro',
-      description: 'For serious miners. Higher hash rate and better returns.',
-      price: 200,
+      name: 'Platinum',
+      description: '18-day high-yield mining package with premium returns.',
+      price: 75,
       currency: 'USDT',
       chain: 'ethereum',
       hashRate: 5.0,
-      dailyRate: 0.025,
-      durationDays: 15,
-      bonusReward: 20,
-      referralBonus: 7,
+      dailyRate: 0.14,
+      durationDays: 18,
+      bonusReward: 10,
+      referralBonus: 6,
+      expectedReturn: 190,
     },
     {
-      name: 'Premium',
-      description: 'Advanced mining with maximum efficiency.',
-      price: 500,
+      name: 'Diamond',
+      description: 'Maximum 30-day mining package with highest returns.',
+      price: 100,
       currency: 'USDT',
       chain: 'ethereum',
-      hashRate: 15.0,
-      dailyRate: 0.03,
+      hashRate: 7.0,
+      dailyRate: 0.17,
       durationDays: 30,
-      bonusReward: 60,
-      referralBonus: 10,
-    },
-    {
-      name: 'Enterprise',
-      description: 'For institutional investors. Maximum returns.',
-      price: 1000,
-      currency: 'USDT',
-      chain: 'ethereum',
-      hashRate: 40.0,
-      dailyRate: 0.035,
-      durationDays: 60,
-      bonusReward: 150,
-      referralBonus: 12,
+      bonusReward: 20,
+      referralBonus: 8,
+      expectedReturn: 500,
     },
   ];
 
@@ -62,6 +92,8 @@ async function main() {
     const existing = await prisma.miningPlan.findFirst({ where: { name: plan.name } });
     if (!existing) {
       await prisma.miningPlan.create({ data: plan });
+    } else {
+      await prisma.miningPlan.update({ where: { id: existing.id }, data: plan });
     }
   }
 
@@ -102,6 +134,8 @@ async function main() {
     const existing = await prisma.hashRentingPlan.findFirst({ where: { name: plan.name } });
     if (!existing) {
       await prisma.hashRentingPlan.create({ data: plan });
+    } else {
+      await prisma.hashRentingPlan.update({ where: { id: existing.id }, data: plan });
     }
   }
 
