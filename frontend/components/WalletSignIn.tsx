@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FaClipboard, FaExclamationTriangle, FaPaste, FaShieldAlt, FaWallet, FaQrcode, FaSyncAlt } from 'react-icons/fa';
 import Logo from './Logo';
-import { API_URL } from '@/lib/auth';
+import { API_URL, setUser } from '@/lib/auth';
 import { validateWalletAddress, isMobileDevice, getAvailableMobileWallets, openMobileWallet, getWalletInstallUrl, connectPhantomWallet, signPhantomMessage, isPhantomProviderAvailable } from '@/lib/wallet';
 import { useAccount, useChainId, useSignMessage } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
@@ -108,16 +108,29 @@ export default function WalletSignIn() {
       console.log('[completeAuth] Starting auth completion with user:', data.user?.id);
       
       // Store authentication data
-      localStorage.setItem('cmhash_token', data.token);
-      localStorage.setItem('cmhash_user', JSON.stringify(data.user));
-      localStorage.setItem('cmhash_created', String(Boolean(data.created)));
-      localStorage.removeItem('cmhash_return_url');
-      localStorage.removeItem('cmhash_autoconnect'); // Clear autoconnect flag
+      if (data.token) {
+        localStorage.setItem('cmhash_token', data.token);
+        console.log('[completeAuth] Token stored');
+      }
       
-      // Verify data was stored
+      // Use setUser function to store user and update runtime cache
+      if (data.user) {
+        setUser(data.user);
+        console.log('[completeAuth] User stored via setUser()');
+      }
+      
+      if (data.created !== undefined) {
+        localStorage.setItem('cmhash_created', String(Boolean(data.created)));
+      }
+      
+      // Clear redirect-related flags
+      localStorage.removeItem('cmhash_return_url');
+      localStorage.removeItem('cmhash_autoconnect');
+      
+      // Verify data was stored before redirecting
       const storedUser = localStorage.getItem('cmhash_user');
       if (!storedUser) {
-        console.error('[completeAuth] Failed to store user data');
+        console.error('[completeAuth] Failed to store user data in localStorage');
         setError('Failed to save authentication data');
         setConnecting(false);
         return;
@@ -126,17 +139,18 @@ export default function WalletSignIn() {
       setAuthStatus(data.created ? 'New Account Created' : 'Welcome Back');
       setConnectionStatus('Connected');
       
-      // Redirect after a short delay to ensure localStorage is synced
+      // Determine redirect URL
       const redirectUrl = data.user.role === 'admin' ? '/admin' : '/dashboard';
-      console.log('[completeAuth] Redirecting to:', redirectUrl);
+      console.log('[completeAuth] Auth complete, redirecting to:', redirectUrl);
       
+      // Redirect after a delay to ensure all data is synced
       setTimeout(() => {
-        console.log('[completeAuth] Executing redirect');
-        router.push(redirectUrl); // Use push instead of replace to avoid race conditions
-      }, 150);
+        console.log('[completeAuth] Executing redirect to:', redirectUrl);
+        router.push(redirectUrl);
+      }, 200);
     } catch (err) {
       console.error('[completeAuth] Error during auth completion:', err);
-      setError('Failed to complete authentication');
+      setError('Failed to complete authentication: ' + String(err));
       setConnecting(false);
     }
   }, [router]);

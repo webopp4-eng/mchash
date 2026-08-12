@@ -15,6 +15,9 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLI
 
 export const ADMIN_API_URL = process.env.NEXT_PUBLIC_ADMIN_API_URL || API_URL;
 
+// Runtime user cache for hydration mismatch issues
+let runtimeUserCache: User | null = null;
+
 export function getAdminApiBase(): string {
   return ADMIN_API_URL || API_URL;
 }
@@ -34,19 +37,52 @@ export function getToken(): string | null {
 
 export function getUser(): User | null {
   if (typeof window === 'undefined') return null;
+  
+  // Check runtime cache first (for hydration issues)
+  if (runtimeUserCache) {
+    console.log('[getUser] Returning cached user:', runtimeUserCache.id);
+    return runtimeUserCache;
+  }
+  
   const stored = localStorage.getItem('cmhash_user');
-  if (!stored) return null;
-  try {
-    return JSON.parse(stored);
-  } catch {
+  if (!stored) {
+    console.log('[getUser] No user data in localStorage');
     return null;
+  }
+  
+  try {
+    const user = JSON.parse(stored);
+    console.log('[getUser] Loaded user from localStorage:', user.id);
+    runtimeUserCache = user;
+    return user;
+  } catch (err) {
+    console.error('[getUser] Failed to parse user data:', err);
+    return null;
+  }
+}
+
+export function setUser(user: User | null): void {
+  if (typeof window === 'undefined') return;
+  
+  runtimeUserCache = user;
+  
+  if (user) {
+    const userData = JSON.stringify(user);
+    localStorage.setItem('cmhash_user', userData);
+    console.log('[setUser] Stored user:', user.id);
+  } else {
+    localStorage.removeItem('cmhash_user');
+    console.log('[setUser] Cleared user data');
   }
 }
 
 export function isAuthenticated(): boolean {
   // Check if user data exists - if it does, they're authenticated
   // (token is in httpOnly cookie, can't access from JS, but if user data is there, they logged in successfully)
-  return Boolean(getUser());
+  const user = getUser();
+  const isAuth = Boolean(user);
+  console.log('[isAuthenticated]', { isAuth, hasUser: !!user });
+  return isAuth;
 }
 
 export async function logout(router?: ReturnType<typeof import('next/navigation').useRouter>): Promise<void> {
@@ -57,16 +93,23 @@ export async function logout(router?: ReturnType<typeof import('next/navigation'
       credentials: 'include', // Include httpOnly cookies
     });
   } catch (error) {
-    console.error('Logout request failed:', error);
+    console.error('[logout] Request failed:', error);
   }
+  
+  // Clear runtime cache
+  runtimeUserCache = null;
   
   // Clear localStorage
   localStorage.removeItem('cmhash_token');
   localStorage.removeItem('cmhash_user');
   localStorage.removeItem('cmhash_created');
+  localStorage.removeItem('cmhash_return_url');
+  localStorage.removeItem('cmhash_autoconnect');
+  
+  console.log('[logout] Cleared all auth data');
   
   if (router) {
-    router.replace('/login');
+    router.push('/login');
   } else {
     window.location.href = '/login';
   }

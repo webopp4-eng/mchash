@@ -18,12 +18,16 @@ const adminNav = [
   { href: '/admin/settings', label: 'Settings', icon: FaCogs },
 ];
 
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 100; // ms
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
   const deployMode = process.env.NEXT_PUBLIC_DEPLOY_MODE || 'public';
@@ -32,38 +36,67 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     setIsMounted(true);
     
-    // Check if admin panel is available
-    if (deployMode !== 'local-admin' || !localAdminOnly) {
-      console.warn('[AdminLayout] Public build detected. Admin routes are local-only. Redirecting to public front page.');
-      setAccessDenied(true);
-      router.replace('/');
-      return;
-    }
+    // Check authentication and admin role with retry logic
+    const checkAdminAccess = async () => {
+      // Check if admin panel is available first
+      if (deployMode !== 'local-admin' || !localAdminOnly) {
+        console.warn('[AdminLayout] Public build detected. Admin routes are local-only.');
+        setAccessDenied(true);
+        setIsChecking(false);
+        router.push('/');
+        return;
+      }
 
-    // Check authentication and admin role
-    const userData = getUser();
-    const authenticated = isAuthenticated();
-    
-    setUser(userData);
-    
-    if (!authenticated) {
-      console.log('[AdminLayout] Not authenticated, redirecting to /login');
-      router.replace('/login');
-      return;
-    }
-    
-    if (!userData || userData.role !== 'admin') {
-      console.log('[AdminLayout] Non-admin access blocked, redirecting to /dashboard');
+      let retries = 0;
+      
+      while (retries < MAX_RETRIES) {
+        try {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          
+          const userData = getUser();
+          const authenticated = isAuthenticated();
+          
+          console.log(`[AdminLayout] Auth check attempt ${retries + 1}:`, { 
+            authenticated, 
+            hasUser: !!userData,
+            isAdmin: userData?.role === 'admin'
+          });
+          
+          if (authenticated && userData) {
+            if (userData.role === 'admin') {
+              console.log('[AdminLayout] Admin access verified');
+              setUser(userData);
+              setIsAdmin(true);
+              setIsChecking(false);
+              return;
+            } else {
+              console.log('[AdminLayout] User is not an admin, redirecting to dashboard');
+              setAccessDenied(true);
+              setIsChecking(false);
+              router.push('/dashboard');
+              return;
+            }
+          }
+          
+          retries++;
+        } catch (err) {
+          console.error('[AdminLayout] Auth check error:', err);
+          retries++;
+        }
+      }
+      
+      // After retries, not authenticated
+      console.log('[AdminLayout] Auth check failed after retries');
       setAccessDenied(true);
-      router.replace('/dashboard');
-      return;
-    }
+      setIsChecking(false);
+      router.push('/login');
+    };
     
-    setIsAdmin(true);
+    checkAdminAccess();
   }, [router, deployMode, localAdminOnly]);
 
   // Show loading while checking access
-  if (!isMounted || accessDenied) {
+  if (isChecking || !isMounted) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
         <div className="text-center">
@@ -74,12 +107,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!isAdmin || !user) {
+  if (accessDenied || !isAdmin || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
         <div className="text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500 mx-auto mb-3" />
-          <p className="text-sm text-slate-400">Verifying credentials...</p>
+          <p className="text-sm text-slate-400">Redirecting...</p>
         </div>
       </div>
     );

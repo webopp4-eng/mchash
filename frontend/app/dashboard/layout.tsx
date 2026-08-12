@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
 import { getUser, isAuthenticated, User } from '@/lib/auth';
 
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 100; // ms
+
 export default function DashboardLayoutWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
@@ -14,36 +17,43 @@ export default function DashboardLayoutWrapper({ children }: { children: React.R
   const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    // Mark as mounted to handle hydration
     setIsMounted(true);
     
-    // Check authentication after hydration
+    // Check authentication with retry logic
     const checkAuth = async () => {
-      try {
-        // Small delay to ensure localStorage is fully initialized
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        const userData = getUser();
-        const authenticated = isAuthenticated();
-        
-        console.log('[DashboardLayout] Auth check:', { authenticated, hasUser: !!userData });
-        
-        setUser(userData);
-        setIsAuth(authenticated);
-        
-        if (!authenticated) {
-          console.log('[DashboardLayout] Not authenticated, redirecting to /login');
-          setRedirecting(true);
-          router.push('/login');
-          return;
+      let retries = 0;
+      
+      while (retries < MAX_RETRIES) {
+        try {
+          // Wait for localStorage to be ready
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          
+          const userData = getUser();
+          const authenticated = isAuthenticated();
+          
+          console.log(`[DashboardLayout] Auth check attempt ${retries + 1}:`, { authenticated, hasUser: !!userData });
+          
+          // If we found a user, we're authenticated - stop checking
+          if (authenticated && userData) {
+            console.log('[DashboardLayout] Authentication verified, user:', userData.id);
+            setUser(userData);
+            setIsAuth(true);
+            setIsChecking(false);
+            return;
+          }
+          
+          retries++;
+        } catch (err) {
+          console.error('[DashboardLayout] Auth check error:', err);
+          retries++;
         }
-      } catch (err) {
-        console.error('[DashboardLayout] Auth check error:', err);
-        setRedirecting(true);
-        router.push('/login');
-      } finally {
-        setIsChecking(false);
       }
+      
+      // After all retries, if still not authenticated, redirect
+      console.log('[DashboardLayout] Auth check failed after retries, redirecting to /login');
+      setIsChecking(false);
+      setRedirecting(true);
+      router.push('/login');
     };
     
     checkAuth();
