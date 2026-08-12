@@ -5,7 +5,7 @@ import prisma from '../lib/prisma';
 export interface AuthRequest extends Request {
   user?: {
     id: string;
-    walletAddress: string;
+    walletAddress?: string | null;
   };
 }
 
@@ -42,6 +42,6 @@ export async function loadUser(req: AuthRequest, res: Response, next: NextFuncti
     return res.status(403).json({ error: 'Account is ' + user.status });
   }
 
-  req.user = { id: user.id, walletAddress: user.walletAddress };
+  req.user = { id: user.id, walletAddress: user.walletAddress || undefined };
   next();
 }

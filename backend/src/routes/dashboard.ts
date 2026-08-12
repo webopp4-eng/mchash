@@ -135,8 +135,9 @@ router.get('/rankings', async (req: AuthRequest, res) => {
 
         return {
           id: user.id,
-          username: user.username || `Miner ${user.walletAddress.slice(0, 6)}`,
-          walletAddress: user.walletAddress,
+          username: user.username || `Miner ${user.walletAddress?.slice(0, 6) || 'User'}`,
+          walletAddress: user.walletAddress || '',
+
           totalEarned: user.totalEarned,
           platformBalance: user.platformBalance,
           hashRate: session?._sum.hashRate || 0,
@@ -576,6 +577,10 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
         totalWithdrawn: { increment: amount },
       },
     });
+
+    if (!user.walletAddress) {
+      return res.status(400).json({ error: 'No wallet connected for withdrawal' });
+    }
 
     const withdrawal = await prisma.withdrawal.create({
       data: {
