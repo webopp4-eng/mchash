@@ -16,13 +16,13 @@ services:
         value: cmhash-super-secret-key-2026-change-in-production-to-something-very-long-and-random
       - key: PUBLIC_FRONTEND_URL
         sync: false
-        value: https://mchash.vercel.app
+        value: https://webopp4-eng.github.io/mchash/
       - key: RENDER_FRONTEND_URL
         sync: false
-        value: https://mchash.vercel.app
+        value: https://webopp4-eng.github.io/mchash/
       - key: FRONTEND_URL
         sync: false
-        value: https://mchash.vercel.app
+        value: https://webopp4-eng.github.io/mchash/
       - key: PORT
         value: 4000
       - key: NODE_ENV

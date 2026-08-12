@@ -37,7 +37,7 @@ The live deployment already has your latest code (verified ✓), but mobile user
 
 ### Desktop Flow (✓ Works)
 ```
-User on https://mchash.vercel.app/login
+User on https://webopp4-eng.github.io/mchash/login
 → Clicks "Connect Wallet"
 → RainbowKit modal opens
 → User selects Phantom browser extension
