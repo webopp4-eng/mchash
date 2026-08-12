@@ -43,7 +43,15 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Login failed');
+        if (response.status === 401) {
+          setError('Invalid email or password. Please check your credentials or create a new account.');
+        } else if (response.status === 400) {
+          setError('Please enter a valid email and password.');
+        } else if (response.status === 403) {
+          setError('Your account has been deactivated. Please contact support.');
+        } else {
+          setError(data.error || 'Login failed');
+        }
         return;
       }
 

@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../lib/prisma';
 
-const PASSWORD_MIN_LENGTH = 8;
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+const PASSWORD_MIN_LENGTH = 6;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]*/;
 
 /**
  * Validate email format
@@ -35,10 +35,6 @@ export function isValidPassword(password: string): {
 
   if (!/\d/.test(password)) {
     errors.push('Password must contain at least one number');
-  }
-
-  if (!/[@$!%*?&]/.test(password)) {
-    errors.push('Password must contain at least one special character (@$!%*?&)');
   }
 
   return {

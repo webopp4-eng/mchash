@@ -184,7 +184,7 @@ export default function EmailSignUp({ onBack, onLoginClick }: EmailSignUpProps) 
             disabled={loading}
           />
           {fieldErrors.password && <p className="text-red-400 text-xs mt-1">{fieldErrors.password}</p>}
-          <p className="text-xs text-slate-400 mt-1">Min 8 chars, uppercase, lowercase, number, special char</p>
+          <p className="text-xs text-slate-400 mt-1">Min 6 chars, with uppercase, lowercase, and a number</p>
         </div>
 
         {/* Confirm Password */}
