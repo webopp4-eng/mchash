@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FaClipboard, FaExclamationTriangle, FaPaste, FaShieldAlt, FaWallet, FaQrcode, FaSyncAlt } from 'react-icons/fa';
 import Logo from './Logo';
 import { API_URL } from '@/lib/auth';
-import { validateWalletAddress, isMobileDevice, mobileWallets, openMobileWallet, getWalletInstallUrl } from '@/lib/wallet';
+import { validateWalletAddress, isMobileDevice, mobileWallets, openMobileWallet, getWalletInstallUrl, connectPhantomWallet, signPhantomMessage, isPhantomProviderAvailable } from '@/lib/wallet';
 import { useAccount, useChainId, useSignMessage } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 
@@ -51,6 +51,7 @@ export default function WalletSignIn() {
   const [connectionStatus, setConnectionStatus] = useState('Detecting Wallet');
   const [mobileFallback, setMobileFallback] = useState<string | null>(null);
   const [autoConnect, setAutoConnect] = useState(false);
+  const [phantomAvailable, setPhantomAvailable] = useState(false);
 
   const { address, connector, isConnected } = useAccount();
   const chainId = useChainId();
@@ -61,6 +62,10 @@ export default function WalletSignIn() {
   const walletChain = useMemo(() => walletChainFromId(chainId), [chainId]);
   const walletType = connector?.name || 'Wallet';
   const isMobile = isMobileDevice();
+
+  useEffect(() => {
+    setPhantomAvailable(isPhantomProviderAvailable());
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem('cmhash_agreed', JSON.stringify(agreed));
@@ -87,12 +92,36 @@ export default function WalletSignIn() {
     router.replace(data.user.role === 'admin' ? '/admin' : '/dashboard');
   };
 
+  const authenticatePhantomWallet = useCallback(async () => {
+    const wallet = await connectPhantomWallet();
+    const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${wallet.address}?chain=solana`);
+    const nonceData = await safeJson(nonceRes);
+    if (!nonceRes.ok) throw new Error(nonceData.error || 'Failed to get wallet nonce');
+
+    const signature = await signPhantomMessage(nonceData.message);
+    const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        address: wallet.address,
+        chain: 'solana',
+        signature,
+        message: nonceData.message,
+        walletType: 'Phantom',
+        ...(referralCode ? { referredBy: referralCode } : {}),
+      }),
+    });
+    const authData = await safeJson(authRes);
+    if (!authRes.ok) throw new Error(authData.error || `Authentication failed (${authRes.status})`);
+    completeAuth(authData);
+  }, [referralCode, completeAuth]);
+
   const authenticateConnectedWallet = useCallback(async () => {
     if (!address) throw new Error('Wallet address is not available.');
     if (!walletChain) throw new Error('Unsupported network. Switch to Ethereum or BNB Smart Chain.');
 
     setConnectionStatus('Waiting for Approval');
-    const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${address}`);
+    const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${address}?chain=${encodeURIComponent(walletChain)}`);
     const nonceData = await safeJson(nonceRes);
     if (!nonceRes.ok) throw new Error(nonceData.error || 'Failed to get wallet nonce');
 
@@ -130,6 +159,25 @@ export default function WalletSignIn() {
       })
       .finally(() => setConnecting(false));
   }, [isConnected, allAgreed, autoConnect, connecting, authenticateConnectedWallet]);
+
+  useEffect(() => {
+    if (!allAgreed || !autoConnect || connecting) return;
+    if (localStorage.getItem('cmhash_token')) return;
+    if (isConnected && walletChain) return;
+    if (!phantomAvailable) return;
+
+    setConnecting(true);
+    setError(null);
+    setConnectionStatus('Opening Phantom Wallet');
+
+    authenticatePhantomWallet()
+      .catch((err: any) => {
+        console.error(err);
+        setConnectionStatus('Connection Failed');
+        setError(err?.message || 'Failed to authenticate Phantom wallet');
+      })
+      .finally(() => setConnecting(false));
+  }, [allAgreed, autoConnect, connecting, phantomAvailable, isConnected, walletChain, authenticatePhantomWallet]);
 
   // Handle wallet app redirect callback
   useEffect(() => {
@@ -186,6 +234,18 @@ export default function WalletSignIn() {
     }
     if (walletId === 'walletconnect') {
       handleConnectClick();
+      return;
+    }
+    if (walletId === 'phantom' && isPhantomProviderAvailable()) {
+      setConnectionStatus('Opening Phantom Wallet');
+      setConnecting(true);
+      authenticatePhantomWallet()
+        .catch((err: any) => {
+          console.error(err);
+          setConnectionStatus('Connection Failed');
+          setError(err?.message || 'Failed to authenticate Phantom wallet');
+        })
+        .finally(() => setConnecting(false));
       return;
     }
     setConnectionStatus('Opening Wallet');

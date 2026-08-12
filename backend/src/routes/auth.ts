@@ -11,6 +11,7 @@ import {
   findOrCreateUser,
   generateJWT,
   isValidWalletAddress,
+  createAuthMessage,
 } from '../services/walletAuth';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 
@@ -40,11 +41,14 @@ setInterval(() => {
 // Get nonce for wallet signing
 router.get('/nonce/:address', (req, res) => {
   const { address } = req.params;
-  if (!address || !isValidWalletAddress(address)) {
-    return res.status(400).json({ error: 'Invalid wallet address' });
+  const chain = String(req.query.chain || '').toLowerCase();
+  if (!address || !chain || !isValidWalletAddress(address, chain)) {
+    return res.status(400).json({ error: 'Invalid wallet address or chain' });
   }
-  const nonce = generateNonce(address);
-  res.json({ nonce, message: `Sign this message to authenticate with CM HASH:\n\nAddress: ${address}\nNonce: ${nonce}` });
+
+  const nonce = generateNonce(address, chain);
+  const message = createAuthMessage(address, chain, nonce, process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL || 'https://mchash.onrender.com');
+  res.json({ nonce, message });
 });
 
 // Generate QR code session
@@ -146,7 +150,7 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
     }
 
     const nonceMatch = typeof message === 'string' ? message.match(/Nonce:\s*([A-Za-z0-9+/=]+)$/) : null;
-    if (!nonceMatch || !verifyAndConsumeNonce(nonceMatch[1], address)) {
+    if (!nonceMatch || !verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
       return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
 
@@ -237,7 +241,7 @@ router.post('/wallet', async (req, res) => {
     if (!nonceMatch) {
       return res.status(400).json({ error: 'Invalid message format' });
     }
-    if (!verifyAndConsumeNonce(nonceMatch[1], address)) {
+    if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
       return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
 

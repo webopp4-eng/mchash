@@ -227,6 +227,36 @@ export async function signSolanaMessage(message: string, walletId?: string): Pro
   }
 }
 
+export function getPhantomProvider() {
+  return getSolanaProvider('phantom');
+}
+
+export function isPhantomProviderAvailable(): boolean {
+  return Boolean(getPhantomProvider());
+}
+
+export function isPhantomBrowser(): boolean {
+  if (typeof window === 'undefined') return false;
+  return Boolean((window as any).solana?.isPhantom);
+}
+
+export async function connectPhantomWallet(): Promise<WalletInfo> {
+  const solana = getPhantomProvider();
+  if (!solana) throw new Error('Phantom wallet is not available in this browser.');
+  try {
+    const response = await solana.connect();
+    const address = response.publicKey.toString();
+    return { address, chain: 'solana', walletType: 'Phantom' };
+  } catch (error: any) {
+    console.error('[Wallet] Phantom connect error:', error);
+    throw new Error(error.message || 'Failed to connect Phantom wallet');
+  }
+}
+
+export async function signPhantomMessage(message: string): Promise<string> {
+  return signSolanaMessage(message, 'phantom');
+}
+
 export async function signEvmMessage(message: string, walletId?: string): Promise<string> {
   try {
     const ethereum = getEvmProvider(walletId);
@@ -340,23 +370,7 @@ export function openMobileWallet(
     };
     window.addEventListener('pagehide', () => { leftPage = true; }, { once: true });
     document.addEventListener('visibilitychange', markHidden, { once: true });
-    window.localStorage.setItem('cmhash_return_url', opener);
     window.location.href = getWalletOpenUrl(wallet.id, opener);
-
-    // Set up listener for wallet app to redirect back
-    const handleIncomingRedirect = (e: PopStateEvent) => {
-      const returnUrl = window.localStorage.getItem('cmhash_return_url');
-      if (returnUrl && e.state?.fromWallet) {
-        // Process the wallet connection callback
-        window.localStorage.removeItem('cmhash_return_url');
-        window.removeEventListener('popstate', handleIncomingRedirect);
-        // Trigger re-authentication
-        window.dispatchEvent(new CustomEvent('cmhash:wallet-auth', {
-          detail: { fromWallet: true, returnUrl }
-        }));
-      }
-    };
-    window.addEventListener('popstate', handleIncomingRedirect, { once: true });
 
     window.setTimeout(() => {
       if (!leftPage && !document.hidden && wallet.id !== 'walletconnect') {

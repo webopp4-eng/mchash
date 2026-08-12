@@ -5,7 +5,14 @@ import bs58 from 'bs58';
 import nacl from 'tweetnacl';
 import prisma from '../lib/prisma';
 
-const issuedNonces = new Map<string, { address: string; timestamp: number; used: boolean }>();
+type NonceRecord = {
+  address: string;
+  chain: string;
+  timestamp: number;
+  used: boolean;
+};
+
+const issuedNonces = new Map<string, NonceRecord>();
 
 function cleanupNonces(maxAgeMs = 5 * 60 * 1000) {
   const now = Date.now();
@@ -15,39 +22,66 @@ function cleanupNonces(maxAgeMs = 5 * 60 * 1000) {
 }
 
 // Generate a nonce for wallet signing
-export function generateNonce(address: string): string {
+export function generateNonce(address: string, chain: string): string {
   cleanupNonces();
   const payload = {
     address,
+    chain,
     timestamp: Date.now(),
     random: crypto.randomBytes(16).toString('hex'),
   };
   const nonce = Buffer.from(JSON.stringify(payload)).toString('base64');
-  issuedNonces.set(nonce, { address, timestamp: payload.timestamp, used: false });
+  issuedNonces.set(nonce, {
+    address,
+    chain,
+    timestamp: payload.timestamp,
+    used: false,
+  });
   return nonce;
 }
 
-export function verifyNonce(nonce: string, maxAgeMs = 5 * 60 * 1000): { address: string; timestamp: number } | null {
+export function verifyNonce(nonce: string, maxAgeMs = 5 * 60 * 1000): { address: string; chain: string; timestamp: number } | null {
   try {
     const payload = JSON.parse(Buffer.from(nonce, 'base64').toString());
     if (Date.now() - payload.timestamp > maxAgeMs) return null;
-    if (typeof payload.address !== 'string') return null;
+    if (typeof payload.address !== 'string' || typeof payload.chain !== 'string') return null;
     return payload;
   } catch {
     return null;
   }
 }
 
-export function verifyAndConsumeNonce(nonce: string, address: string, maxAgeMs = 5 * 60 * 1000): boolean {
+export function verifyAndConsumeNonce(nonce: string, address: string, chain: string, maxAgeMs = 5 * 60 * 1000): boolean {
   cleanupNonces(maxAgeMs);
   const record = issuedNonces.get(nonce);
   const payload = verifyNonce(nonce, maxAgeMs);
   if (!record || record.used || !payload) return false;
   if (record.address.toLowerCase() !== address.toLowerCase()) return false;
+  if (record.chain.toLowerCase() !== chain.toLowerCase()) return false;
   if (payload.address.toLowerCase() !== address.toLowerCase()) return false;
+  if (payload.chain.toLowerCase() !== chain.toLowerCase()) return false;
   record.used = true;
   issuedNonces.delete(nonce);
   return true;
+}
+
+export function createAuthMessage(address: string, chain: string, nonce: string, domain: string): string {
+  const chainLabel = chain === 'solana' ? 'Solana' : chain === 'bnb' ? 'BNB Smart Chain' : 'Ethereum';
+  const issuedAt = new Date().toISOString();
+  const expiration = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  return [
+    'Sign in to CM HASH',
+    '',
+    `Wallet: ${address}`,
+    `Chain: ${chainLabel}`,
+    `Domain: ${domain}`,
+    `Nonce: ${nonce}`,
+    `Issued At: ${issuedAt}`,
+    `Expiration: ${expiration}`,
+    '',
+    'This signature is used only to authenticate your wallet.',
+    'It does not authorize a blockchain transaction.',
+  ].join('\n');
 }
 
 // Solana address validation (58-char base58, starts with specific patterns)
