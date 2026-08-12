@@ -21,20 +21,8 @@ export function isValidPassword(password: string): {
 } {
   const errors: string[] = [];
 
-  if (password.length < PASSWORD_MIN_LENGTH) {
-    errors.push(`Password must be at least ${PASSWORD_MIN_LENGTH} characters long`);
-  }
-
-  if (!/[a-z]/.test(password)) {
-    errors.push('Password must contain at least one lowercase letter');
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter');
-  }
-
-  if (!/\d/.test(password)) {
-    errors.push('Password must contain at least one number');
+  if (!password || password.length === 0) {
+    errors.push('Password is required');
   }
 
   return {
@@ -47,7 +35,7 @@ export function isValidPassword(password: string): {
  * Validate full name
  */
 export function isValidFullName(fullName: string): boolean {
-  return fullName.trim().length >= 2 && fullName.trim().length <= 100;
+  return Boolean(fullName && fullName.trim().length > 0);
 }
 
 /**
@@ -57,13 +45,11 @@ export function isValidUsername(username: string): {
   valid: boolean;
   error?: string;
 } {
-  // Username: 3-20 chars, alphanumeric + underscore
-  const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
-
-  if (!usernameRegex.test(username)) {
+  // Just require that username exists and is not empty
+  if (!username || username.trim().length === 0) {
     return {
       valid: false,
-      error: 'Username must be 3-20 characters, alphanumeric and underscores only',
+      error: 'Username is required',
     };
   }
 
@@ -137,11 +123,6 @@ export async function validateSignupData(data: {
   // Validate password
   if (!data.password) {
     errors.password = 'Password is required';
-  } else {
-    const passwordValidation = isValidPassword(data.password);
-    if (!passwordValidation.valid) {
-      errors.password = passwordValidation.errors[0] || 'Password does not meet requirements';
-    }
   }
 
   // Validate password confirmation
@@ -152,20 +133,13 @@ export async function validateSignupData(data: {
   // Validate full name
   if (!data.fullName) {
     errors.fullName = 'Full name is required';
-  } else if (!isValidFullName(data.fullName)) {
-    errors.fullName = 'Full name must be 2-100 characters';
   }
 
   // Validate username
   if (!data.username) {
     errors.username = 'Username is required';
-  } else {
-    const usernameValidation = isValidUsername(data.username);
-    if (!usernameValidation.valid) {
-      errors.username = usernameValidation.error || 'Invalid username';
-    } else if (await isUsernameExists(data.username)) {
-      errors.username = 'Username already taken';
-    }
+  } else if (await isUsernameExists(data.username)) {
+    errors.username = 'Username already taken';
   }
 
   // Validate country
