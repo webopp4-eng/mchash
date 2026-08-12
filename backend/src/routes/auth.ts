@@ -15,6 +15,13 @@ import {
   checkRateLimit,
   generateDeviceFingerprint,
 } from '../services/walletAuth';
+import {
+  hashPassword,
+  verifyPassword,
+  validateSignupData,
+  validateLoginData,
+  normalizeEmail,
+} from '../services/emailAuth';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -434,6 +441,348 @@ router.post('/logout', (req, res) => {
     path: '/',
   });
   res.json({ message: 'Logged out successfully' });
+});
+
+// ============ EMAIL AUTHENTICATION ROUTES ============
+
+// Email signup
+router.post('/email/register', async (req, res) => {
+  try {
+    const signupData = {
+      email: req.body.email?.trim() || '',
+      password: req.body.password || '',
+      confirmPassword: req.body.confirmPassword || '',
+      fullName: req.body.fullName?.trim() || '',
+      username: req.body.username?.trim() || '',
+      country: req.body.country?.trim() || '',
+    };
+
+    // Validate input
+    const validation = await validateSignupData(signupData);
+    if (!validation.valid) {
+      return res.status(400).json({ error: 'Validation failed', errors: validation.errors });
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(signupData.password);
+
+    // Generate unique referral code
+    let referralCode = '';
+    do {
+      referralCode = 'CMH' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    } while (await prisma.referral.findUnique({ where: { code: referralCode } }));
+
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        email: normalizeEmail(signupData.email),
+        passwordHash,
+        fullName: signupData.fullName,
+        username: signupData.username.toLowerCase(),
+        country: signupData.country,
+        authMethod: 'EMAIL',
+        referralCode,
+        status: 'active',
+        role: 'user',
+        platformBalance: 0,
+      },
+    });
+
+    // Create referral record
+    await prisma.referral.create({
+      data: {
+        userId: user.id,
+        code: referralCode,
+      },
+    });
+
+    // Generate JWT
+    const token = generateJWT(user.id);
+
+    // Set JWT as httpOnly cookie
+    res.cookie('cmhash_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    // Record login
+    await prisma.loginHistory.create({
+      data: {
+        userId: user.id,
+        walletAddress: 'email-signup',
+        chain: 'none',
+        deviceInfo: req.headers['user-agent'] || null,
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: 'login',
+        title: 'Welcome to CM HASH',
+        message: 'Your account has been created successfully. You can now sign in and start using the platform.',
+      },
+    });
+
+    res.status(201).json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        username: user.username,
+        country: user.country,
+        authMethod: user.authMethod,
+        referralCode: user.referralCode,
+        platformBalance: user.platformBalance,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Email signup error:', error);
+    res.status(500).json({ error: 'Failed to create account' });
+  }
+});
+
+// Email login
+router.post('/email/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    const validation = validateLoginData({ email, password });
+    if (!validation.valid) {
+      return res.status(400).json({ error: 'Validation failed', errors: validation.errors });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Check if user is active
+    if (user.status !== 'active') {
+      return res.status(403).json({ error: 'Your account is not active. Please contact support.' });
+    }
+
+    // Verify password
+    if (!user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate JWT
+    const token = generateJWT(user.id);
+
+    // Set JWT as httpOnly cookie
+    res.cookie('cmhash_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    // Record login
+    await prisma.loginHistory.create({
+      data: {
+        userId: user.id,
+        walletAddress: 'email-login',
+        chain: 'none',
+        deviceInfo: req.headers['user-agent'] || null,
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: 'login',
+        title: 'Welcome Back',
+        message: 'You have successfully logged in.',
+      },
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        username: user.username,
+        country: user.country,
+        authMethod: user.authMethod,
+        referralCode: user.referralCode,
+        platformBalance: user.platformBalance,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Email login error:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// Connect wallet to existing email account
+router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequest, res) => {
+  try {
+    const { address, chain, signature, message, walletType } = req.body;
+
+    // Validate wallet address
+    if (!isValidWalletAddress(address, chain)) {
+      return res.status(400).json({ error: 'Invalid wallet address' });
+    }
+
+    // Verify nonce
+    const nonceMatch = message.match(/Nonce:\s*([A-Za-z0-9+/=]+)$/);
+    if (!nonceMatch) {
+      return res.status(400).json({ error: 'Invalid message format' });
+    }
+
+    if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
+      return res.status(400).json({ error: 'Invalid or expired nonce' });
+    }
+
+    // Verify signature
+    let valid = false;
+    if (chain === 'solana') {
+      valid = verifySolanaSignature(message, signature, address);
+    } else {
+      valid = verifyEvmSignature(message, signature, address);
+    }
+
+    if (!valid) {
+      return res.status(401).json({ error: 'Signature verification failed' });
+    }
+
+    const normalizedAddress = address.toLowerCase();
+
+    // Check if wallet is already connected to a different user
+    const existingWallet = await prisma.wallet.findFirst({
+      where: {
+        address: {
+          equals: normalizedAddress,
+          mode: 'insensitive',
+        },
+      },
+      include: { user: true },
+    });
+
+    if (existingWallet && existingWallet.userId !== req.user!.id) {
+      return res.status(409).json({
+        error: 'This wallet is already connected to another account. Please use a different wallet.',
+      });
+    }
+
+    // If wallet already exists for this user, just return it
+    if (existingWallet && existingWallet.userId === req.user!.id) {
+      return res.json({
+        wallet: {
+          id: existingWallet.id,
+          address: existingWallet.address,
+          chain: existingWallet.chain,
+          isPrimary: existingWallet.isPrimary,
+          verifiedAt: existingWallet.verifiedAt,
+        },
+      });
+    }
+
+    // Create new wallet record
+    const wallet = await prisma.wallet.create({
+      data: {
+        userId: req.user!.id,
+        address: normalizedAddress,
+        chain,
+        isPrimary: false, // User can make it primary later
+        verifiedAt: new Date(),
+      },
+    });
+
+    res.status(201).json({
+      wallet: {
+        id: wallet.id,
+        address: wallet.address,
+        chain: wallet.chain,
+        isPrimary: wallet.isPrimary,
+        verifiedAt: wallet.verifiedAt,
+      },
+    });
+  } catch (error) {
+    console.error('Wallet connect error:', error);
+    res.status(500).json({ error: 'Failed to connect wallet' });
+  }
+});
+
+// Get user's wallets
+router.get('/wallets', authenticateToken, loadUser, async (req: AuthRequest, res) => {
+  try {
+    const wallets = await prisma.wallet.findMany({
+      where: { userId: req.user!.id },
+      select: {
+        id: true,
+        address: true,
+        chain: true,
+        isPrimary: true,
+        balance: true,
+        verifiedAt: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ wallets });
+  } catch (error) {
+    console.error('Get wallets error:', error);
+    res.status(500).json({ error: 'Failed to fetch wallets' });
+  }
+});
+
+// Disconnect wallet
+router.delete('/wallet/:walletId', authenticateToken, loadUser, async (req: AuthRequest, res) => {
+  try {
+    const { walletId } = req.params;
+
+    // Verify wallet belongs to user
+    const wallet = await prisma.wallet.findUnique({
+      where: { id: walletId },
+    });
+
+    if (!wallet) {
+      return res.status(404).json({ error: 'Wallet not found' });
+    }
+
+    if (wallet.userId !== req.user!.id) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    // Delete the wallet
+    await prisma.wallet.delete({
+      where: { id: walletId },
+    });
+
+    res.json({ message: 'Wallet disconnected successfully' });
+  } catch (error) {
+    console.error('Disconnect wallet error:', error);
+    res.status(500).json({ error: 'Failed to disconnect wallet' });
+  }
 });
 
 export default router;

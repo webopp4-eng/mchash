@@ -11,24 +11,41 @@ datasource db {
 
 model User {
   id            String    @id @default(uuid()) @db.Uuid
-  walletAddress String    @unique
-  chain         String
-
-  @@index([walletAddress])
+  
+  // Authentication method: EMAIL or WALLET
+  authMethod    String    @default("WALLET") // EMAIL or WALLET
+  
+  // Email authentication fields (optional, for email-authenticated users)
+  email         String?   @unique
+  passwordHash  String?
+  fullName      String?
+  country       String?
+  
+  // Legacy wallet-based fields (now optional)
+  walletAddress String?
+  chain         String?
   walletType    String?
-  username      String?
+  
+  // Account metadata
+  username      String?   @unique
   referralCode  String    @unique
   referredBy    String?   @db.Uuid
   status        String    @default("active") // active, suspended, banned
   role          String    @default("user") // user, admin
+  
+  // Financial tracking
   platformBalance Decimal  @default(0) @db.Decimal(18, 8)
   totalEarned   Decimal   @default(0) @db.Decimal(18, 8)
   totalDeposited Decimal  @default(0) @db.Decimal(18, 8)
   totalWithdrawn Decimal  @default(0) @db.Decimal(18, 8)
+  
+  // Timestamps
   lastLoginAt   DateTime?
+  emailVerifiedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  // Relations
   wallets        Wallet[]
   loginHistory   LoginHistory[]
   purchases      MiningPurchase[]
@@ -42,6 +59,11 @@ model User {
   referrals      Referral[]
   referralEarnings ReferralEarning[]
   auditLogs      AuditLog[]
+
+  @@index([email])
+  @@index([username])
+  @@index([authMethod])
+  @@index([walletAddress])
 }
 
 model Wallet {
@@ -52,6 +74,7 @@ model Wallet {
   balance   Decimal  @default(0) @db.Decimal(18, 8)
   token     String?
   isPrimary Boolean  @default(false)
+  verifiedAt DateTime? // When wallet ownership was verified
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -59,6 +82,7 @@ model Wallet {
 
   @@unique([userId, chain, address])
   @@index([userId])
+  @@index([address])
 }
 
 model LoginHistory {

@@ -1,10 +1,6 @@
-import { Suspense } from 'react';
-import WalletSignIn from '@/components/WalletSignIn';
+import { redirect } from 'next/navigation';
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen" />}>
-      <WalletSignIn />
-    </Suspense>
-  );
+  // Redirect to the new auth page
+  redirect('/auth');
 }
