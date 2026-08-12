@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { FaHome, FaUsers, FaLayerGroup, FaWallet, FaArrowUp, FaArrowDown, FaCogs, FaSignOutAlt, FaChartLine } from 'react-icons/fa';
 import Logo from '@/components/Logo';
-import { getUser, isAuthenticated } from '@/lib/auth';
+import { getUser, isAuthenticated, User } from '@/lib/auth';
 
 const adminNav = [
   { href: '/admin', label: 'Dashboard', icon: FaHome },
@@ -21,45 +21,65 @@ const adminNav = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const user = getUser();
+  const [isMounted, setIsMounted] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const deployMode = process.env.NEXT_PUBLIC_DEPLOY_MODE || 'public';
   const localAdminOnly = process.env.NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY === 'true';
 
   useEffect(() => {
+    setIsMounted(true);
+    
+    // Check if admin panel is available
     if (deployMode !== 'local-admin' || !localAdminOnly) {
       console.warn('[AdminLayout] Public build detected. Admin routes are local-only. Redirecting to public front page.');
+      setAccessDenied(true);
       router.replace('/');
       return;
     }
 
-    if (!isAuthenticated()) {
+    // Check authentication and admin role
+    const userData = getUser();
+    const authenticated = isAuthenticated();
+    
+    setUser(userData);
+    
+    if (!authenticated) {
       console.log('[AdminLayout] Not authenticated, redirecting to /login');
       router.replace('/login');
       return;
     }
-    if (!user || user.role !== 'admin') {
+    
+    if (!userData || userData.role !== 'admin') {
       console.log('[AdminLayout] Non-admin access blocked, redirecting to /dashboard');
+      setAccessDenied(true);
       router.replace('/dashboard');
       return;
     }
-  }, [router, user, deployMode, localAdminOnly]);
+    
+    setIsAdmin(true);
+  }, [router, deployMode, localAdminOnly]);
 
-  if (deployMode !== 'local-admin' || !localAdminOnly) {
+  // Show loading while checking access
+  if (!isMounted || accessDenied) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
         <div className="text-center">
-          <p className="text-sm text-slate-400">Admin panel is local-only.</p>
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500 mx-auto mb-3" />
+          <p className="text-sm text-slate-400">Checking admin access...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated() || !user || user.role !== 'admin') {
+  if (!isAdmin || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
         <div className="text-center">
-          <p className="text-sm text-slate-400">Checking admin access...</p>
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500 mx-auto mb-3" />
+          <p className="text-sm text-slate-400">Verifying credentials...</p>
         </div>
       </div>
     );
