@@ -39,6 +39,18 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Deployment diagnostics (local)
+        working-directory: frontend
+        run: |
+          echo "Commit: $GITHUB_SHA"
+          echo "Ref: $GITHUB_REF"
+          node -v || true
+          npm -v || true
+          echo "Listing frontend/out (first 200 entries):"
+          ls -la out | head -n 200 || true
+          echo "Show sample asset names and sizes:"
+          find out -maxdepth 3 -type f -printf "%p %s\n" | sort -r | head -n 200 || true
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

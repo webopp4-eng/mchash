@@ -301,7 +301,10 @@ router.patch('/withdrawals/:id', async (req, res) => {
       }
 
       res.status(400).json({ error: 'Unsupported status transition' });
-});
+  } catch (error) {
+    console.error('Withdrawal update error:', error);
+    res.status(500).json({ error: 'Failed to update withdrawal' });
+  });
 
 // ============ TREASURY WALLET MANAGEMENT ============
 router.get('/treasury', async (_req, res) => {
