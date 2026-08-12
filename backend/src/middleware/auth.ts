@@ -10,8 +10,18 @@ export interface AuthRequest extends Request {
 }
 
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+  // Try to get token from Authorization header first
+  let token: string | undefined;
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.split(' ')[1];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+  
+  // Fall back to httpOnly cookie if no Authorization header
+  if (!token && req.cookies && req.cookies.cmhash_token) {
+    token = req.cookies.cmhash_token;
+  }
+  
   if (!token) return res.status(401).json({ error: 'Missing token' });
 
   try {

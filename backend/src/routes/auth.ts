@@ -12,6 +12,8 @@ import {
   generateJWT,
   isValidWalletAddress,
   createAuthMessage,
+  checkRateLimit,
+  generateDeviceFingerprint,
 } from '../services/walletAuth';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 
@@ -46,8 +48,33 @@ router.get('/nonce/:address', (req, res) => {
     return res.status(400).json({ error: 'Invalid wallet address or chain' });
   }
 
-  const nonce = generateNonce(address, chain);
+  // Check rate limit
+  const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || 'unknown';
+  const rateLimitCheck = checkRateLimit(clientIp);
+  
+  if (!rateLimitCheck.allowed) {
+    const resetTimeSeconds = Math.ceil((rateLimitCheck.resetTime! - Date.now()) / 1000);
+    res.set('RateLimit-Limit', '5');
+    res.set('RateLimit-Remaining', '0');
+    res.set('RateLimit-Reset', String(Math.ceil(rateLimitCheck.resetTime! / 1000)));
+    return res.status(429).json({ 
+      error: `Rate limit exceeded. Please try again in ${resetTimeSeconds} seconds.`,
+      retryAfter: resetTimeSeconds,
+    });
+  }
+
+  // Generate device fingerprint
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const deviceFingerprint = generateDeviceFingerprint(userAgent, clientIp);
+
+  const nonce = generateNonce(address, chain, deviceFingerprint, clientIp);
   const message = createAuthMessage(address, chain, nonce, process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL || 'https://mchash.onrender.com');
+  
+  // Set rate limit headers
+  res.set('RateLimit-Limit', '5');
+  res.set('RateLimit-Remaining', String(rateLimitCheck.remaining));
+  res.set('RateLimit-Reset', String(Math.ceil(rateLimitCheck.resetTime! / 1000)));
+  
   res.json({ nonce, message });
 });
 
@@ -181,6 +208,15 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
     // Generate JWT
     const token = generateJWT(user.id);
 
+    // Set JWT as httpOnly cookie (secure against XSS)
+    res.cookie('cmhash_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
     // Record login
     await prisma.loginHistory.create({
       data: {
@@ -302,6 +338,16 @@ router.post('/wallet', async (req, res) => {
     // Generate JWT
     const token = generateJWT(user.id);
 
+    // Set JWT as httpOnly cookie (secure against XSS)
+    // Using 'sameSite: lax' for cross-site POST requests from wallet apps
+    res.cookie('cmhash_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
     res.json({
       token,
       created,
@@ -377,6 +423,17 @@ router.patch('/username', authenticateToken, loadUser, async (req: AuthRequest, 
     console.error('Update username error:', error);
     res.status(500).json({ error: 'Failed to update username' });
   }
+});
+
+// Logout endpoint - clears httpOnly cookie
+router.post('/logout', (req, res) => {
+  res.clearCookie('cmhash_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+  });
+  res.json({ message: 'Logged out successfully' });
 });
 
 export default router;

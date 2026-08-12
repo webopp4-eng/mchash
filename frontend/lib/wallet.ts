@@ -316,18 +316,69 @@ export function isMobileDevice(): boolean {
   return detectMobilePlatform().isMobile;
 }
 
-const walletConnectionRoutes = new Set(['/login', '/', '/dashboard']);
+const walletConnectionRoutes = new Set(['/login', '/', '/dashboard', '/dashboard/wallet']);
+
+/**
+ * Extract basePath from current location pathname
+ * E.g., /mchash/login → /mchash
+ * E.g., /login → ''
+ */
+function extractBasePath(): string {
+  if (typeof window === 'undefined') return '';
+  const pathname = window.location.pathname;
+  
+  // Known basePaths that might be used
+  const possibleBasePaths = ['/mchash', '/cm-hash', '/cmhash'];
+  for (const basePath of possibleBasePaths) {
+    if (pathname.startsWith(basePath) && pathname !== basePath) {
+      return basePath;
+    }
+  }
+  return '';
+}
+
+/**
+ * Validate route pathname, accounting for basePath
+ */
+function isValidWalletRedirectRoute(pathname: string, basePath: string): boolean {
+  // Remove basePath from pathname for comparison
+  const pathWithoutBase = basePath ? pathname.replace(basePath, '') : pathname;
+  
+  // Check if the route (without basePath) is in allowed list
+  if (walletConnectionRoutes.has(pathWithoutBase)) return true;
+  
+  // Also accept routes with basePath prepended
+  for (const route of walletConnectionRoutes) {
+    if (pathname === `${basePath}${route}`) return true;
+  }
+  
+  return false;
+}
 
 export function getSafeWalletRedirectUrl(routeOrUrl?: string): string {
   if (typeof window === 'undefined') return '/login';
+  
   const origin = window.location.origin;
-  const fallback = `${origin}/login?autoconnect=1`;
+  const basePath = extractBasePath();
+  const fallback = `${origin}${basePath}/login?autoconnect=1`;
 
   try {
-    const candidate = new URL(routeOrUrl || '/login?autoconnect=1', origin);
+    // Prepend basePath to route if it doesn't already have it
+    let urlToValidate = routeOrUrl || '/login?autoconnect=1';
+    if (!urlToValidate.startsWith(basePath) && !urlToValidate.startsWith('http')) {
+      urlToValidate = `${basePath}${urlToValidate}`;
+    }
+    
+    const candidate = new URL(urlToValidate, origin);
     if (candidate.origin !== origin) return fallback;
-    if (!walletConnectionRoutes.has(candidate.pathname)) return fallback;
-    if (!candidate.searchParams.has('autoconnect')) candidate.searchParams.set('autoconnect', '1');
+    
+    if (!isValidWalletRedirectRoute(candidate.pathname, basePath)) {
+      return fallback;
+    }
+    
+    if (!candidate.searchParams.has('autoconnect')) {
+      candidate.searchParams.set('autoconnect', '1');
+    }
     return candidate.toString();
   } catch {
     return fallback;
@@ -407,6 +458,64 @@ export function getWalletConnections(): Array<{ id: string; name: string; type: 
     protocol: resolveWalletProtocol(wallet.id),
     installUrl: getWalletInstallUrl(wallet.id),
     downloadUrl: getWalletInstallUrl(wallet.id),
+  }));
+}
+
+/**
+ * Get mobile wallets filtered by availability and current platform
+ * Returns available wallets first, then others
+ */
+export function getAvailableMobileWallets(): Array<{ 
+  id: string; 
+  name: string; 
+  chain: string; 
+  installed: boolean; 
+  installUrl: string;
+  description: string;
+}> {
+  if (typeof window === 'undefined') return [];
+
+  const detected = detectInstalledWallets();
+  const platform = detectMobilePlatform();
+  const detectedWallet = detectWalletBrowser();
+  
+  // Priority 1: Detected wallet (inside wallet app)
+  const priorityWallets: typeof mobileWallets = [];
+  if (detectedWallet) {
+    const match = mobileWallets.find(w => w.id === detectedWallet.walletId);
+    if (match) priorityWallets.push(match);
+  }
+  
+  // Priority 2: Installed wallets
+  for (const installedName of detected) {
+    const wallet = mobileWallets.find(w => w.name === installedName);
+    if (wallet && !priorityWallets.includes(wallet)) {
+      priorityWallets.push(wallet);
+    }
+  }
+  
+  // Priority 3: WalletConnect (always available as fallback)
+  const wcWallet = mobileWallets.find(w => w.id === 'walletconnect');
+  if (wcWallet && !priorityWallets.includes(wcWallet)) {
+    priorityWallets.push(wcWallet);
+  }
+  
+  // Priority 4: Other wallets
+  for (const wallet of mobileWallets) {
+    if (!priorityWallets.includes(wallet)) {
+      priorityWallets.push(wallet);
+    }
+  }
+  
+  return priorityWallets.map((wallet) => ({
+    id: wallet.id,
+    name: wallet.name,
+    chain: wallet.chain,
+    installed: detected.includes(wallet.name) || (detectedWallet?.walletId === wallet.id),
+    installUrl: getWalletInstallUrl(wallet.id),
+    description: wallet.id === 'walletconnect' 
+      ? 'Connect to 200+ wallets via QR code'
+      : `${wallet.chain} wallet${detected.includes(wallet.name) ? ' (Installed)' : ''}`,
   }));
 }
 

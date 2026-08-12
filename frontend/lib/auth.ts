@@ -20,8 +20,16 @@ export function getAdminApiBase(): string {
 }
 
 export function getToken(): string | null {
+  // Token is now stored in httpOnly cookie (not accessible from JavaScript)
+  // Frontend should rely on the cookie being sent automatically with credentials: 'include'
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('cmhash_token');
+  
+  // Try to get from localStorage for backward compatibility (during transition)
+  const stored = localStorage.getItem('cmhash_token');
+  if (stored) return stored;
+  
+  // Token is in httpOnly cookie - not readable from JavaScript for security
+  return null;
 }
 
 export function getUser(): User | null {
@@ -36,12 +44,25 @@ export function getUser(): User | null {
 }
 
 export function isAuthenticated(): boolean {
-  return Boolean(getToken());
+  return Boolean(getUser() && localStorage.getItem('cmhash_token'));
 }
 
-export function logout(router?: ReturnType<typeof import('next/navigation').useRouter>): void {
+export async function logout(router?: ReturnType<typeof import('next/navigation').useRouter>): Promise<void> {
+  try {
+    // Call backend logout endpoint to clear httpOnly cookie
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include', // Include httpOnly cookies
+    });
+  } catch (error) {
+    console.error('Logout request failed:', error);
+  }
+  
+  // Clear localStorage
   localStorage.removeItem('cmhash_token');
   localStorage.removeItem('cmhash_user');
+  localStorage.removeItem('cmhash_created');
+  
   if (router) {
     router.replace('/login');
   } else {

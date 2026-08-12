@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { FaClipboard, FaExclamationTriangle, FaPaste, FaShieldAlt, FaWallet, FaQrcode, FaSyncAlt } from 'react-icons/fa';
 import Logo from './Logo';
 import { API_URL } from '@/lib/auth';
-import { validateWalletAddress, isMobileDevice, mobileWallets, openMobileWallet, getWalletInstallUrl, connectPhantomWallet, signPhantomMessage, isPhantomProviderAvailable } from '@/lib/wallet';
+import { validateWalletAddress, isMobileDevice, getAvailableMobileWallets, openMobileWallet, getWalletInstallUrl, connectPhantomWallet, signPhantomMessage, isPhantomProviderAvailable } from '@/lib/wallet';
 import { useAccount, useChainId, useSignMessage } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
 
@@ -20,6 +20,24 @@ async function safeJson(res: Response): Promise<any> {
   } catch {
     return { error: text || `Server returned ${res.status}` };
   }
+}
+
+function getAuthErrorMessage(status: number, data: any, retryAfter?: string | null): string {
+  if (status === 429) {
+    // Rate limit error
+    const seconds = retryAfter ? parseInt(retryAfter) : 60;
+    return `Too many authentication attempts. Please try again in ${seconds} second${seconds !== 1 ? 's' : ''}.`;
+  }
+  if (status === 401) {
+    return 'Signature verification failed. Please try signing the message again.';
+  }
+  if (status === 400) {
+    return data.error || 'Invalid request. Please check your wallet address and try again.';
+  }
+  if (status === 403) {
+    return 'Your account is no longer active. Please contact support for assistance.';
+  }
+  return data.error || `Authentication failed (${status})`;
 }
 
 function walletChainFromId(chainId: number | undefined): SupportedChain | null {
@@ -94,14 +112,20 @@ export default function WalletSignIn() {
 
   const authenticatePhantomWallet = useCallback(async () => {
     const wallet = await connectPhantomWallet();
-    const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${wallet.address}?chain=solana`);
+    const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${wallet.address}?chain=solana`, {
+      credentials: 'include',
+    });
     const nonceData = await safeJson(nonceRes);
-    if (!nonceRes.ok) throw new Error(nonceData.error || 'Failed to get wallet nonce');
+    if (!nonceRes.ok) {
+      const retryAfter = nonceRes.headers.get('retry-after');
+      throw new Error(getAuthErrorMessage(nonceRes.status, nonceData, retryAfter));
+    }
 
     const signature = await signPhantomMessage(nonceData.message);
     const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({
         address: wallet.address,
         chain: 'solana',
@@ -112,7 +136,10 @@ export default function WalletSignIn() {
       }),
     });
     const authData = await safeJson(authRes);
-    if (!authRes.ok) throw new Error(authData.error || `Authentication failed (${authRes.status})`);
+    if (!authRes.ok) {
+      const retryAfter = authRes.headers.get('retry-after');
+      throw new Error(getAuthErrorMessage(authRes.status, authData, retryAfter));
+    }
     completeAuth(authData);
   }, [referralCode, completeAuth]);
 
@@ -121,14 +148,20 @@ export default function WalletSignIn() {
     if (!walletChain) throw new Error('Unsupported network. Switch to Ethereum or BNB Smart Chain.');
 
     setConnectionStatus('Waiting for Approval');
-    const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${address}?chain=${encodeURIComponent(walletChain)}`);
+    const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${address}?chain=${encodeURIComponent(walletChain)}`, {
+      credentials: 'include',
+    });
     const nonceData = await safeJson(nonceRes);
-    if (!nonceRes.ok) throw new Error(nonceData.error || 'Failed to get wallet nonce');
+    if (!nonceRes.ok) {
+      const retryAfter = nonceRes.headers.get('retry-after');
+      throw new Error(getAuthErrorMessage(nonceRes.status, nonceData, retryAfter));
+    }
 
     const signature = await signMessageAsync({ message: nonceData.message });
     const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({
         address,
         chain: walletChain,
@@ -139,7 +172,10 @@ export default function WalletSignIn() {
       }),
     });
     const authData = await safeJson(authRes);
-    if (!authRes.ok) throw new Error(authData.error || `Authentication failed (${authRes.status})`);
+    if (!authRes.ok) {
+      const retryAfter = authRes.headers.get('retry-after');
+      throw new Error(getAuthErrorMessage(authRes.status, authData, retryAfter));
+    }
     completeAuth(authData);
   }, [address, walletChain, walletType, referralCode, completeAuth]);
 
@@ -269,6 +305,7 @@ export default function WalletSignIn() {
       const res = await fetch(`${API_URL}/api/auth/qr/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ connectionUri: '' }),
       });
       const data = await safeJson(res);
@@ -364,7 +401,7 @@ export default function WalletSignIn() {
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="mb-3 text-xs font-semibold text-slate-300">Or choose a mobile wallet:</p>
                     <div className="grid grid-cols-2 gap-2">
-                      {mobileWallets.map((wallet) => (
+                      {getAvailableMobileWallets().map((wallet) => (
                         <button
                           key={wallet.id}
                           onClick={() => handleMobileWallet(wallet.id)}
@@ -443,7 +480,7 @@ export default function WalletSignIn() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  {mobileWallets.map((wallet) => (
+                  {getAvailableMobileWallets().map((wallet) => (
                     <button
                       key={wallet.id}
                       onClick={() => handleMobileWallet(wallet.id)}
