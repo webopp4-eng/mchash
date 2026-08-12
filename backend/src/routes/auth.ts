@@ -106,7 +106,7 @@ router.post('/qr/session', async (req, res) => {
       metadata: {
         name: 'CM HASH',
         description: 'Wallet address sign-in for CM HASH',
-        url: process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL || 'https://mchash.vercel.app',
+        url: process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL || '',
       },
       issuedAt: new Date().toISOString(),
       expiresAt: expiresAt.toISOString(),

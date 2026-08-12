@@ -39,11 +39,10 @@ app.use((req, res, next) => {
 });
 
 const allowedOrigins = [
-  process.env.PUBLIC_FRONTEND_URL || 'https://mchash.vercel.app',
-  process.env.RENDER_FRONTEND_URL || 'https://mchash.vercel.app',
+  process.env.PUBLIC_FRONTEND_URL,
+  process.env.RENDER_FRONTEND_URL,
   'https://webopp4-eng.github.io',
-  'https://mchash.vercel.app',
-];
+].filter(Boolean);
 
 // Add localhost origins only in development
 if (process.env.NODE_ENV !== 'production') {
