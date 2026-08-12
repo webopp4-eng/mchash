@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FaClipboard, FaExclamationTriangle, FaPaste, FaShieldAlt, FaWallet, FaQrcode, FaSyncAlt } from 'react-icons/fa';
 import Logo from './Logo';
@@ -32,7 +32,17 @@ export default function WalletSignIn() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const referralCode = searchParams.get('ref');
-  const [agreed, setAgreed] = useState({ terms: false, privacy: false, risk: false });
+  const [agreed, setAgreed] = useState(() => {
+    if (typeof window === 'undefined') {
+      return { terms: false, privacy: false, risk: false };
+    }
+    try {
+      const stored = window.localStorage.getItem('cmhash_agreed');
+      return stored ? JSON.parse(stored) : { terms: false, privacy: false, risk: false };
+    } catch {
+      return { terms: false, privacy: false, risk: false };
+    }
+  });
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<string | null>(null);
@@ -40,6 +50,7 @@ export default function WalletSignIn() {
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('wallet');
   const [connectionStatus, setConnectionStatus] = useState('Detecting Wallet');
   const [mobileFallback, setMobileFallback] = useState<string | null>(null);
+  const [autoConnect, setAutoConnect] = useState(false);
 
   const { address, connector, isConnected } = useAccount();
   const chainId = useChainId();
@@ -51,16 +62,32 @@ export default function WalletSignIn() {
   const walletType = connector?.name || 'Wallet';
   const isMobile = isMobileDevice();
 
+  useEffect(() => {
+    window.localStorage.setItem('cmhash_agreed', JSON.stringify(agreed));
+  }, [agreed]);
+
+  useEffect(() => {
+    const shouldAuto = searchParams.get('autoconnect') === '1';
+    setAutoConnect(shouldAuto);
+    if (typeof window !== 'undefined') {
+      const returnUrl = window.localStorage.getItem('cmhash_return_url');
+      if (returnUrl && shouldAuto) {
+        setConnectionStatus('Processing wallet connection...');
+      }
+    }
+  }, [searchParams]);
+
   const completeAuth = (data: any) => {
     localStorage.setItem('cmhash_token', data.token);
     localStorage.setItem('cmhash_user', JSON.stringify(data.user));
     localStorage.setItem('cmhash_created', String(Boolean(data.created)));
+    window.localStorage.removeItem('cmhash_return_url');
     setAuthStatus(data.created ? 'New Account Created' : 'Welcome Back');
     setConnectionStatus('Connected');
     router.replace(data.user.role === 'admin' ? '/admin' : '/dashboard');
   };
 
-  const authenticateConnectedWallet = async () => {
+  const authenticateConnectedWallet = useCallback(async () => {
     if (!address) throw new Error('Wallet address is not available.');
     if (!walletChain) throw new Error('Unsupported network. Switch to Ethereum or BNB Smart Chain.');
 
@@ -85,10 +112,10 @@ export default function WalletSignIn() {
     const authData = await safeJson(authRes);
     if (!authRes.ok) throw new Error(authData.error || `Authentication failed (${authRes.status})`);
     completeAuth(authData);
-  };
+  }, [address, walletChain, walletType, referralCode, completeAuth]);
 
   useEffect(() => {
-    if (!isConnected || !allAgreed || connecting) return;
+    if (!isConnected || !allAgreed || !autoConnect || connecting) return;
     if (localStorage.getItem('cmhash_token')) return;
 
     setConnecting(true);
@@ -102,24 +129,39 @@ export default function WalletSignIn() {
         setError(err?.message || 'Failed to authenticate wallet');
       })
       .finally(() => setConnecting(false));
-  }, [isConnected, allAgreed, address, walletChain, walletType]);
+  }, [isConnected, allAgreed, autoConnect, connecting, authenticateConnectedWallet]);
 
   // Handle wallet app redirect callback
   useEffect(() => {
-    const handleWalletAuth = (e: PopStateEvent) => {
-      // Check if this was triggered from wallet app redirect
+    const handleWalletAuth = (event: Event) => {
+      const customEvent = event as CustomEvent<{ fromWallet?: boolean; returnUrl?: string }>;
+      const fromWallet = customEvent?.detail?.fromWallet || (event as PopStateEvent)?.state?.fromWallet;
+      if (!fromWallet) return;
+
       const returnUrl = window.localStorage.getItem('cmhash_return_url');
-      if (returnUrl && !connecting) {
-        setConnectionStatus('Processing wallet connection...');
-        // Navigate back to dashboard with the authenticated session
-        // The backend will handle the referral code from the original URL
-        window.localStorage.removeItem('cmhash_return_url');
-        router.replace('/dashboard');
-      }
+      if (!returnUrl) return;
+
+      setConnectionStatus('Processing wallet connection...');
+      setAutoConnect(true);
+
+      if (!isConnected || !allAgreed) return;
+      setConnecting(true);
+      authenticateConnectedWallet()
+        .catch((err: any) => {
+          console.error(err);
+          setConnectionStatus('Connection Failed');
+          setError(err?.message || 'Failed to authenticate wallet');
+        })
+        .finally(() => setConnecting(false));
     };
-    window.addEventListener('popstate', handleWalletAuth);
-    return () => window.removeEventListener('popstate', handleWalletAuth);
-  }, [connecting, router]);
+
+    window.addEventListener('cmhash:wallet-auth', handleWalletAuth as EventListener);
+    window.addEventListener('popstate', handleWalletAuth as EventListener);
+    return () => {
+      window.removeEventListener('cmhash:wallet-auth', handleWalletAuth as EventListener);
+      window.removeEventListener('popstate', handleWalletAuth as EventListener);
+    };
+  }, [authenticateConnectedWallet, allAgreed, isConnected]);
 
   const handleConnectClick = async () => {
     setError(null);
