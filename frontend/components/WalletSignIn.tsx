@@ -70,6 +70,7 @@ export default function WalletSignIn() {
   const [mobileFallback, setMobileFallback] = useState<string | null>(null);
   const [autoConnect, setAutoConnect] = useState(false);
   const [phantomAvailable, setPhantomAvailable] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   const { address, connector, isConnected } = useAccount();
   const chainId = useChainId();
@@ -81,7 +82,9 @@ export default function WalletSignIn() {
   const walletType = connector?.name || 'Wallet';
   const isMobile = isMobileDevice();
 
+  // Hydration safety: mark as mounted after client hydration
   useEffect(() => {
+    setIsMounted(true);
     setPhantomAvailable(isPhantomProviderAvailable());
   }, []);
 
@@ -394,7 +397,7 @@ export default function WalletSignIn() {
                   disabled={connecting}
                 >
                   <FaWallet className="h-5 w-5" />
-                  {isConnected ? 'Sign In with Wallet' : 'Connect Wallet'}
+                  {isMounted && isConnected ? 'Sign In with Wallet' : 'Connect Wallet'}
                 </button>
 
                 {isMobile && (
@@ -418,7 +421,7 @@ export default function WalletSignIn() {
                   </div>
                 )}
 
-                {isConnected && address && (
+                {isMounted && isConnected && address && (
                   <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-200">
                     <p className="font-semibold">Connected Wallet</p>
                     <p className="mt-1 break-words text-xs text-slate-400">{address}</p>
