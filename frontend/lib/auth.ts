@@ -40,23 +40,31 @@ export function getUser(): User | null {
   
   // Check runtime cache first (for hydration issues)
   if (runtimeUserCache) {
-    console.log('[getUser] Returning cached user:', runtimeUserCache.id);
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:STATE] getUser() from cache: id=${runtimeUserCache.id}`);
+    }
     return runtimeUserCache;
   }
   
   const stored = localStorage.getItem('cmhash_user');
   if (!stored) {
-    console.log('[getUser] No user data in localStorage');
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:STATE] getUser() no data in localStorage`);
+    }
     return null;
   }
   
   try {
     const user = JSON.parse(stored);
-    console.log('[getUser] Loaded user from localStorage:', user.id);
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:STATE] getUser() from localStorage: id=${user.id}`);
+    }
     runtimeUserCache = user;
     return user;
   } catch (err) {
-    console.error('[getUser] Failed to parse user data:', err);
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.error(`[AUTH-DEBUG:STATE] getUser() failed to parse: ${err instanceof Error ? err.message : String(err)}`);
+    }
     return null;
   }
 }
@@ -69,10 +77,17 @@ export function setUser(user: User | null): void {
   if (user) {
     const userData = JSON.stringify(user);
     localStorage.setItem('cmhash_user', userData);
-    console.log('[setUser] Stored user:', user.id);
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:STATE] setUser() stored: id=${user.id}`);
+      console.log(`[AUTH-DEBUG:STATE] runtimeUserCache updated`);
+      console.log(`[AUTH-DEBUG:STORAGE] localStorage['cmhash_user'] set`);
+    }
   } else {
     localStorage.removeItem('cmhash_user');
-    console.log('[setUser] Cleared user data');
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:STATE] setUser(null) cleared user data`);
+      console.log(`[AUTH-DEBUG:STORAGE] localStorage['cmhash_user'] removed`);
+    }
   }
 }
 
@@ -81,19 +96,31 @@ export function isAuthenticated(): boolean {
   // (token is in httpOnly cookie, can't access from JS, but if user data is there, they logged in successfully)
   const user = getUser();
   const isAuth = Boolean(user);
-  console.log('[isAuthenticated]', { isAuth, hasUser: !!user });
+  if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+    console.log(`[AUTH-DEBUG:STATE] isAuthenticated() result: ${isAuth}`);
+  }
   return isAuth;
 }
 
 export async function logout(router?: ReturnType<typeof import('next/navigation').useRouter>): Promise<void> {
   try {
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:REQUEST] POST /api/auth/logout calling`);
+    }
+
     // Call backend logout endpoint to clear httpOnly cookie
     await fetch(`${API_URL}/api/auth/logout`, {
       method: 'POST',
       credentials: 'include', // Include httpOnly cookies
     });
+
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:REQUEST] POST /api/auth/logout completed`);
+    }
   } catch (error) {
-    console.error('[logout] Request failed:', error);
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.error(`[AUTH-DEBUG:REQUEST] POST /api/auth/logout failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
   
   // Clear runtime cache
@@ -106,7 +133,9 @@ export async function logout(router?: ReturnType<typeof import('next/navigation'
   localStorage.removeItem('cmhash_return_url');
   localStorage.removeItem('cmhash_autoconnect');
   
-  console.log('[logout] Cleared all auth data');
+  if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+    console.log(`[AUTH-DEBUG:STATE] logout() cleared all auth data`);
+  }
   
   if (router) {
     router.push('/login');
@@ -123,25 +152,43 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     ...options.headers,
   };
 
+  if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+    console.log(`[AUTH-DEBUG:REQUEST] ${options.method || 'GET'} ${path} called`);
+    console.log(`[AUTH-DEBUG:REQUEST] fetch options: credentials='include'`);
+  }
+
   try {
     const res = await fetch(`${API_URL}${path}`, {
       ...options,
       credentials: 'include', // Include httpOnly cookies with every request
       headers,
     });
+
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.log(`[AUTH-DEBUG:REQUEST] Response status: ${res.status} for ${path}`);
+    }
+
     if (res.status === 401) {
-      console.error('[apiFetch] Unauthorized access detected, logging out', path);
+      if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+        console.error(`[AUTH-DEBUG:REQUEST] Unauthorized (401), logging out`);
+      }
       logout();
       throw new Error('Session expired');
     }
+
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      console.error('[apiFetch] Backend request failed:', res.status, path, data);
+      if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+        console.error(`[AUTH-DEBUG:REQUEST] Request failed: ${res.status} ${path}`);
+        console.error(`[AUTH-DEBUG:REQUEST] Error: ${data.error}`);
+      }
       throw new Error(data.error || 'Request failed');
     }
     return data;
   } catch (error) {
-    console.error('[apiFetch] Request error:', path, error);
+    if (process.env.NODE_ENV === 'development' || localStorage.getItem('cmhash_debug')) {
+      console.error(`[AUTH-DEBUG:REQUEST] Exception: ${path} - ${error instanceof Error ? error.message : String(error)}`);
+    }
     throw error;
   }
 }

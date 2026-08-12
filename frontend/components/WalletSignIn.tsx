@@ -105,18 +105,21 @@ export default function WalletSignIn() {
 
   const completeAuth = useCallback((data: any) => {
     try {
-      console.log('[completeAuth] Starting auth completion with user:', data.user?.id);
+      const debugMode = localStorage.getItem('cmhash_debug') || process.env.NODE_ENV === 'development';
+      if (debugMode) {
+        console.log(`[AUTH-DEBUG:STATE] completeAuth() called with user: ${data.user?.id}`);
+      }
       
       // Store authentication data
       if (data.token) {
         localStorage.setItem('cmhash_token', data.token);
-        console.log('[completeAuth] Token stored');
+        if (debugMode) console.log(`[AUTH-DEBUG:STORAGE] Token stored in localStorage`);
       }
       
       // Use setUser function to store user and update runtime cache
       if (data.user) {
         setUser(data.user);
-        console.log('[completeAuth] User stored via setUser()');
+        if (debugMode) console.log(`[AUTH-DEBUG:STATE] User stored via setUser(), id=${data.user.id}`);
       }
       
       if (data.created !== undefined) {
@@ -130,7 +133,7 @@ export default function WalletSignIn() {
       // Verify data was stored before redirecting
       const storedUser = localStorage.getItem('cmhash_user');
       if (!storedUser) {
-        console.error('[completeAuth] Failed to store user data in localStorage');
+        if (debugMode) console.error(`[AUTH-DEBUG:STORAGE] Failed to persist user data in localStorage`);
         setError('Failed to save authentication data');
         setConnecting(false);
         return;
@@ -141,11 +144,14 @@ export default function WalletSignIn() {
       
       // Determine redirect URL
       const redirectUrl = data.user.role === 'admin' ? '/admin' : '/dashboard';
-      console.log('[completeAuth] Auth complete, redirecting to:', redirectUrl);
+      if (debugMode) {
+        console.log(`[AUTH-DEBUG:REDIRECT] Redirect target: ${redirectUrl}`);
+        console.log(`[AUTH-DEBUG:REDIRECT] Waiting 200ms for state settlement`);
+      }
       
       // Redirect after a delay to ensure all data is synced
       setTimeout(() => {
-        console.log('[completeAuth] Executing redirect to:', redirectUrl);
+        if (debugMode) console.log(`[AUTH-DEBUG:REDIRECT] Executing router.push('${redirectUrl}')`);
         router.push(redirectUrl);
       }, 200);
     } catch (err) {
@@ -192,7 +198,17 @@ export default function WalletSignIn() {
     if (!address) throw new Error('Wallet address is not available.');
     if (!walletChain) throw new Error('Unsupported network. Switch to Ethereum or BNB Smart Chain.');
 
+    const debugMode = localStorage.getItem('cmhash_debug') || process.env.NODE_ENV === 'development';
+    if (debugMode) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] Wallet connected: ${address?.substring(0, 10)}..., chain: ${walletChain}`);
+    }
+
     setConnectionStatus('Waiting for Approval');
+    
+    if (debugMode) {
+      console.log(`[AUTH-DEBUG:REQUEST] GET /api/auth/nonce/${address?.substring(0, 10)}... called`);
+    }
+    
     const nonceRes = await fetch(`${API_URL}/api/auth/nonce/${address}?chain=${encodeURIComponent(walletChain)}`, {
       credentials: 'include',
     });
@@ -202,7 +218,18 @@ export default function WalletSignIn() {
       throw new Error(getAuthErrorMessage(nonceRes.status, nonceData, retryAfter));
     }
 
+    if (debugMode) {
+      console.log(`[AUTH-DEBUG:NONCE] Nonce received from backend`);
+      console.log(`[AUTH-DEBUG:NONCE] Message length: ${nonceData.message.length}`);
+    }
+
     const signature = await signMessageAsync({ message: nonceData.message });
+    
+    if (debugMode) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] User signed message, signature length: ${signature.length}`);
+      console.log(`[AUTH-DEBUG:REQUEST] POST /api/auth/wallet sending signature`);
+    }
+
     const authRes = await fetch(`${API_URL}/api/auth/wallet`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -221,8 +248,14 @@ export default function WalletSignIn() {
       const retryAfter = authRes.headers.get('retry-after');
       throw new Error(getAuthErrorMessage(authRes.status, authData, retryAfter));
     }
+
+    if (debugMode) {
+      console.log(`[AUTH-DEBUG:REQUEST] POST /api/auth/wallet successful, status: ${authRes.status}`);
+      console.log(`[AUTH-DEBUG:SESSION] Response includes user and token`);
+    }
+
     completeAuth(authData);
-  }, [address, walletChain, walletType, referralCode, completeAuth]);
+  }, [address, walletChain, walletType, referralCode, completeAuth, signMessageAsync]);
 
   useEffect(() => {
     if (!isConnected || !allAgreed || !autoConnect || connecting) return;

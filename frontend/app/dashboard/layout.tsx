@@ -18,10 +18,15 @@ export default function DashboardLayoutWrapper({ children }: { children: React.R
 
   useEffect(() => {
     setIsMounted(true);
+    const debugMode = localStorage.getItem('cmhash_debug') || process.env.NODE_ENV === 'development';
     
     // Check authentication with retry logic
     const checkAuth = async () => {
       let retries = 0;
+      
+      if (debugMode) {
+        console.log(`[AUTH-DEBUG:STATE] Dashboard layout mounted, starting auth check`);
+      }
       
       while (retries < MAX_RETRIES) {
         try {
@@ -31,11 +36,15 @@ export default function DashboardLayoutWrapper({ children }: { children: React.R
           const userData = getUser();
           const authenticated = isAuthenticated();
           
-          console.log(`[DashboardLayout] Auth check attempt ${retries + 1}:`, { authenticated, hasUser: !!userData });
+          if (debugMode) {
+            console.log(`[AUTH-DEBUG:STATE] checkAuth() attempt ${retries + 1}/${MAX_RETRIES}: authenticated=${authenticated}, hasUser=${!!userData}`);
+          }
           
           // If we found a user, we're authenticated - stop checking
           if (authenticated && userData) {
-            console.log('[DashboardLayout] Authentication verified, user:', userData.id);
+            if (debugMode) {
+              console.log(`[AUTH-DEBUG:STATE] checkAuth() PASSED, user=${userData.id}`);
+            }
             setUser(userData);
             setIsAuth(true);
             setIsChecking(false);
@@ -44,13 +53,17 @@ export default function DashboardLayoutWrapper({ children }: { children: React.R
           
           retries++;
         } catch (err) {
-          console.error('[DashboardLayout] Auth check error:', err);
+          if (debugMode) {
+            console.error(`[AUTH-DEBUG:STATE] checkAuth() error: ${err instanceof Error ? err.message : String(err)}`);
+          }
           retries++;
         }
       }
       
       // After all retries, if still not authenticated, redirect
-      console.log('[DashboardLayout] Auth check failed after retries, redirecting to /login');
+      if (debugMode) {
+        console.log(`[AUTH-DEBUG:REDIRECT] checkAuth() failed after ${MAX_RETRIES} retries, redirecting to /login`);
+      }
       setIsChecking(false);
       setRedirecting(true);
       router.push('/login');

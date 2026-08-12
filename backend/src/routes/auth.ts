@@ -270,8 +270,16 @@ const authSchema = z.object({
 
 router.post('/wallet', async (req, res) => {
   try {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:REQUEST] POST /api/auth/wallet received`);
+      console.log(`[AUTH-DEBUG:REQUEST] Body: address=${req.body.address?.substring(0, 10)}..., chain=${req.body.chain}`);
+    }
+
     const parsed = authSchema.safeParse(req.body);
     if (!parsed.success) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:REQUEST] Validation failed: ${JSON.stringify(parsed.error.errors)}`);
+      }
       return res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
     }
 
@@ -279,14 +287,29 @@ router.post('/wallet', async (req, res) => {
 
     // Verify nonce from message
     if (!isValidWalletAddress(address, chain)) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:REQUEST] Invalid wallet address: ${address}`);
+      }
       return res.status(400).json({ error: 'Invalid wallet address' });
     }
 
     const nonceMatch = message.match(/Nonce:\s*([A-Za-z0-9+/=]+)/);
     if (!nonceMatch) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:NONCE] Message does not contain valid Nonce field`);
+        console.log(`[AUTH-DEBUG:NONCE] Message preview: ${message.substring(0, 100)}...`);
+      }
       return res.status(400).json({ error: 'Invalid message format. Missing nonce.' });
     }
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:NONCE] Nonce extracted from message: ${nonceMatch[1].substring(0, 20)}...`);
+    }
+
     if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:NONCE] Nonce verification failed`);
+      }
       return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
 
@@ -299,7 +322,14 @@ router.post('/wallet', async (req, res) => {
     }
 
     if (!valid) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:SIGNATURE] Signature verification FAILED`);
+      }
       return res.status(401).json({ error: 'Signature verification failed' });
+    }
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] Signature verification PASSED`);
     }
 
     // Resolve referral code to referrer user ID if provided
@@ -311,13 +341,27 @@ router.post('/wallet', async (req, res) => {
       });
       if (referrer) {
         referrerId = referrer.id;
+        if (process.env.ENABLE_DEBUG_LOGGING) {
+          console.log(`[AUTH-DEBUG:REQUEST] Referrer found: ${referrerId}`);
+        }
       }
     }
 
     // Find or create user
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SESSION] Calling findOrCreateUser()`);
+    }
+
     const { user, created } = await findOrCreateUser(address, chain, walletType, referrerId);
     if (!user) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:SESSION] findOrCreateUser returned null user`);
+      }
       return res.status(500).json({ error: 'Unable to materialize wallet account' });
+    }
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SESSION] User resolved: id=${user.id}, created=${created}`);
     }
 
     // Record login history
@@ -332,6 +376,10 @@ router.post('/wallet', async (req, res) => {
         userAgent: req.headers['user-agent'] || null,
       },
     });
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SESSION] Login history recorded`);
+    }
 
     // Create notification
     await prisma.notification.create({
@@ -349,6 +397,10 @@ router.post('/wallet', async (req, res) => {
     // Generate JWT
     const token = generateJWT(user.id);
 
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SESSION] JWT token generated: ${token.substring(0, 20)}...`);
+    }
+
     // Set JWT as httpOnly cookie (secure against XSS)
     // Using 'sameSite: lax' for cross-site POST requests from wallet apps
     res.cookie('cmhash_token', token, {
@@ -358,6 +410,14 @@ router.post('/wallet', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
     });
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SESSION] httpOnly cookie set: cmhash_token, httpOnly=true, secure=${process.env.NODE_ENV === 'production'}, sameSite=lax`);
+    }
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:REQUEST] POST /api/auth/wallet response: status=200, user.id=${user.id}, created=${created}`);
+    }
 
     res.json({
       token,
@@ -395,8 +455,15 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:WALLET] POST /api/auth/wallet/connect received, user=${user.id}`);
+    }
+
     const parsed = connectWalletSchema.safeParse(req.body);
     if (!parsed.success) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:WALLET] Validation failed: ${JSON.stringify(parsed.error.errors)}`);
+      }
       return res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
     }
 
@@ -404,15 +471,29 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
 
     // Validate wallet address
     if (!isValidWalletAddress(address, chain)) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:WALLET] Invalid wallet address: ${address}`);
+      }
       return res.status(400).json({ error: 'Invalid wallet address' });
     }
 
     // Verify nonce from message
     const nonceMatch = message.match(/Nonce:\s*([A-Za-z0-9+/=]+)/);
     if (!nonceMatch) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:WALLET] Message format invalid, no Nonce found`);
+      }
       return res.status(400).json({ error: 'Invalid message format. Missing nonce.' });
     }
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:NONCE] Verifying nonce for wallet connect`);
+    }
+
     if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:NONCE] Nonce verification failed`);
+      }
       return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
 
@@ -425,7 +506,14 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
     }
 
     if (!valid) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:SIGNATURE] Signature verification failed for wallet connect`);
+      }
       return res.status(401).json({ error: 'Signature verification failed' });
+    }
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] Signature verification PASSED for wallet connect`);
     }
 
     const normalizedAddress = address.toLowerCase();
@@ -438,7 +526,17 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
       },
     });
 
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:WALLET] Existing wallet check: found=${!!existingWallet}`);
+      if (existingWallet) {
+        console.log(`[AUTH-DEBUG:WALLET] Existing wallet userId: ${existingWallet.userId}, current user: ${user.id}`);
+      }
+    }
+
     if (existingWallet && existingWallet.userId !== user.id) {
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:WALLET] Duplicate prevention: wallet belongs to different user`);
+      }
       return res.status(400).json({ 
         error: 'This wallet is already connected to another account' 
       });
@@ -446,13 +544,18 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
 
     // If wallet exists and belongs to this user, just mark it verified and return success
     if (existingWallet) {
-      console.log(`[connectWallet] Wallet ${normalizedAddress} already connected to user ${user.id}`);
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:WALLET] Wallet already belongs to this user`);
+      }
       
       if (!existingWallet.verifiedAt) {
         await prisma.wallet.update({
           where: { id: existingWallet.id },
           data: { verifiedAt: new Date() },
         });
+        if (process.env.ENABLE_DEBUG_LOGGING) {
+          console.log(`[AUTH-DEBUG:WALLET] Marked wallet as verified`);
+        }
       }
 
       return res.json({
@@ -468,7 +571,9 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
     }
 
     // Create new wallet record for this user
-    console.log(`[connectWallet] Connecting wallet ${normalizedAddress} on chain ${chain} to user ${user.id}`);
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:WALLET] Creating new wallet for user: ${normalizedAddress} on ${chain}`);
+    }
     
     const wallet = await prisma.wallet.create({
       data: {
@@ -482,6 +587,10 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
       },
     });
 
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:WALLET] Wallet created: id=${wallet.id}, address=${normalizedAddress}, isPrimary=false`);
+    }
+
     // Update user to reflect they have a connected wallet
     await prisma.user.update({
       where: { id: user.id },
@@ -489,6 +598,11 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
         walletType: walletType || undefined,
       },
     });
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:WALLET] User updated with wallet connection`);
+      console.log(`[AUTH-DEBUG:REQUEST] POST /api/auth/wallet/connect response: status=201, wallet=${wallet.id}`);
+    }
 
     res.status(201).json({
       message: 'Wallet successfully connected',

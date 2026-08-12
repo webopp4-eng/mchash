@@ -102,6 +102,13 @@ export function generateNonce(address: string, chain: string, deviceFingerprint?
     deviceFingerprint,
     ipAddress,
   });
+  
+  if (process.env.ENABLE_DEBUG_LOGGING) {
+    console.log(`[AUTH-DEBUG:NONCE] generateNonce() called for ${address} on ${chain}`);
+    console.log(`[AUTH-DEBUG:NONCE] Nonce stored in Map, size now: ${issuedNonces.size}`);
+    console.log(`[AUTH-DEBUG:NONCE] Nonce (first 20 chars): ${nonce.substring(0, 20)}...`);
+  }
+  
   return nonce;
 }
 
@@ -120,13 +127,51 @@ export function verifyAndConsumeNonce(nonce: string, address: string, chain: str
   cleanupNonces(maxAgeMs);
   const record = issuedNonces.get(nonce);
   const payload = verifyNonce(nonce, maxAgeMs);
-  if (!record || record.used || !payload) return false;
-  if (record.address.toLowerCase() !== address.toLowerCase()) return false;
-  if (record.chain.toLowerCase() !== chain.toLowerCase()) return false;
-  if (payload.address.toLowerCase() !== address.toLowerCase()) return false;
-  if (payload.chain.toLowerCase() !== chain.toLowerCase()) return false;
+  
+  if (process.env.ENABLE_DEBUG_LOGGING) {
+    console.log(`[AUTH-DEBUG:NONCE] verifyAndConsumeNonce() called`);
+    console.log(`[AUTH-DEBUG:NONCE] Nonce found in Map: ${!!record}`);
+    console.log(`[AUTH-DEBUG:NONCE] Payload valid: ${!!payload}`);
+    if (record) console.log(`[AUTH-DEBUG:NONCE] Nonce already used: ${record.used}`);
+  }
+  
+  if (!record || record.used || !payload) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:NONCE] Nonce validation FAILED: ${!record ? 'not found' : record.used ? 'already used' : 'invalid payload'}`);
+    }
+    return false;
+  }
+  
+  if (record.address.toLowerCase() !== address.toLowerCase()) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:NONCE] Address mismatch: ${record.address} !== ${address}`);
+    }
+    return false;
+  }
+  
+  if (record.chain.toLowerCase() !== chain.toLowerCase()) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:NONCE] Chain mismatch: ${record.chain} !== ${chain}`);
+    }
+    return false;
+  }
+  
+  if (payload.address.toLowerCase() !== address.toLowerCase() ||
+      payload.chain.toLowerCase() !== chain.toLowerCase()) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:NONCE] Payload address/chain mismatch`);
+    }
+    return false;
+  }
+  
   record.used = true;
   issuedNonces.delete(nonce);
+  
+  if (process.env.ENABLE_DEBUG_LOGGING) {
+    console.log(`[AUTH-DEBUG:NONCE] Nonce CONSUMED and deleted from Map`);
+    console.log(`[AUTH-DEBUG:NONCE] verifyAndConsumeNonce() PASSED`);
+  }
+  
   return true;
 }
 
@@ -181,12 +226,22 @@ export function isValidWalletAddress(address: string, chain?: string): boolean {
 
 export function verifySolanaSignature(message: string, signature: string, address: string): boolean {
   try {
-    if (!isValidSolanaAddress(address)) return false;
+    if (!isValidSolanaAddress(address)) {
+      if (process.env.ENABLE_DEBUG_LOGGING) console.log(`[AUTH-DEBUG:SIGNATURE] Solana address invalid: ${address}`);
+      return false;
+    }
     const publicKey = bs58.decode(address);
     const signatureBytes = Buffer.from(signature, 'base64');
     const messageBytes = new TextEncoder().encode(message);
-    return nacl.sign.detached.verify(messageBytes, signatureBytes, publicKey);
-  } catch {
+    const result = nacl.sign.detached.verify(messageBytes, signatureBytes, publicKey);
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] Solana signature verification: ${result ? 'PASS' : 'FAIL'}`);
+    }
+    return result;
+  } catch (err) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] Solana signature error: ${err instanceof Error ? err.message : String(err)}`);
+    }
     return false;
   }
 }
@@ -195,8 +250,16 @@ export function verifySolanaSignature(message: string, signature: string, addres
 export function verifyEvmSignature(message: string, signature: string, address: string): boolean {
   try {
     const recoveredAddress = ethers.verifyMessage(message, signature);
-    return recoveredAddress.toLowerCase() === address.toLowerCase();
-  } catch {
+    const match = recoveredAddress.toLowerCase() === address.toLowerCase();
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] EVM recovery: submitted=${address.substring(0, 10)}..., recovered=${recoveredAddress.substring(0, 10)}...`);
+      console.log(`[AUTH-DEBUG:SIGNATURE] EVM signature verification: ${match ? 'PASS' : 'FAIL'}`);
+    }
+    return match;
+  } catch (err) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:SIGNATURE] EVM signature error: ${err instanceof Error ? err.message : String(err)}`);
+    }
     return false;
   }
 }
@@ -207,6 +270,10 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
 
   if (!isValidWalletAddress(walletAddress, chain)) {
     throw new Error('Invalid wallet address');
+  }
+
+  if (process.env.ENABLE_DEBUG_LOGGING) {
+    console.log(`[AUTH-DEBUG:WALLET] findOrCreateUser() called for ${normalizedAddress} on ${chain}`);
   }
 
   // First, look up the wallet record using the Wallet model
@@ -221,7 +288,9 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
 
   // If wallet exists, load the associated user
   if (wallet) {
-    console.log(`[findOrCreateUser] Wallet ${normalizedAddress} found on chain ${chain}, user: ${wallet.userId}`);
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:WALLET] Wallet found in database for ${normalizedAddress}, userId=${wallet.userId}`);
+    }
     
     // Update the user's last login and wallet type
     const updatedUser = await prisma.user.update({
@@ -240,13 +309,22 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
         where: { id: wallet.id },
         data: { verifiedAt: new Date() },
       });
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:WALLET] Wallet marked as verified: ${wallet.id}`);
+      }
+    }
+
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:WALLET] Returning existing user: id=${updatedUser.id}, created=false`);
     }
 
     return { user: updatedUser, created: false };
   }
 
   // Wallet doesn't exist - create new user and wallet
-  console.log(`[findOrCreateUser] Creating new user for wallet ${normalizedAddress} on chain ${chain}`);
+  if (process.env.ENABLE_DEBUG_LOGGING) {
+    console.log(`[AUTH-DEBUG:WALLET] Wallet NOT found, creating new user and wallet`);
+  }
 
   // Generate unique referral code
   let referralCode = '';
@@ -285,7 +363,11 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
     },
   });
 
-  console.log(`[findOrCreateUser] Created user ${user.id} with wallet ${newWallet.id}`);
+  if (process.env.ENABLE_DEBUG_LOGGING) {
+    console.log(`[AUTH-DEBUG:WALLET] Created user: id=${user.id}`);
+    console.log(`[AUTH-DEBUG:WALLET] Created wallet: id=${newWallet.id}, address=${normalizedAddress}, isPrimary=true`);
+    console.log(`[AUTH-DEBUG:WALLET] Returning new user: id=${user.id}, created=true`);
+  }
 
   // Create referral record
   await prisma.referral.create({
