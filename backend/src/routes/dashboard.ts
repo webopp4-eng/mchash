@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 import { getActivePlan, getMiningSessions } from '../services/mining';
@@ -81,7 +82,7 @@ router.get('/mining', async (req: AuthRequest, res) => {
     const sessions = await getMiningSessions(userId);
     const history = await prisma.miningPurchase.findMany({
       where: { userId },
-      include: { plan: true },
+      include: { MiningPlan: true },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -112,7 +113,7 @@ router.get('/rankings', async (req: AuthRequest, res) => {
       }),
       prisma.miningPurchase.findMany({
         where: { status: 'active' },
-        include: { plan: true },
+        include: { MiningPlan: true },
       }),
       prisma.miningSession.groupBy({
         by: ['userId'],
@@ -142,7 +143,7 @@ router.get('/rankings', async (req: AuthRequest, res) => {
           platformBalance: user.platformBalance,
           hashRate: session?._sum.hashRate || 0,
           totalMined: session?._sum.totalMined || 0,
-          activePlan: activePlan?.plan.name || null,
+          activePlan: activePlan?.MiningPlan.name || null,
           score,
           joinedAt: user.createdAt,
         };
@@ -241,6 +242,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
 
       const createdPurchase = await tx.miningPurchase.create({
         data: {
+          id: uuid(),
           userId,
           planId,
           amount: planPrice,
@@ -255,6 +257,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
 
       await tx.miningSession.create({
         data: {
+          id: uuid(),
           userId,
           purchaseId: createdPurchase.id,
           hashRate: plan.hashRate,
@@ -266,6 +269,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
 
       await tx.transaction.create({
         data: {
+          id: uuid(),
           userId,
           type: 'purchase',
           amount: -planPrice,
@@ -279,6 +283,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
 
       await tx.notification.create({
         data: {
+          id: uuid(),
           userId,
           type: 'purchase',
           title: 'Plan Activated',
@@ -298,6 +303,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
         if (referral) {
           await prisma.referralEarning.create({
             data: {
+              id: uuid(),
               referralId: referral.id,
               userId: referrer.id,
               amount: commission,
@@ -312,6 +318,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
           });
           await prisma.notification.create({
             data: {
+              id: uuid(),
               userId: referrer.id,
               type: 'referral',
               title: 'Referral Commission',
@@ -368,6 +375,7 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
 
       const createdPurchase = await tx.hashRentingPurchase.create({
         data: {
+          id: uuid(),
           userId,
           planId,
           amount: planPrice,
@@ -382,6 +390,7 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
 
       await tx.miningSession.create({
         data: {
+          id: uuid(),
           userId,
           purchaseId: createdPurchase.id,
           hashRate: plan.hashPower,
@@ -393,6 +402,7 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
 
       await tx.transaction.create({
         data: {
+          id: uuid(),
           userId,
           type: 'hash_renting',
           amount: -planPrice,
@@ -406,6 +416,7 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
 
       await tx.notification.create({
         data: {
+          id: uuid(),
           userId,
           type: 'hash_renting',
           title: 'Hash Renting Activated',
@@ -430,7 +441,7 @@ router.get('/wallet', async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { wallets: true },
+      include: { Wallet: true },
     });
     const deposits = await prisma.deposit.findMany({
       where: { userId },
@@ -443,7 +454,7 @@ router.get('/wallet', async (req: AuthRequest, res) => {
       walletAddress: user?.walletAddress,
       chain: user?.chain,
       walletType: user?.walletType,
-      wallets: user?.wallets,
+      wallets: user?.Wallet,
       deposits,
     });
   } catch (error) {
@@ -584,6 +595,7 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
 
     const withdrawal = await prisma.withdrawal.create({
       data: {
+        id: uuid(),
         userId,
         amount,
         currency: currency || 'USDT',
@@ -595,6 +607,7 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
 
     await prisma.transaction.create({
       data: {
+        id: uuid(),
         userId,
         type: 'withdrawal',
         amount: -amount,
@@ -607,6 +620,7 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
 
     await prisma.notification.create({
       data: {
+        id: uuid(),
         userId,
         type: 'withdrawal',
         title: 'Withdrawal Requested',
@@ -627,7 +641,7 @@ router.get('/support/tickets', async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const tickets = await prisma.supportTicket.findMany({
       where: { userId },
-      include: { messages: true },
+      include: { SupportMessage: true },
       orderBy: { createdAt: 'desc' },
     });
     res.json({ tickets });
@@ -648,20 +662,23 @@ router.post('/support/tickets', async (req: AuthRequest, res) => {
 
     const ticket = await prisma.supportTicket.create({
       data: {
+        id: uuid(),
         userId,
         subject,
         category: category || 'general',
         priority: priority || 'normal',
         status: 'open',
-        messages: {
+        updatedAt: new Date(),
+        SupportMessage: {
           create: {
+            id: uuid(),
             senderId: userId,
             senderRole: 'user',
             message,
           },
         },
       },
-      include: { messages: true },
+      include: { SupportMessage: true },
     });
 
     res.json({ success: true, ticket });
@@ -686,6 +703,7 @@ router.post('/support/tickets/:ticketId/messages', async (req: AuthRequest, res)
 
     const msg = await prisma.supportMessage.create({
       data: {
+        id: uuid(),
         ticketId,
         senderId: userId,
         senderRole: 'user',

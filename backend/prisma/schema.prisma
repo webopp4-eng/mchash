@@ -7,241 +7,221 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============ USERS & AUTH ============
-
-model User {
-  id            String    @id @default(uuid()) @db.Uuid
-  
-  // Authentication method: EMAIL or WALLET
-  authMethod    String    @default("WALLET") // EMAIL or WALLET
-  
-  // Email authentication fields (optional, for email-authenticated users)
-  email         String?   @unique
-  passwordHash  String?
-  fullName      String?
-  country       String?
-  
-  // Legacy wallet-based fields (now optional)
-  walletAddress String?
-  chain         String?
-  walletType    String?
-  
-  // Account metadata
-  username      String?   @unique
-  referralCode  String    @unique
-  referredBy    String?   @db.Uuid
-  status        String    @default("active") // active, suspended, banned
-  role          String    @default("user") // user, admin
-  
-  // Financial tracking
-  platformBalance Decimal  @default(0) @db.Decimal(18, 8)
-  totalEarned   Decimal   @default(0) @db.Decimal(18, 8)
-  totalDeposited Decimal  @default(0) @db.Decimal(18, 8)
-  totalWithdrawn Decimal  @default(0) @db.Decimal(18, 8)
-  
-  // Timestamps
-  lastLoginAt   DateTime?
-  emailVerifiedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relations
-  wallets        Wallet[]
-  loginHistory   LoginHistory[]
-  purchases      MiningPurchase[]
-  hashRentingPurchases HashRentingPurchase[]
-  deposits       Deposit[]
-  withdrawals    Withdrawal[]
-  transactions   Transaction[]
-  miningSessions MiningSession[]
-  notifications  Notification[]
-  supportTickets SupportTicket[]
-  referrals      Referral[]
-  referralEarnings ReferralEarning[]
-  auditLogs      AuditLog[]
-
-  @@index([email])
-  @@index([username])
-  @@index([authMethod])
-  @@index([walletAddress])
-}
-
-model Wallet {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  chain     String
-  address   String
-  balance   Decimal  @default(0) @db.Decimal(18, 8)
-  token     String?
-  isPrimary Boolean  @default(false)
-  verifiedAt DateTime? // When wallet ownership was verified
+model AdminSetting {
+  id        String   @id @db.Uuid
+  key       String   @unique
+  value     String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, chain, address])
-  @@index([userId])
-  @@index([address])
+  updatedAt DateTime
 }
 
-model LoginHistory {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  walletAddress String
-  chain     String
-  deviceInfo String?
+model AuditLog {
+  id        String   @id @db.Uuid
+  userId    String?  @db.Uuid
+  action    String
+  details   Json?
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+  User      User?    @relation(fields: [userId], references: [id])
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([action])
   @@index([userId])
 }
 
-// ============ MINING ============
-
-model MiningPlan {
-  id            String   @id @default(uuid()) @db.Uuid
-  name          String
-  description   String?
-  price         Decimal  @db.Decimal(18, 8)
-  currency      String   @default("USDT")
+model Deposit {
+  id            String    @id @db.Uuid
+  userId        String    @db.Uuid
+  walletAddress String
   chain         String
-  hashRate      Decimal  @db.Decimal(18, 8)
-  dailyRate     Decimal  @db.Decimal(18, 8) // daily earnings percentage
-  durationDays  Int
-  bonusReward   Decimal  @default(0) @db.Decimal(18, 8)
-  referralBonus Decimal  @default(0) @db.Decimal(18, 8) // percentage
-  expectedReturn Decimal @default(0) @db.Decimal(18, 8) // expected total return for the package
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  amount        Decimal   @db.Decimal(18, 8)
+  token         String
+  txHash        String    @unique
+  status        String    @default("pending")
+  confirmedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  User          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  purchases MiningPurchase[]
-}
-
-model MiningPurchase {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  planId      String   @db.Uuid
-  amount      Decimal  @db.Decimal(18, 8)
-  currency    String
-  chain       String
-  txHash      String?
-  status      String   @default("active") // active, completed, expired
-  startedAt   DateTime @default(now())
-  endsAt      DateTime
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan MiningPlan @relation(fields: [planId], references: [id])
-
-  @@index([userId])
-  @@index([planId])
-}
-
-model MiningSession {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  purchaseId String? @db.Uuid
-  hashRate  Decimal  @db.Decimal(18, 8)
-  status    String   @default("active")
-  startedAt DateTime @default(now())
-  lastPayoutAt DateTime?
-  totalMined Decimal  @default(0) @db.Decimal(18, 8)
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  @@index([txHash])
   @@index([userId])
 }
-
-// ============ HASH RENTING ============
 
 model HashRentingPlan {
-  id            String   @id @default(uuid()) @db.Uuid
-  name          String
-  description   String?
-  price         Decimal  @db.Decimal(18, 8)
-  currency      String   @default("USDT")
-  chain         String   @default("ethereum")
-  hashPower     Decimal  @db.Decimal(18, 8) // e.g., 500 TH/s
-  durationDays  Int
-  expectedYield Decimal  @default(0) @db.Decimal(18, 8) // estimated yield percentage
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  purchases HashRentingPurchase[]
+  id                  String                @id @db.Uuid
+  name                String
+  description         String?
+  price               Decimal               @db.Decimal(18, 8)
+  currency            String                @default("USDT")
+  chain               String                @default("ethereum")
+  hashPower           Decimal               @db.Decimal(18, 8)
+  durationDays        Int
+  expectedYield       Decimal               @default(0) @db.Decimal(18, 8)
+  active              Boolean               @default(true)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  HashRentingPurchase HashRentingPurchase[]
 }
 
 model HashRentingPurchase {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  planId      String   @db.Uuid
-  amount      Decimal  @db.Decimal(18, 8)
+  id              String          @id @db.Uuid
+  userId          String          @db.Uuid
+  planId          String          @db.Uuid
+  amount          Decimal         @db.Decimal(18, 8)
+  currency        String
+  chain           String
+  txHash          String?
+  status          String          @default("active")
+  startedAt       DateTime        @default(now())
+  endsAt          DateTime
+  completedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  HashRentingPlan HashRentingPlan @relation(fields: [planId], references: [id])
+  User            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([userId])
+}
+
+model LoginHistory {
+  id            String   @id @db.Uuid
+  userId        String   @db.Uuid
+  walletAddress String
+  chain         String
+  deviceInfo    String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  User          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model MiningPlan {
+  id             String           @id @db.Uuid
+  name           String
+  description    String?
+  price          Decimal          @db.Decimal(18, 8)
+  currency       String           @default("USDT")
+  chain          String
+  hashRate       Decimal          @db.Decimal(18, 8)
+  dailyRate      Decimal          @db.Decimal(18, 8)
+  durationDays   Int
+  bonusReward    Decimal          @default(0) @db.Decimal(18, 8)
+  referralBonus  Decimal          @default(0) @db.Decimal(18, 8)
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  expectedReturn Decimal          @default(0) @db.Decimal(18, 8)
+  MiningPurchase MiningPurchase[]
+}
+
+model MiningPurchase {
+  id          String     @id @db.Uuid
+  userId      String     @db.Uuid
+  planId      String     @db.Uuid
+  amount      Decimal    @db.Decimal(18, 8)
   currency    String
   chain       String
   txHash      String?
-  status      String   @default("active") // active, completed, expired
-  startedAt   DateTime @default(now())
+  status      String     @default("active")
+  startedAt   DateTime   @default(now())
   endsAt      DateTime
+  createdAt   DateTime   @default(now())
   completedAt DateTime?
-  createdAt   DateTime @default(now())
+  MiningPlan  MiningPlan @relation(fields: [planId], references: [id])
+  User        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan HashRentingPlan @relation(fields: [planId], references: [id])
-
-  @@index([userId])
   @@index([planId])
+  @@index([userId])
 }
 
-// ============ FINANCIAL ============
-
-model Deposit {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  walletAddress String
-  chain     String
-  amount    Decimal  @db.Decimal(18, 8)
-  token     String
-  txHash    String   @unique
-  status    String   @default("pending") // pending, confirmed, failed
-  confirmedAt DateTime?
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+model MiningSession {
+  id           String    @id @db.Uuid
+  userId       String    @db.Uuid
+  purchaseId   String?   @db.Uuid
+  hashRate     Decimal   @db.Decimal(18, 8)
+  status       String    @default("active")
+  startedAt    DateTime  @default(now())
+  lastPayoutAt DateTime?
+  totalMined   Decimal   @default(0) @db.Decimal(18, 8)
+  createdAt    DateTime  @default(now())
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([txHash])
 }
 
-model Withdrawal {
-  id        String   @id @default(uuid()) @db.Uuid
+model Notification {
+  id        String   @id @db.Uuid
   userId    String   @db.Uuid
-  amount    Decimal  @db.Decimal(18, 8)
-  currency  String
-  chain     String
-  destinationAddress String
-  status    String   @default("pending") // pending, approved, rejected, completed
-  txHash    String?
-  adminNote String?
-  requestedAt DateTime @default(now())
-  processedAt DateTime?
+  type      String
+  title     String
+  message   String
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([read])
+  @@index([userId])
+}
+
+model Referral {
+  id              String            @id @db.Uuid
+  userId          String            @unique @db.Uuid
+  code            String            @unique
+  totalReferrals  Int               @default(0)
+  activeReferrals Int               @default(0)
+  totalEarned     Decimal           @default(0) @db.Decimal(18, 8)
+  createdAt       DateTime          @default(now())
+  User            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ReferralEarning ReferralEarning[]
+}
+
+model ReferralEarning {
+  id         String   @id @db.Uuid
+  referralId String   @db.Uuid
+  userId     String   @db.Uuid
+  amount     Decimal  @db.Decimal(18, 8)
+  level      Int      @default(1)
+  sourceType String
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  Referral   Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([referralId])
+}
+
+model SupportMessage {
+  id            String        @id @db.Uuid
+  ticketId      String        @db.Uuid
+  senderId      String?       @db.Uuid
+  senderRole    String        @default("user")
+  message       String
+  createdAt     DateTime      @default(now())
+  SupportTicket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model SupportTicket {
+  id             String           @id @db.Uuid
+  userId         String           @db.Uuid
+  subject        String
+  category       String
+  priority       String           @default("normal")
+  status         String           @default("open")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  SupportMessage SupportMessage[]
+  User           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model Transaction {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String   @id @db.Uuid
   userId    String   @db.Uuid
-  type      String   // deposit, purchase, withdrawal, referral, mining
+  type      String
   amount    Decimal  @db.Decimal(18, 8)
   currency  String
   chain     String
@@ -249,142 +229,116 @@ model Transaction {
   status    String   @default("completed")
   metadata  Json?
   createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
   @@index([type])
-}
-
-// ============ REFERRALS ============
-
-model Referral {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @unique @db.Uuid
-  code      String   @unique
-  totalReferrals Int  @default(0)
-  activeReferrals Int @default(0)
-  totalEarned Decimal @default(0) @db.Decimal(18, 8)
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  earnings ReferralEarning[]
-}
-
-model ReferralEarning {
-  id         String   @id @default(uuid()) @db.Uuid
-  referralId String   @db.Uuid
-  userId     String   @db.Uuid
-  amount     Decimal  @db.Decimal(18, 8)
-  level      Int      @default(1)
-  sourceType String   // purchase, mining
-  status     String   @default("pending")
-  createdAt  DateTime @default(now())
-
-  referral Referral @relation(fields: [referralId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([referralId])
-}
-
-// ============ NOTIFICATIONS & SUPPORT ============
-
-model Notification {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  type      String   // login, purchase, mining, deposit, withdrawal, referral, admin
-  title     String
-  message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@index([userId])
-  @@index([read])
-}
-
-model SupportTicket {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  subject   String
-  category  String
-  priority  String   @default("normal")
-  status    String   @default("open") // open, pending, resolved, closed
-  messages  SupportMessage[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model SupportMessage {
-  id        String   @id @default(uuid()) @db.Uuid
-  ticketId  String   @db.Uuid
-  senderId  String?  @db.Uuid
-  senderRole String  @default("user") // user, admin
-  message   String
-  createdAt DateTime @default(now())
-
-  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-
-  @@index([ticketId])
-}
-
-// ============ TREASURY & ADMIN ============
-
-model TreasuryWallet {
-  id        String   @id @default(uuid()) @db.Uuid
-  network   String   @unique // solana, ethereum, bnb
-  address   String
-  label     String?
-  active    Boolean  @default(true)
-  supportedCurrency String @default("USDT")
-  balance   Decimal  @default(0) @db.Decimal(18, 8)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  transactions TreasuryTransaction[]
 }
 
 model TreasuryTransaction {
-  id        String   @id @default(uuid()) @db.Uuid
-  walletId  String   @db.Uuid
-  type      String   // incoming, outgoing
-  txHash    String
-  fromAddress String?
-  toAddress  String?
-  amount    Decimal @db.Decimal(18, 8)
-  currency  String
-  status    String   @default("confirmed")
-  createdAt DateTime @default(now())
-
-  wallet TreasuryWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  id             String         @id @db.Uuid
+  walletId       String         @db.Uuid
+  type           String
+  txHash         String
+  fromAddress    String?
+  toAddress      String?
+  amount         Decimal        @db.Decimal(18, 8)
+  currency       String
+  status         String         @default("confirmed")
+  createdAt      DateTime       @default(now())
+  TreasuryWallet TreasuryWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@index([walletId])
 }
 
-model AdminSetting {
-  id        String   @id @default(uuid()) @db.Uuid
-  key       String   @unique
-  value     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model TreasuryWallet {
+  id                  String                @id @db.Uuid
+  network             String                @unique
+  address             String
+  label               String?
+  active              Boolean               @default(true)
+  balance             Decimal               @default(0) @db.Decimal(18, 8)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  supportedCurrency   String                @default("USDT")
+  TreasuryTransaction TreasuryTransaction[]
 }
 
-model AuditLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @db.Uuid
-  action    String
-  details   Json?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
+model User {
+  id                  String                @id @db.Uuid
+  walletAddress       String?
+  chain               String?
+  walletType          String?
+  username            String?               @unique
+  referralCode        String                @unique
+  referredBy          String?               @db.Uuid
+  status              String                @default("active")
+  role                String                @default("user")
+  platformBalance     Decimal               @default(0) @db.Decimal(18, 8)
+  totalEarned         Decimal               @default(0) @db.Decimal(18, 8)
+  totalDeposited      Decimal               @default(0) @db.Decimal(18, 8)
+  totalWithdrawn      Decimal               @default(0) @db.Decimal(18, 8)
+  lastLoginAt         DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  authMethod          String                @default("WALLET")
+  country             String?
+  email               String?               @unique
+  emailVerifiedAt     DateTime?
+  fullName            String?
+  passwordHash        String?
+  AuditLog            AuditLog[]
+  Deposit             Deposit[]
+  HashRentingPurchase HashRentingPurchase[]
+  LoginHistory        LoginHistory[]
+  MiningPurchase      MiningPurchase[]
+  MiningSession       MiningSession[]
+  Notification        Notification[]
+  Referral            Referral?
+  ReferralEarning     ReferralEarning[]
+  SupportTicket       SupportTicket[]
+  Transaction         Transaction[]
+  Wallet              Wallet[]
+  Withdrawal          Withdrawal[]
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  @@index([authMethod])
+  @@index([email])
+  @@index([username])
+  @@index([walletAddress])
+}
+
+model Wallet {
+  id         String    @id @db.Uuid
+  userId     String    @db.Uuid
+  chain      String
+  address    String
+  balance    Decimal   @default(0) @db.Decimal(18, 8)
+  token      String?
+  isPrimary  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime
+  verifiedAt DateTime?
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chain, address])
+  @@index([address])
+  @@index([userId])
+}
+
+model Withdrawal {
+  id                 String    @id @db.Uuid
+  userId             String    @db.Uuid
+  amount             Decimal   @db.Decimal(18, 8)
+  currency           String
+  chain              String
+  destinationAddress String
+  status             String    @default("pending")
+  txHash             String?
+  adminNote          String?
+  requestedAt        DateTime  @default(now())
+  processedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  User               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([action])
 }

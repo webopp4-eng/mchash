@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 import { requireAdmin } from '../middleware/admin';
@@ -53,9 +54,8 @@ router.get('/users', async (req, res) => {
     const users = await prisma.user.findMany({
       where,
       include: {
-        wallets: true,
-        purchases: { include: { plan: true } },
-        _count: { select: { transactions: true, deposits: true, withdrawals: true } },
+        Wallet: true,
+        _count: { select: { Transaction: true, Deposit: true, Withdrawal: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -86,8 +86,8 @@ router.get('/users/:id/mining', async (req, res) => {
   try {
     const { id } = req.params;
     const [purchases, sessions] = await Promise.all([
-      prisma.miningPurchase.findMany({ where: { userId: id }, include: { plan: true }, orderBy: { createdAt: 'desc' } }),
-      prisma.hashRentingPurchase.findMany({ where: { userId: id }, include: { plan: true }, orderBy: { createdAt: 'desc' } }),
+      prisma.miningPurchase.findMany({ where: { userId: id }, include: { MiningPlan: true }, orderBy: { createdAt: 'desc' } }),
+      prisma.hashRentingPurchase.findMany({ where: { userId: id }, include: { HashRentingPlan: true }, orderBy: { createdAt: 'desc' } }),
     ]);
     res.json({ purchases, hashRentingPurchases: sessions });
   } catch (error) {
@@ -112,6 +112,7 @@ router.post('/plans', async (req, res) => {
     const { name, description, price, currency, chain, hashRate, dailyRate, durationDays, bonusReward, referralBonus, expectedReturn } = req.body;
     const plan = await prisma.miningPlan.create({
       data: {
+        id: uuid(),
         name,
         description,
         price: Number(price),
@@ -123,6 +124,7 @@ router.post('/plans', async (req, res) => {
         bonusReward: Number(bonusReward || 0),
         referralBonus: Number(referralBonus || 0),
         expectedReturn: Number(expectedReturn || 0),
+        updatedAt: new Date(),
       },
     });
     res.json({ success: true, plan });
@@ -191,11 +193,13 @@ router.post('/receiving-wallets', async (req, res) => {
 
     const wallet = await prisma.treasuryWallet.create({
       data: {
+        id: uuid(),
         network,
         address,
         label,
         supportedCurrency: supportedCurrency || 'USDT',
         active: active !== undefined ? Boolean(active) : true,
+        updatedAt: new Date(),
       },
     });
     res.json({ success: true, wallet });
@@ -240,7 +244,7 @@ router.delete('/receiving-wallets/:id', async (req, res) => {
 router.get('/deposits', async (_req, res) => {
   try {
     const deposits = await prisma.deposit.findMany({
-      include: { user: { select: { username: true, walletAddress: true } } },
+      include: { User: { select: { username: true, walletAddress: true } } },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -254,7 +258,7 @@ router.get('/deposits', async (_req, res) => {
 router.get('/withdrawals', async (_req, res) => {
   try {
     const withdrawals = await prisma.withdrawal.findMany({
-      include: { user: { select: { username: true, walletAddress: true } } },
+      include: { User: { select: { username: true, walletAddress: true } } },
       orderBy: { requestedAt: 'desc' },
       take: 100,
     });
@@ -301,6 +305,7 @@ router.patch('/withdrawals/:id', async (req, res) => {
 
       await prisma.notification.create({
         data: {
+          id: uuid(),
           userId: withdrawal.userId,
           type: 'withdrawal',
           title: 'Withdrawal Approved',
@@ -339,6 +344,7 @@ router.patch('/withdrawals/:id', async (req, res) => {
         }),
         prisma.notification.create({
           data: {
+            id: uuid(),
             userId: withdrawal.userId,
             type: 'withdrawal',
             title: 'Withdrawal Rejected',
@@ -372,6 +378,7 @@ router.patch('/withdrawals/:id', async (req, res) => {
 
       await prisma.notification.create({
         data: {
+          id: uuid(),
           userId: withdrawal.userId,
           type: 'withdrawal',
           title: 'Withdrawal Completed',
@@ -405,8 +412,8 @@ router.put('/settings', async (req, res) => {
     const { key, value } = req.body;
     const setting = await prisma.adminSetting.upsert({
       where: { key },
-      update: { value },
-      create: { key, value },
+      update: { value, updatedAt: new Date() },
+      create: { id: uuid(), key, value, updatedAt: new Date() },
     });
     res.json({ success: true, setting });
   } catch (error) {
@@ -419,9 +426,9 @@ router.put('/settings', async (req, res) => {
 router.get('/audit-logs', async (_req, res) => {
   try {
     const logs = await prisma.auditLog.findMany({
-      include: { user: { select: { username: true, walletAddress: true } } },
+      include: { User: true },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: 50,
     });
     res.json({ logs });
   } catch (error) {

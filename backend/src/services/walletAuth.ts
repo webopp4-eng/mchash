@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
+import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
 
 type NonceRecord = {
@@ -244,6 +245,7 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
 
   const user = await prisma.user.create({
     data: {
+      id: uuid(),
       walletAddress: normalizedAddress,
       chain,
       walletType,
@@ -251,13 +253,16 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
       username: `User_${normalizedAddress.slice(0, 6)}`,
       referredBy: referredBy || null,
       status: 'active',
+      role: 'user',
       platformBalance: 0,
+      updatedAt: new Date(),
     },
   });
 
   // Create referral record
   await prisma.referral.create({
     data: {
+      id: uuid(),
       userId: user.id,
       code: referralCode,
     },

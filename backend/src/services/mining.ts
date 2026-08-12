@@ -1,3 +1,4 @@
+import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -76,6 +77,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
   if (!session) {
     session = await prisma.miningSession.create({
       data: {
+        id: uuid(),
         userId: purchase.userId,
         purchaseId: purchase.id,
         hashRate,
@@ -110,6 +112,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
       }),
       prisma.transaction.create({
         data: {
+          id: uuid(),
           userId: purchase.userId,
           type: 'mining',
           amount: earned,
@@ -173,6 +176,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
           }),
           prisma.transaction.create({
             data: {
+              id: uuid(),
               userId: purchase.userId,
               type: 'mining',
               amount: bonusReward,
@@ -197,12 +201,12 @@ export async function refreshMiningForUser(userId: string) {
   const [miningPurchases, hashRentingPurchases] = await Promise.all([
     prisma.miningPurchase.findMany({
       where: { userId, status: 'active' },
-      include: { plan: true },
+      include: { MiningPlan: true },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.hashRentingPurchase.findMany({
       where: { userId, status: 'active' },
-      include: { plan: true },
+      include: { HashRentingPlan: true },
       orderBy: { createdAt: 'desc' },
     }),
   ]);
@@ -222,12 +226,12 @@ export async function getActivePlan(userId: string) {
   const [miningPurchase, hashRentingPurchase] = await Promise.all([
     prisma.miningPurchase.findFirst({
       where: { userId, status: 'active', endsAt: { gt: now } },
-      include: { plan: true },
+      include: { MiningPlan: true },
       orderBy: { createdAt: 'desc' },
     }),
     prisma.hashRentingPurchase.findFirst({
       where: { userId, status: 'active', endsAt: { gt: now } },
-      include: { plan: true },
+      include: { HashRentingPlan: true },
       orderBy: { createdAt: 'desc' },
     }),
   ]);

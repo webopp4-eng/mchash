@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import crypto from 'crypto';
+import { v4 as uuid } from 'uuid';
 import QRCode from 'qrcode';
 import {
   generateNonce,
@@ -227,6 +228,7 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
     // Record login
     await prisma.loginHistory.create({
       data: {
+        id: uuid(),
         userId: user.id,
         walletAddress: address.toLowerCase(),
         chain,
@@ -321,6 +323,7 @@ router.post('/wallet', async (req, res) => {
     // Record login history
     await prisma.loginHistory.create({
       data: {
+        id: uuid(),
         userId: user.id,
         walletAddress: address.toLowerCase(),
         chain,
@@ -333,6 +336,7 @@ router.post('/wallet', async (req, res) => {
     // Create notification
     await prisma.notification.create({
       data: {
+        id: uuid(),
         userId: user.id,
         type: 'login',
         title: created ? 'New Account Created' : 'Welcome Back',
@@ -381,8 +385,7 @@ router.get('/me', authenticateToken, loadUser, async (req: AuthRequest, res) => 
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
       include: {
-        wallets: true,
-        referrals: true,
+        Wallet: true,
       },
     });
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -402,8 +405,7 @@ router.get('/me', authenticateToken, loadUser, async (req: AuthRequest, res) => 
         role: user.role,
         status: user.status,
         createdAt: user.createdAt,
-        wallets: user.wallets,
-        referral: user.referrals[0] || null,
+        wallets: user.Wallet,
       },
     });
   } catch (error) {
@@ -475,6 +477,7 @@ router.post('/email/register', async (req, res) => {
     // Create user
     const user = await prisma.user.create({
       data: {
+        id: uuid(),
         email: normalizeEmail(signupData.email),
         passwordHash,
         fullName: signupData.fullName,
@@ -485,12 +488,14 @@ router.post('/email/register', async (req, res) => {
         status: 'active',
         role: 'user',
         platformBalance: 0,
+        updatedAt: new Date(),
       },
     });
 
     // Create referral record
     await prisma.referral.create({
       data: {
+        id: uuid(),
         userId: user.id,
         code: referralCode,
       },
@@ -511,6 +516,7 @@ router.post('/email/register', async (req, res) => {
     // Record login
     await prisma.loginHistory.create({
       data: {
+        id: uuid(),
         userId: user.id,
         walletAddress: 'email-signup',
         chain: 'none',
@@ -523,6 +529,7 @@ router.post('/email/register', async (req, res) => {
     // Create notification
     await prisma.notification.create({
       data: {
+        id: uuid(),
         userId: user.id,
         type: 'login',
         title: 'Welcome to CM HASH',
@@ -603,6 +610,7 @@ router.post('/email/login', async (req, res) => {
     // Record login
     await prisma.loginHistory.create({
       data: {
+        id: uuid(),
         userId: user.id,
         walletAddress: 'email-login',
         chain: 'none',
@@ -615,6 +623,7 @@ router.post('/email/login', async (req, res) => {
     // Create notification
     await prisma.notification.create({
       data: {
+        id: uuid(),
         userId: user.id,
         type: 'login',
         title: 'Welcome Back',
@@ -684,7 +693,7 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
           mode: 'insensitive',
         },
       },
-      include: { user: true },
+      include: { User: true },
     });
 
     if (existingWallet && existingWallet.userId !== req.user!.id) {
@@ -709,11 +718,13 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
     // Create new wallet record
     const wallet = await prisma.wallet.create({
       data: {
+        id: uuid(),
         userId: req.user!.id,
         address: normalizedAddress,
         chain,
         isPrimary: false, // User can make it primary later
         verifiedAt: new Date(),
+        updatedAt: new Date(),
       },
     });
 
