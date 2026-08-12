@@ -260,9 +260,9 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
 
 // Wallet authentication
 const authSchema = z.object({
-  address: z.string().min(10),
+  address: z.string().min(1),
   chain: z.enum(['solana', 'ethereum', 'bnb']),
-  signature: z.string().min(10),
+  signature: z.string().min(1),
   message: z.string(),
   walletType: z.string().optional(),
   referredBy: z.string().optional(),
