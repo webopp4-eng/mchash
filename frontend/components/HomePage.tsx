@@ -1,4 +1,5 @@
 import { FaArrowDown, FaArrowUp, FaBolt, FaCoins, FaGift, FaHistory, FaUserCircle, FaWallet } from 'react-icons/fa';
+import WalletConnectionPanel from './WalletConnectionPanel';
 
 const quickStats = [
   { label: 'Total Mined', value: '2.45 TH/s', icon: FaCoins },
@@ -67,6 +68,10 @@ export default function HomePage() {
             <button className="rounded-2xl border border-white/80 bg-white px-3 py-2 text-[11px] font-semibold text-slate-900 shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition hover:bg-slate-100">
               Withdraw
             </button>
+          </div>
+
+          <div className="mt-3">
+            <WalletConnectionPanel compact showTitle={false} />
           </div>
         </section>
 
@@ -141,6 +146,10 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="rounded-[24px] bg-white/90 p-4 shadow-[0_14px_40px_rgba(0,0,0,0.18)]">
+              <WalletConnectionPanel compact showTitle={true} darkMode={false} />
             </div>
           </div>
         </section>

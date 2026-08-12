@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import { getUser, logout, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
+import WalletConnectionPanel from '@/components/WalletConnectionPanel';
 
 const secondaryItems = [
   { href: '/dashboard/referrals', label: 'Referral', desc: 'Invite friends & earn commissions', icon: FaUsers, color: 'text-cmblue-600 bg-cmblue-50' },
@@ -99,6 +100,10 @@ export default function ProfilePage() {
             </Link>
           ))}
         </div>
+      </div>
+
+      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+        <WalletConnectionPanel darkMode={true} />
       </div>
 
       {/* Logout */}

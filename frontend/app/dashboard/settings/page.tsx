@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { FaBell, FaShieldAlt, FaUserCircle, FaWallet, FaCheck, FaCopy } from 'react-icons/fa';
 import { apiFetch, getUser } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
+import WalletConnectionPanel from '@/components/WalletConnectionPanel';
 
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
@@ -156,6 +157,10 @@ export default function SettingsPage() {
             <Switch checked={notifications.marketingEmails} onChange={() => setNotifications({ ...notifications, marketingEmails: !notifications.marketingEmails })} />
           </div>
         </div>
+      </div>
+
+      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+        <WalletConnectionPanel darkMode={true} />
       </div>
 
       {/* Security */}
