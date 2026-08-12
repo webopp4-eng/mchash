@@ -1,7 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import SPARedirect from './SPARedirect';
-import WagmiProvider from '@/components/WagmiProvider';
+import Providers from '@/components/WagmiProvider';
 import '@rainbow-me/rainbowkit/styles.css';
 
 export const metadata: Metadata = {
@@ -13,10 +13,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <WagmiProvider>
+        <Providers>
           {children}
           <SPARedirect />
-        </WagmiProvider>
+        </Providers>
       </body>
     </html>
   );

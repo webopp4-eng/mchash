@@ -1,12 +1,11 @@
 'use client';
 
 import type { PropsWithChildren } from 'react';
-import { useMemo } from 'react';
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { WagmiConfig, createConfig } from 'wagmi';
+import { WagmiProvider } from 'wagmi';
+import { createConfig, http } from 'wagmi';
 import { metaMask, walletConnect } from '@wagmi/connectors';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { http } from 'viem';
 import { mainnet, bsc } from 'wagmi/chains';
 
 const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
@@ -25,7 +24,7 @@ const connectors = [
     : []),
 ];
 
-const wagmiConfig = createConfig({
+const config = createConfig({
   chains,
   connectors,
   transports: {
@@ -34,14 +33,14 @@ const wagmiConfig = createConfig({
   },
 });
 
-export default function WagmiProvider({ children }: PropsWithChildren) {
+export default function Providers({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
-      <WagmiConfig config={wagmiConfig}>
-        <RainbowKitProvider initialChain={mainnet.id} theme={darkTheme()}>
+      <WagmiProvider config={config}>
+        <RainbowKitProvider theme={darkTheme()}>
           {children}
         </RainbowKitProvider>
-      </WagmiConfig>
+      </WagmiProvider>
     </QueryClientProvider>
   );
 }

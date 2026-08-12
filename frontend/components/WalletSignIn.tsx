@@ -393,11 +393,12 @@ export default function WalletSignIn() {
               <div className="space-y-3">
                 <button
                   onClick={handleConnectClick}
+                  suppressHydrationWarning
                   className="flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-6 py-3.5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(14,161,255,0.3)] transition-all hover:scale-[1.02]"
                   disabled={connecting}
                 >
                   <FaWallet className="h-5 w-5" />
-                  {isMounted && isConnected ? 'Sign In with Wallet' : 'Connect Wallet'}
+                  {isConnected ? 'Sign In with Wallet' : 'Connect Wallet'}
                 </button>
 
                 {isMobile && (
@@ -422,7 +423,10 @@ export default function WalletSignIn() {
                 )}
 
                 {isMounted && isConnected && address && (
-                  <div className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-200">
+                  <div
+                    suppressHydrationWarning
+                    className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-200"
+                  >
                     <p className="font-semibold">Connected Wallet</p>
                     <p className="mt-1 break-words text-xs text-slate-400">{address}</p>
                     <p className="mt-2 text-xs text-slate-500">Network: {walletChain ?? 'Unsupported'}</p>
