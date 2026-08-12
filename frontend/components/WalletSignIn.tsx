@@ -105,17 +105,21 @@ export default function WalletSignIn() {
 
   const completeAuth = useCallback((data: any) => {
     try {
+      console.log('[completeAuth] Starting auth completion with user:', data.user?.id);
+      
       // Store authentication data
       localStorage.setItem('cmhash_token', data.token);
       localStorage.setItem('cmhash_user', JSON.stringify(data.user));
       localStorage.setItem('cmhash_created', String(Boolean(data.created)));
       localStorage.removeItem('cmhash_return_url');
+      localStorage.removeItem('cmhash_autoconnect'); // Clear autoconnect flag
       
       // Verify data was stored
       const storedUser = localStorage.getItem('cmhash_user');
       if (!storedUser) {
         console.error('[completeAuth] Failed to store user data');
         setError('Failed to save authentication data');
+        setConnecting(false);
         return;
       }
       
@@ -127,11 +131,13 @@ export default function WalletSignIn() {
       console.log('[completeAuth] Redirecting to:', redirectUrl);
       
       setTimeout(() => {
-        router.replace(redirectUrl);
-      }, 100);
+        console.log('[completeAuth] Executing redirect');
+        router.push(redirectUrl); // Use push instead of replace to avoid race conditions
+      }, 150);
     } catch (err) {
       console.error('[completeAuth] Error during auth completion:', err);
       setError('Failed to complete authentication');
+      setConnecting(false);
     }
   }, [router]);
 
@@ -206,7 +212,8 @@ export default function WalletSignIn() {
 
   useEffect(() => {
     if (!isConnected || !allAgreed || !autoConnect || connecting) return;
-    if (localStorage.getItem('cmhash_token')) return;
+    // Don't auto-auth if already logged in
+    if (localStorage.getItem('cmhash_token') && localStorage.getItem('cmhash_user')) return;
 
     setConnecting(true);
     setError(null);
@@ -217,8 +224,8 @@ export default function WalletSignIn() {
         console.error(err);
         setConnectionStatus('Connection Failed');
         setError(err?.message || 'Failed to authenticate wallet');
-      })
-      .finally(() => setConnecting(false));
+        setConnecting(false);
+      });
   }, [isConnected, allAgreed, autoConnect, connecting, authenticateConnectedWallet]);
 
   useEffect(() => {
@@ -449,11 +456,46 @@ export default function WalletSignIn() {
                 {isMounted && isConnected && address && (
                   <div
                     suppressHydrationWarning
-                    className="rounded-2xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-200"
+                    className="rounded-2xl border-2 border-emerald-500/50 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 p-4 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
                   >
-                    <p className="font-semibold">Connected Wallet</p>
-                    <p className="mt-1 break-words text-xs text-slate-400">{address}</p>
-                    <p className="mt-2 text-xs text-slate-500">Network: {walletChain ?? 'Unsupported'}</p>
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <p className="font-semibold text-emerald-300">Wallet Connected</p>
+                    </div>
+                    <p className="mb-3 break-words text-xs text-emerald-200/80">{address}</p>
+                    <p className="mb-4 text-xs text-emerald-200/60">Network: {walletChain ? walletChain.charAt(0).toUpperCase() + walletChain.slice(1) : 'Unsupported'}</p>
+                    
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => {
+                          setConnecting(true);
+                          setError(null);
+                          authenticateConnectedWallet()
+                            .catch((err: any) => {
+                              console.error(err);
+                              setConnectionStatus('Connection Failed');
+                              setError(err?.message || 'Failed to authenticate wallet');
+                              setConnecting(false);
+                            });
+                        }}
+                        disabled={connecting}
+                        className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2.5 text-xs font-semibold text-white transition-all hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50"
+                      >
+                        {connecting ? 'Signing Message...' : 'Sign & Connect'}
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setConnecting(false);
+                          setError(null);
+                          setLoginMethod('wallet');
+                        }}
+                        disabled={connecting}
+                        className="w-full rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-xs font-semibold text-emerald-300 transition-all hover:bg-emerald-500/20 disabled:opacity-50"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
                   </div>
                 )}
 
