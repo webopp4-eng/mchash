@@ -41,13 +41,19 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   process.env.PUBLIC_FRONTEND_URL || 'https://mchash.vercel.app',
   process.env.RENDER_FRONTEND_URL || 'https://mchash.vercel.app',
-  process.env.LOCAL_ADMIN_ORIGIN || 'http://localhost:3001',
-  process.env.FRONTEND_URL || 'http://localhost:3000',
   'https://webopp4-eng.github.io',
   'https://mchash.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:3001',
 ];
+
+// Add localhost origins only in development
+if (process.env.NODE_ENV !== 'production') {
+  allowedOrigins.push(
+    process.env.LOCAL_ADMIN_ORIGIN || 'http://localhost:3001',
+    process.env.FRONTEND_URL || 'http://localhost:3000',
+    'http://localhost:3000',
+    'http://localhost:3001',
+  );
+}
 
 app.use(cors({
   origin: (origin, callback) => {
