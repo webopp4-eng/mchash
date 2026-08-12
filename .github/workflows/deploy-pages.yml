@@ -38,6 +38,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: '1'
 
       - name: Deployment diagnostics (local)
         working-directory: frontend
