@@ -43,13 +43,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="min-h-screen bg-[#eef4ff] text-slate-800">
+    <div className="min-h-screen bg-gradient-to-b from-[#f5f8ff] via-[#f0f4ff] to-[#ebf1ff] text-slate-800">
+      {/* Subtle background accents */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-1/2 top-[-100px] h-[320px] w-[320px] -translate-x-1/2 rounded-full bg-cmblue-500/10 blur-[110px]" />
-        <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-blue-200/30 blur-[120px]" />
+        <div className="absolute left-1/2 top-[-120px] h-[320px] w-[320px] -translate-x-1/2 rounded-full bg-cmblue-500/10 blur-[110px]" />
+        <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-blue-300/20 blur-[120px]" />
       </div>
 
-      <div className="fixed left-0 top-0 z-40 flex items-center justify-between border-b border-slate-200 bg-[#f7faff]/90 px-4 py-3 backdrop-blur-xl lg:hidden">
+      {/* Mobile Top Bar */}
+      <div className="fixed left-0 top-0 z-40 flex items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 py-3 backdrop-blur-xl lg:hidden">
         <div className="flex items-center gap-2">
           <Logo size={30} />
           <span className="text-sm font-bold text-slate-800">CM HASH</span>
@@ -74,11 +76,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      <aside className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-slate-200 bg-[#f9fbff]/95 px-4 py-4 shadow-[0_0_30px_rgba(15,23,42,0.05)] backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+      {/* Sidebar */}
+      <aside className={`fixed left-0 top-0 z-50 flex h-screen w-72 flex-col border-r border-slate-200/80 bg-white/95 px-4 py-4 shadow-[0_0_30px_rgba(15,23,42,0.05)] backdrop-blur-xl transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm">
           <Logo size={36} />
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-cmblue-700">CM HASH</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-cmblue-600">CM HASH</p>
             <p className="text-[10px] text-slate-500">Cloud Mining</p>
           </div>
         </div>
@@ -93,11 +96,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-gradient-to-r from-cmblue-50 to-blue-100 text-cmblue-700 shadow-[0_6px_18px_rgba(14,161,255,0.15)]'
-                    : 'text-slate-500 hover:bg-white hover:text-slate-800'
+                    ? 'bg-cmblue-50 text-cmblue-700 shadow-[0_6px_18px_rgba(17,120,250,0.12)]'
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                 }`}
               >
-                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isActive ? 'bg-cmblue-600 text-white shadow-[0_8px_18px_rgba(14,161,255,0.3)]' : 'bg-slate-100 text-slate-500'}`}>
+                <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isActive ? 'bg-cmblue-600 text-white shadow-[0_8px_18px_rgba(17,120,250,0.3)]' : 'bg-slate-100 text-slate-500'}`}>
                   <item.icon className="h-3.5 w-3.5" />
                 </span>
                 {item.label}
@@ -107,7 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cmblue-500 to-cmblue-700 text-xs font-bold text-white">
               {user?.username?.slice(0, 2).toUpperCase() || 'CM'}

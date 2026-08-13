@@ -85,23 +85,24 @@ export default function MiningPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Mining</h1>
-        <p className="mt-1 text-sm text-slate-400">Monitor your active mining package in real time</p>
+        <h1 className="text-2xl font-bold text-slate-900">Mining</h1>
+        <p className="mt-1 text-sm text-slate-500">Monitor your active mining package in real time</p>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-400">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">
           {error}
         </div>
       )}
 
-      <div className="rounded-[24px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
+      {/* Main Mining Card - White */}
+      <div className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-card">
         <div className="flex flex-col items-center gap-4">
-          <div className={`relative flex h-40 w-40 items-center justify-center rounded-full bg-gradient-to-br from-cmblue-500 to-cmblue-300 ${activePlan && !activePlan.isExpired ? 'mining-glow' : 'shadow-[0_0_40px_rgba(14,161,255,0.3)]'}`}>
+          <div className={`relative flex h-40 w-40 items-center justify-center rounded-full bg-gradient-to-br from-cmblue-500 to-cmblue-300 ${activePlan && !activePlan.isExpired ? 'mining-glow' : 'shadow-[0_0_40px_rgba(17,120,250,0.3)]'}`}>
             <div className="absolute inset-0 rounded-full border-2 border-dashed border-white/40 spin-slow" />
             {activePlan && !activePlan.isExpired && <div className="absolute inset-4 rounded-full border border-white/50 bg-white/20 pulse-ring" />}
             <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cmblue-200 spin-reverse" />
-            <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-slate-900 shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
+            <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-slate-900 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
               <div className="text-center">
                 <p className="text-2xl font-bold">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
                 <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">TH/s</p>
@@ -110,12 +111,12 @@ export default function MiningPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${activePlan ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-500/20 text-slate-400'}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${activePlan ? 'bg-emerald-400' : 'bg-slate-400'}`} />
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${activePlan ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${activePlan ? 'bg-emerald-500' : 'bg-slate-400'}`} />
               {activePlan ? 'Mining Active' : 'Mining Inactive'}
             </span>
             {activePlan && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-cmblue-500/20 px-3 py-1.5 text-xs font-semibold text-cmblue-300">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-cmblue-50 px-3 py-1.5 text-xs font-semibold text-cmblue-700">
                 <FaBolt className="h-3 w-3" />
                 {activePlan.plan.name}
               </span>
@@ -126,54 +127,54 @@ export default function MiningPage() {
         {activePlan ? (
           <div className="mt-6 space-y-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center gap-2 text-cmblue-400">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
+                <div className="flex items-center gap-2 text-cmblue-600">
                   <FaBolt className="h-3.5 w-3.5" />
                   <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Hash Power</p>
                 </div>
-                <p className="mt-1 text-lg font-bold">{Number(activePlan.hashRate || 0).toFixed(2)} TH/s</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">{Number(activePlan.hashRate || 0).toFixed(2)} TH/s</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center gap-2 text-emerald-400">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
+                <div className="flex items-center gap-2 text-emerald-600">
                   <FaCoins className="h-3.5 w-3.5" />
                   <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Daily Earnings</p>
                 </div>
-                <p className="mt-1 text-lg font-bold text-emerald-400">${Number(activePlan.dailyEarnings || 0).toFixed(4)}</p>
+                <p className="mt-1 text-lg font-bold text-emerald-600">${Number(activePlan.dailyEarnings || 0).toFixed(4)}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center gap-2 text-purple-400">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
+                <div className="flex items-center gap-2 text-purple-600">
                   <FaChartLine className="h-3.5 w-3.5" />
                   <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Mined So Far</p>
                 </div>
-                <p className="mt-1 text-lg font-bold">${Number(activePlan.liveEarned || 0).toFixed(6)}</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">${Number(activePlan.liveEarned || 0).toFixed(6)}</p>
               </div>
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="flex items-center gap-2 text-amber-400">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
+                <div className="flex items-center gap-2 text-amber-600">
                   <FaClock className="h-3.5 w-3.5" />
                   <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Time Left</p>
                 </div>
-                <p className="mt-1 text-lg font-bold">{activePlan.timeRemaining}</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">{activePlan.timeRemaining}</p>
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Mining Progress</p>
-                <p className="text-xs font-semibold text-cmblue-300">{activePlan.progressPercent}%</p>
+                <p className="text-xs font-semibold text-cmblue-600">{activePlan.progressPercent}%</p>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
                 <div className="h-full rounded-full bg-gradient-to-r from-cmblue-500 to-emerald-400 transition-all duration-500" style={{ width: `${activePlan.progress}%` }} />
               </div>
-              <div className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-3">
-                <p><FaCalendarAlt className="mr-1 inline h-3 w-3" />Started {new Date(activePlan.startedAt).toLocaleString()}</p>
-                <p><FaCheckCircle className="mr-1 inline h-3 w-3" />Ends {new Date(activePlan.endsAt).toLocaleString()}</p>
+              <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                <p><FaCalendarAlt className="mr-1 inline h-3 w-3 text-cmblue-500" />Started {new Date(activePlan.startedAt).toLocaleString()}</p>
+                <p><FaCheckCircle className="mr-1 inline h-3 w-3 text-emerald-500" />Ends {new Date(activePlan.endsAt).toLocaleString()}</p>
                 <p>Expected total ${Number(activePlan.totalEarnings || 0).toFixed(4)}</p>
               </div>
             </div>
           </div>
         ) : (
-          <div className="mt-6 rounded-xl border border-dashed border-white/20 p-6 text-center">
-            <p className="text-sm text-slate-400">No active mining package</p>
+          <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+            <p className="text-sm text-slate-500">No active mining package</p>
             <Link href="/dashboard/plans" className="mt-3 inline-flex items-center gap-2 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500">
               <FaBolt className="h-3.5 w-3.5" />
               Buy Mining Time
@@ -182,17 +183,18 @@ export default function MiningPage() {
         )}
       </div>
 
-      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+      {/* Mining Sessions - White */}
+      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
         <div className="mb-4">
-          <h2 className="text-sm font-semibold text-cmblue-300">Mining Sessions</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Mining Sessions</h2>
           <p className="text-[10px] text-slate-500">Live and completed simulator sessions</p>
         </div>
         {sessions.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
             {sessions.map((session: any) => (
-              <div key={session.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p className={`text-xs font-semibold capitalize ${session.status === 'active' ? 'text-emerald-300' : 'text-slate-400'}`}>{session.status}</p>
-                <p className="mt-2 text-lg font-bold">{Number(session.hashRate || 0).toFixed(2)} TH/s</p>
+              <div key={session.id} className="rounded-xl border border-slate-200/80 bg-slate-50 p-4">
+                <p className={`text-xs font-semibold capitalize ${session.status === 'active' ? 'text-emerald-600' : 'text-slate-500'}`}>{session.status}</p>
+                <p className="mt-2 text-lg font-bold text-slate-900">{Number(session.hashRate || 0).toFixed(2)} TH/s</p>
                 <p className="mt-1 text-[10px] text-slate-500">Total mined: ${Number(session.totalMined || 0).toFixed(6)}</p>
               </div>
             ))}
@@ -202,30 +204,31 @@ export default function MiningPage() {
         )}
       </div>
 
-      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+      {/* Mining History - White */}
+      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
         <div className="mb-4">
-          <h2 className="text-sm font-semibold text-cmblue-300">Mining History</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Mining History</h2>
           <p className="text-[10px] text-slate-500">Your purchased mining contracts</p>
         </div>
 
         {history.length > 0 ? (
           <div className="space-y-2">
             {history.map((item: any) => (
-              <div key={item.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+              <div key={item.id} className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50 p-3">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-600">
                     <FaBolt className="h-3.5 w-3.5" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold">{item.plan.name}</p>
+                    <p className="text-xs font-semibold text-slate-900">{item.plan.name}</p>
                     <p className="text-[10px] text-slate-500">
                       {new Date(item.startedAt).toLocaleDateString()} - {new Date(item.endsAt).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-semibold">${Number(item.amount).toFixed(2)}</p>
-                  <span className={`text-[10px] font-medium ${item.status === 'active' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  <p className="text-xs font-semibold text-slate-900">${Number(item.amount).toFixed(2)}</p>
+                  <span className={`text-[10px] font-medium ${item.status === 'active' ? 'text-emerald-600' : 'text-slate-500'}`}>
                     {item.status}
                   </span>
                 </div>

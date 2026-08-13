@@ -18,7 +18,7 @@ interface WalletConnectionPanelProps {
   darkMode?: boolean;
 }
 
-export default function WalletConnectionPanel({ compact = false, showTitle = true, darkMode = true }: WalletConnectionPanelProps) {
+export default function WalletConnectionPanel({ compact = false, showTitle = true, darkMode = false }: WalletConnectionPanelProps) {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,13 +71,13 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
     const borderClass = darkMode ? 'border-slate-600' : 'border-slate-200';
     const textClass = darkMode ? 'text-white' : 'text-slate-900';
     const secondaryTextClass = darkMode ? 'text-slate-400' : 'text-slate-500';
-    const buttonClass = darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700';
+    const buttonClass = darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-cmblue-600 hover:bg-cmblue-700';
     const buttonTextClass = 'text-white';
 
     return (
-      <div className={`${bgClass} rounded-lg p-4 border ${borderClass}`}>
+      <div className={`${bgClass} rounded-2xl p-4 border ${borderClass}`}>
         <div className="flex items-center gap-2 mb-3">
-          <FaWallet className="text-blue-400" />
+          <FaWallet className="text-cmblue-600" />
           <h3 className={`font-semibold ${textClass}`}>Wallet</h3>
         </div>
 
@@ -100,7 +100,7 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
 
         <button
           onClick={() => setShowConnectModal(true)}
-          className={`w-full ${buttonClass} ${buttonTextClass} font-semibold py-2 px-3 rounded-lg transition text-sm flex items-center justify-center gap-2`}
+          className={`w-full ${buttonClass} ${buttonTextClass} font-semibold py-2 px-3 rounded-xl transition text-sm flex items-center justify-center gap-2`}
         >
           <FaPlus className="w-3 h-3" />
           {wallets.length === 0 ? 'Connect Wallet' : 'Add Wallet'}
@@ -120,13 +120,13 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
     <div className="space-y-4">
       {showTitle && (
         <div className="flex items-center gap-2">
-          <FaWallet className="text-blue-400" />
+          <FaWallet className="text-cmblue-600" />
           <h2 className={`text-xl font-bold ${textClass}`}>Connected Wallets</h2>
         </div>
       )}
 
       {error && (
-        <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-sm">
+        <div className="bg-rose-50 border border-rose-200 text-rose-600 px-4 py-3 rounded-xl text-sm">
           {error}
         </div>
       )}
@@ -134,12 +134,12 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
       {loading && wallets.length === 0 ? (
         <div className={secondaryTextClass}>Loading wallets...</div>
       ) : wallets.length === 0 ? (
-        <div className={`${cardBgClass} rounded-lg p-6 border ${borderClass} text-center`}>
+        <div className={`${cardBgClass} rounded-2xl p-6 border ${borderClass} text-center`}>
           <FaWallet className={`w-12 h-12 mx-auto ${secondaryTextClass} mb-3`} />
           <p className={`${secondaryTextClass} mb-4`}>No wallet connected yet</p>
           <button
             onClick={() => setShowConnectModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition inline-flex items-center gap-2"
+            className="bg-cmblue-600 hover:bg-cmblue-700 text-white font-semibold py-2 px-6 rounded-xl transition inline-flex items-center gap-2"
           >
             <FaPlus className="w-4 h-4" />
             Connect Wallet
@@ -148,14 +148,14 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
       ) : (
         <div className="space-y-3">
           {wallets.map(wallet => (
-            <div key={wallet.id} className={`${cardBgClass} rounded-lg p-4 border ${borderClass} flex items-center justify-between`}>
+            <div key={wallet.id} className={`${cardBgClass} rounded-2xl p-4 border ${borderClass} flex items-center justify-between`}>
               <div>
                 <p className={`${textClass} font-mono`}>{wallet.address}</p>
                 <p className={`text-sm ${secondaryTextClass} capitalize`}>{wallet.chain}</p>
               </div>
               <button
                 onClick={() => handleDisconnect(wallet.id)}
-                className="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition text-sm flex items-center gap-2"
+                className="bg-rose-500 hover:bg-rose-600 text-white py-2 px-4 rounded-xl transition text-sm flex items-center gap-2"
               >
                 <FaUnlink className="w-4 h-4" />
                 Disconnect
@@ -164,7 +164,7 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
           ))}
           <button
             onClick={() => setShowConnectModal(true)}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+            className="w-full bg-cmblue-600 hover:bg-cmblue-700 text-white font-semibold py-2 px-4 rounded-xl transition flex items-center justify-center gap-2"
           >
             <FaPlus className="w-4 h-4" />
             Add Another Wallet
@@ -174,7 +174,7 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
 
       {/* Connect Modal - TODO: implement full wallet connection flow */}
       {showConnectModal && (
-        <div className={`${cardBgClass} rounded-lg p-6 border ${borderClass}`}>
+        <div className={`${cardBgClass} rounded-2xl p-6 border ${borderClass}`}>
           <div className="flex justify-between items-center mb-4">
             <h3 className={`text-lg font-bold ${textClass}`}>Connect Wallet</h3>
             <button
@@ -189,7 +189,7 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
           </p>
           <button
             onClick={() => setShowConnectModal(false)}
-            className={`mt-4 ${darkMode ? 'bg-slate-600 hover:bg-slate-500' : 'bg-slate-200 hover:bg-slate-300'} ${darkMode ? 'text-white' : 'text-slate-900'} py-2 px-4 rounded-lg transition`}
+            className={`mt-4 ${darkMode ? 'bg-slate-600 hover:bg-slate-500' : 'bg-slate-200 hover:bg-slate-300'} ${darkMode ? 'text-white' : 'text-slate-900'} py-2 px-4 rounded-xl transition`}
           >
             Close
           </button>

@@ -205,30 +205,30 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
       <div>
         <button
           onClick={onBack}
-          className="text-slate-400 hover:text-slate-300 text-sm flex items-center gap-2 mb-4"
+          className="text-slate-600 hover:text-slate-900 text-sm flex items-center gap-2 mb-4"
         >
           ← Back
         </button>
-        <h2 className="text-2xl font-bold text-white">Connect Wallet</h2>
-        <p className="text-slate-400 text-sm mt-1">Sign in with your crypto wallet</p>
+        <h2 className="text-2xl font-bold text-slate-900">Connect Wallet</h2>
+        <p className="text-slate-600 text-sm mt-1">Sign in with your crypto wallet</p>
       </div>
 
       {error && (
-        <div className="bg-red-900 border border-red-700 text-red-200 px-4 py-3 rounded-lg text-sm flex gap-2">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex gap-2">
           <FaExclamationTriangle className="flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
       {authStatus && (
-        <div className="bg-blue-900 border border-blue-700 text-blue-200 px-4 py-3 rounded-lg text-sm flex gap-2">
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm flex gap-2">
           <FaSyncAlt className="flex-shrink-0 mt-0.5 animate-spin" />
           <span>{authStatus}</span>
         </div>
       )}
 
       {/* Login Method Selection */}
-      <div className="flex gap-2 bg-slate-700 rounded-lg p-1">
+      <div className="flex gap-2 bg-slate-100 rounded-lg p-1">
         {(['wallet', 'address', 'qrcode'] as LoginMethod[]).map((method) => (
           <button
             key={method}
@@ -240,8 +240,8 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
             disabled={connecting}
             className={`flex-1 py-2 px-3 rounded transition text-sm font-medium ${
               loginMethod === method
-                ? 'bg-blue-600 text-white'
-                : 'bg-transparent text-slate-300 hover:text-slate-200'
+                ? 'bg-cmblue-600 text-white'
+                : 'bg-transparent text-slate-600 hover:text-slate-800'
             }`}
           >
             {method === 'wallet' && <FaWallet className="inline mr-1" />}
@@ -256,13 +256,13 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
       {loginMethod === 'wallet' && (
         <div className="space-y-4">
           {isConnected && address ? (
-            <div className="bg-green-900 border border-green-700 rounded-lg p-4">
-              <p className="text-green-200 text-sm mb-3">✓ Wallet Connected</p>
-              <p className="text-white text-sm font-mono break-all mb-4">{address}</p>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <p className="text-emerald-700 text-sm mb-3 font-semibold">✓ Wallet Connected</p>
+              <p className="text-slate-900 text-sm font-mono break-all mb-4">{address}</p>
               <button
                 onClick={handleWalletConnect}
                 disabled={connecting}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-semibold py-2 px-4 rounded-lg transition shadow-sm"
               >
                 {connecting ? 'Signing...' : 'Sign & Connect'}
               </button>
@@ -271,7 +271,7 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
             <button
               onClick={handleWalletConnect}
               disabled={connecting}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
+              className="w-full bg-cmblue-600 hover:bg-cmblue-700 disabled:bg-slate-300 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 shadow-sm"
             >
               <FaWallet />
               {connecting ? 'Connecting...' : 'Connect Wallet'}
@@ -284,20 +284,20 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
       {loginMethod === 'address' && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Wallet Address</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Wallet Address</label>
             <input
               type="text"
               value={walletAddress}
               onChange={(e) => setWalletAddress(e.target.value)}
               placeholder="0x... or 4A..."
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cmblue-500"
               disabled={connecting}
             />
           </div>
           <button
             onClick={handleManualAddress}
             disabled={connecting || !walletAddress.trim()}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition"
+            className="w-full bg-cmblue-600 hover:bg-cmblue-700 disabled:bg-slate-300 text-white font-semibold py-2 px-4 rounded-lg transition shadow-sm"
           >
             {connecting ? 'Processing...' : 'Continue'}
           </button>
@@ -306,7 +306,7 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
 
       {/* QR Code */}
       {loginMethod === 'qrcode' && (
-        <div className="text-center text-slate-400 py-8">
+        <div className="text-center text-slate-600 py-8">
           <FaQrcode className="text-4xl mx-auto mb-4" />
           <p className="text-sm">QR code login coming soon</p>
         </div>

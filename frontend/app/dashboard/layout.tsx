@@ -75,10 +75,10 @@ export default function DashboardLayoutWrapper({ children }: { children: React.R
   // Show loading while checking authentication
   if (isChecking || !isMounted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-white text-slate-900">
         <div className="text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500 mx-auto mb-3" />
-          <p className="text-sm text-slate-400">Verifying authentication...</p>
+          <p className="text-sm text-slate-500">Verifying authentication...</p>
         </div>
       </div>
     );
@@ -87,10 +87,10 @@ export default function DashboardLayoutWrapper({ children }: { children: React.R
   // If redirecting, show loading
   if (redirecting || !isAuth) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-white text-slate-900">
         <div className="text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500 mx-auto mb-3" />
-          <p className="text-sm text-slate-400">Redirecting...</p>
+          <p className="text-sm text-slate-500">Redirecting...</p>
         </div>
       </div>
     );

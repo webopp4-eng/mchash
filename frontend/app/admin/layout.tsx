@@ -98,10 +98,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Show loading while checking access
   if (isChecking || !isMounted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-white text-slate-900">
         <div className="text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500 mx-auto mb-3" />
-          <p className="text-sm text-slate-400">Checking admin access...</p>
+          <p className="text-sm text-slate-500">Checking admin access...</p>
         </div>
       </div>
     );
@@ -109,29 +109,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (accessDenied || !isAdmin || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0a0e1a] text-white">
+      <div className="flex min-h-screen items-center justify-center bg-white text-slate-900">
         <div className="text-center">
           <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500 mx-auto mb-3" />
-          <p className="text-sm text-slate-400">Redirecting...</p>
+          <p className="text-sm text-slate-500">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0e1a] text-white">
+    <div className="min-h-screen bg-white text-slate-900">
       <div className="pointer-events-none fixed inset-0">
-        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cmblue-500/10 blur-[100px]" />
-        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-purple-500/5 blur-[100px]" />
+        <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-cmblue-500/5 blur-[100px]" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-blue-200/20 blur-[100px]" />
       </div>
 
       <div className="relative z-10 flex min-h-screen">
         {/* Admin Sidebar */}
-        <aside className="fixed top-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-white/10 bg-[#0d1226]/95 backdrop-blur-xl">
-          <div className="flex items-center gap-3 border-b border-white/10 p-5">
+        <aside className="fixed top-0 left-0 z-50 flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
+          <div className="flex items-center gap-3 border-b border-slate-200 p-5 shadow-sm">
             <Logo size={36} />
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cmblue-400">Admin</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cmblue-600">Admin</p>
               <p className="text-[10px] text-slate-500">CM HASH Panel</p>
             </div>
           </div>
@@ -145,8 +145,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   href={item.href}
                   className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-gradient-to-r from-cmblue-600/30 to-cmblue-500/10 text-cmblue-300'
-                      : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                      ? 'bg-cmblue-50 text-cmblue-600 shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
                   }`}
                 >
                   <item.icon className="h-4 w-4" />
@@ -156,10 +156,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             })}
           </nav>
 
-          <div className="border-t border-white/10 p-4">
+          <div className="border-t border-slate-200 p-4">
             <Link
               href="/dashboard"
-              className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/10"
+              className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100 shadow-sm"
             >
               <FaChartLine className="h-3.5 w-3.5" />
               Back to User Dashboard

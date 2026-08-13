@@ -142,12 +142,12 @@ export default function SupportPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Support Center</h1>
-        <p className="mt-1 text-sm text-slate-400">Get help, find answers, and contact support</p>
+        <h1 className="text-2xl font-bold text-slate-900">Support Center</h1>
+        <p className="mt-1 text-sm text-slate-500">Get help, find answers, and contact support</p>
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-1 rounded-[20px] border border-white/10 bg-white/5 p-1.5 backdrop-blur-xl">
+      <div className="flex flex-wrap gap-1 rounded-[20px] border border-slate-200/80 bg-white p-1.5 shadow-card">
         {[
           { id: 'faq', label: 'FAQ', icon: FaQuestionCircle },
           { id: 'knowledge', label: 'Knowledge Base', icon: FaBook },
@@ -159,8 +159,8 @@ export default function SupportPage() {
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-all ${
               activeTab === tab.id
-                ? 'bg-cmblue-500/20 text-cmblue-400 shadow-[0_0_15px_rgba(14,161,255,0.2)]'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-cmblue-50 text-cmblue-700 shadow-[0_0_15px_rgba(17,120,250,0.15)]'
+                : 'text-slate-500 hover:text-slate-800'
             }}`}
           >
             <tab.icon className="h-3 w-3" />
@@ -170,24 +170,24 @@ export default function SupportPage() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-400">{error}</div>
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">{error}</div>
       )}
       {success && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-400">{success}</div>
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div>
       )}
 
       {/* FAQ Tab */}
       {activeTab === 'faq' && (
-        <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-          <h2 className="text-sm font-semibold text-cmblue-300">Frequently Asked Questions</h2>
+        <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
+          <h2 className="text-sm font-semibold text-slate-900">Frequently Asked Questions</h2>
           <div className="mt-4 space-y-3">
             {faqs.map((faq) => (
-              <details key={faq.q} className="group rounded-xl border border-white/10 bg-white/5 p-4 open:bg-white/10">
-                <summary className="flex cursor-pointer items-center justify-between text-sm font-medium">
+              <details key={faq.q} className="group rounded-xl border border-slate-200/80 bg-slate-50 p-4 open:bg-cmblue-50/50">
+                <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold text-slate-900">
                   {faq.q}
-                  <span className="text-slate-500 transition-transform group-open:rotate-45">+</span>
+                  <span className="text-slate-400 transition-transform group-open:rotate-45">+</span>
                 </summary>
-                <p className="mt-3 text-xs text-slate-400 leading-relaxed">{faq.a}</p>
+                <p className="mt-3 text-xs text-slate-600 leading-relaxed">{faq.a}</p>
               </details>
             ))}
           </div>
@@ -197,18 +197,18 @@ export default function SupportPage() {
       {/* Knowledge Base Tab */}
       {activeTab === 'knowledge' && (
         <div className="space-y-6">
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold text-cmblue-300">Knowledge Base</h2>
+          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <h2 className="text-sm font-semibold text-slate-900">Knowledge Base</h2>
             <p className="mt-1 text-xs text-slate-500">Guides and articles to help you get the most from CM HASH</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaShieldAlt className="h-4 w-4 text-cmblue-400" />
-                <h3 className="text-sm font-semibold">Security Best Practices</h3>
+                <FaShieldAlt className="h-4 w-4 text-cmblue-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Security Best Practices</h3>
               </div>
-              <ul className="space-y-2 text-xs text-slate-400">
+              <ul className="space-y-2 text-xs text-slate-600">
                 <li>• Never share your private key or seed phrase</li>
                 <li>• Always verify you are on the official CM Hash site</li>
                 <li>• Enable 2FA on your wallet app when available</li>
@@ -217,25 +217,25 @@ export default function SupportPage() {
               </ul>
             </div>
 
-            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaWallet className="h-4 w-4 text-purple-400" />
-                <h3 className="text-sm font-semibold">Supported Wallets</h3>
+                <FaWallet className="h-4 w-4 text-purple-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Supported Wallets</h3>
               </div>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li>• <span className="text-slate-300">Ethereum:</span> MetaMask, Rainbow, Coinbase Wallet</li>
-                <li>• <span className="text-slate-300">Solana:</span> Phantom, Solflare, Trust Wallet</li>
-                <li>• <span className="text-slate-300">BNB Chain:</span> MetaMask, Trust Wallet</li>
-                <li>• <span className="text-slate-300">Mobile:</span> WalletConnect deep linking</li>
+              <ul className="space-y-2 text-xs text-slate-600">
+                <li>• <span className="font-semibold text-slate-800">Ethereum:</span> MetaMask, Rainbow, Coinbase Wallet</li>
+                <li>• <span className="font-semibold text-slate-800">Solana:</span> Phantom, Solflare, Trust Wallet</li>
+                <li>• <span className="font-semibold text-slate-800">BNB Chain:</span> MetaMask, Trust Wallet</li>
+                <li>• <span className="font-semibold text-slate-800">Mobile:</span> WalletConnect deep linking</li>
               </ul>
             </div>
 
-            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaClock className="h-4 w-4 text-emerald-400" />
-                <h3 className="text-sm font-semibold">Mining Rewards Schedule</h3>
+                <FaClock className="h-4 w-4 text-emerald-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Mining Rewards Schedule</h3>
               </div>
-              <ul className="space-y-2 text-xs text-slate-400">
+              <ul className="space-y-2 text-xs text-slate-600">
                 <li>• Rewards accrue every block in real-time</li>
                 <li>• Daily payouts are processed automatically</li>
                 <li>• Minimum payout: 0.001 USDT per session</li>
@@ -244,37 +244,37 @@ export default function SupportPage() {
               </ul>
             </div>
 
-            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaCube className="h-4 w-4 text-amber-400" />
-                <h3 className="text-sm font-semibold">Supported Chains</h3>
+                <FaCube className="h-4 w-4 text-amber-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Supported Chains</h3>
               </div>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li>• <span className="text-slate-300">Ethereum (ETH):</span> ERC-20 USDT</li>
-                <li>• <span className="text-slate-300">Solana (SOL):</span> SPL USDT</li>
-                <li>• <span className="text-slate-300">BNB Smart Chain:</span> BEP-20 USDT</li>
+              <ul className="space-y-2 text-xs text-slate-600">
+                <li>• <span className="font-semibold text-slate-800">Ethereum (ETH):</span> ERC-20 USDT</li>
+                <li>• <span className="font-semibold text-slate-800">Solana (SOL):</span> SPL USDT</li>
+                <li>• <span className="font-semibold text-slate-800">BNB Smart Chain:</span> BEP-20 USDT</li>
               </ul>
             </div>
 
-            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaCoins className="h-4 w-4 text-cmblue-400" />
-                <h3 className="text-sm font-semibold">Earning Methods</h3>
+                <FaCoins className="h-4 w-4 text-cmblue-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Earning Methods</h3>
               </div>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li>• <span className="text-slate-300">Mining:</span> Earn from your active plan</li>
-                <li>• <span className="text-slate-300">Referrals:</span> 3-8% commission on referred purchases</li>
-                <li>• <span className="text-slate-300">Hash Renting:</span> Rent hash power for yields</li>
-                <li>• <span className="text-slate-300">Bonus Rewards:</span> Extra rewards on plan completion</li>
+              <ul className="space-y-2 text-xs text-slate-600">
+                <li>• <span className="font-semibold text-slate-800">Mining:</span> Earn from your active plan</li>
+                <li>• <span className="font-semibold text-slate-800">Referrals:</span> 3-8% commission on referred purchases</li>
+                <li>• <span className="font-semibold text-slate-800">Hash Renting:</span> Rent hash power for yields</li>
+                <li>• <span className="font-semibold text-slate-800">Bonus Rewards:</span> Extra rewards on plan completion</li>
               </ul>
             </div>
 
-            <div className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaServer className="h-4 w-4 text-sky-400" />
-                <h3 className="text-sm font-semibold">Platform Fees</h3>
+                <FaServer className="h-4 w-4 text-sky-600" />
+                <h3 className="text-sm font-semibold text-slate-900">Platform Fees</h3>
               </div>
-              <ul className="space-y-2 text-xs text-slate-400">
+              <ul className="space-y-2 text-xs text-slate-600">
                 <li>• No fees for mining plan purchases</li>
                 <li>• Withdrawal fee: 0.5% (min 1 USDT)</li>
                 <li>• Hash renting management: Free</li>
@@ -288,27 +288,27 @@ export default function SupportPage() {
       {/* Tutorial Tab */}
       {activeTab === 'tutorial' && (
         <div className="space-y-6">
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold text-cmblue-300">Step-by-Step Tutorials</h2>
+          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <h2 className="text-sm font-semibold text-slate-900">Step-by-Step Tutorials</h2>
             <p className="mt-1 text-xs text-slate-500">Walkthroughs to help you get started fast</p>
           </div>
 
           <div className="space-y-4">
             {tutorials.map((tutorial) => (
-              <div key={tutorial.title} className="rounded-[20px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div key={tutorial.title} className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
                 <div className="mb-4 flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-600">
                     <tutorial.icon className="h-4 w-4" />
                   </span>
-                  <h3 className="text-lg font-semibold">{tutorial.title}</h3>
+                  <h3 className="text-lg font-semibold text-slate-900">{tutorial.title}</h3>
                 </div>
                 <ol className="space-y-3">
                   {tutorial.steps.map((step, i) => (
                     <li key={i} className="flex items-start gap-2.5">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cmblue-500/20 text-xs font-bold text-cmblue-400">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cmblue-50 text-xs font-bold text-cmblue-600">
                         {i + 1}
                       </span>
-                      <span className="text-xs text-slate-300 leading-relaxed">{step}</span>
+                      <span className="text-xs text-slate-600 leading-relaxed">{step}</span>
                     </li>
                   ))}
                 </ol>
@@ -322,21 +322,21 @@ export default function SupportPage() {
       {activeTab === 'tickets' && (
         <div className="space-y-4">
           {/* Create Ticket */}
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold text-cmblue-300">Create Support Ticket</h2>
+          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <h2 className="text-sm font-semibold text-slate-900">Create Support Ticket</h2>
             <div className="mt-4 space-y-3">
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Subject"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
               />
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
                 >
                   <option value="general">General</option>
                   <option value="mining">Mining</option>
@@ -349,7 +349,7 @@ export default function SupportPage() {
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
                 >
                   <option value="low">Low</option>
                   <option value="normal">Normal</option>
@@ -362,7 +362,7 @@ export default function SupportPage() {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Describe your issue in detail..."
                 rows={4}
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none transition focus:border-cmblue-500/50"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
               />
               <button
                 onClick={submitTicket}
@@ -385,18 +385,18 @@ export default function SupportPage() {
           </div>
 
           {/* Existing Tickets */}
-          <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-            <h2 className="text-sm font-semibold text-cmblue-300">Your Tickets</h2>
+          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <h2 className="text-sm font-semibold text-slate-900">Your Tickets</h2>
             {tickets.length > 0 ? (
               <div className="mt-4 space-y-2">
                 {tickets.map((ticket: any) => (
-                  <div key={ticket.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div key={ticket.id} className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold">{ticket.subject}</p>
+                      <p className="text-xs font-semibold text-slate-900">{ticket.subject}</p>
                       <span className={`text-[10px] font-medium ${
-                        ticket.status === 'open' ? 'text-emerald-400' :
-                        ticket.status === 'pending' ? 'text-amber-400' :
-                        ticket.status === 'resolved' || ticket.status === 'closed' ? 'text-slate-400' : 'text-cmblue-400'
+                        ticket.status === 'open' ? 'text-emerald-600' :
+                        ticket.status === 'pending' ? 'text-amber-600' :
+                        ticket.status === 'resolved' || ticket.status === 'closed' ? 'text-slate-500' : 'text-cmblue-600'
                       }`}>
                         {ticket.status}
                       </span>
@@ -409,12 +409,12 @@ export default function SupportPage() {
                         {ticket.messages.map((msg: any) => (
                           <div
                             key={msg.id}
-                            className={`rounded-lg bg-white/5 p-2 text-xs ${
-                              msg.senderRole === 'user' ? 'ml-6' : 'mr-6 border border-cmblue-500/20'
+                            className={`rounded-lg bg-white p-2 text-xs shadow-sm ${
+                              msg.senderRole === 'user' ? 'ml-6' : 'mr-6 border border-cmblue-200'
                             }`}
                           >
                             <p className="text-[10px] text-slate-500 capitalize">{msg.senderRole}</p>
-                            <p className="mt-0.5 text-slate-300">{msg.message}</p>
+                            <p className="mt-0.5 text-slate-700">{msg.message}</p>
                           </div>
                         ))}
                       </div>

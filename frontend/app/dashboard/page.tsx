@@ -67,7 +67,8 @@ export default function DashboardHome() {
         </span>
       </div>
 
-      <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-r from-[#0d67d8] via-[#0f88ff] to-[#3aabff] p-6 text-white shadow-[0_24px_60px_rgba(14,161,255,0.24)]">
+      {/* Balance Hero Card - vivid blue gradient */}
+      <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#0b5fd4] via-[#1178fa] to-[#4a9dff] p-6 text-white shadow-[0_24px_60px_rgba(17,120,250,0.3)]">
         <div className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10" />
         <div className="pointer-events-none absolute -bottom-16 left-0 h-40 w-40 rounded-full bg-white/5" />
         <div className="relative">
@@ -76,7 +77,7 @@ export default function DashboardHome() {
               <p className="text-[10px] uppercase tracking-[0.28em] text-blue-100">CM HASH</p>
               <p className="mt-1 text-sm text-blue-100/80">Cloud Mining</p>
             </div>
-            <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-50">
+            <div className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white">
               Live
             </div>
           </div>
@@ -109,29 +110,30 @@ export default function DashboardHome() {
         </div>
       </div>
 
+      {/* Stats Cards - clean white */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-[22px] border border-slate-200/80 bg-white p-4 shadow-card">
           <div className="flex items-center gap-2 text-cmblue-600">
             <FaBolt className="h-4 w-4" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Hash Rate</span>
           </div>
           <p className="mt-3 text-2xl font-bold text-slate-900">{activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s'}</p>
         </div>
-        <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-[22px] border border-slate-200/80 bg-white p-4 shadow-card">
           <div className="flex items-center gap-2 text-emerald-500">
             <FaCoins className="h-4 w-4" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Total Earned</span>
           </div>
           <p className="mt-3 text-2xl font-bold text-slate-900">${Number(data?.user?.totalEarned || 0).toFixed(2)}</p>
         </div>
-        <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-[22px] border border-slate-200/80 bg-white p-4 shadow-card">
           <div className="flex items-center gap-2 text-violet-500">
             <FaUsers className="h-4 w-4" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Referrals</span>
           </div>
           <p className="mt-3 text-2xl font-bold text-slate-900">0</p>
         </div>
-        <div className="rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="rounded-[22px] border border-slate-200/80 bg-white p-4 shadow-card">
           <div className="flex items-center gap-2 text-amber-500">
             <FaExchangeAlt className="h-4 w-4" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">Transactions</span>
@@ -140,7 +142,8 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+      {/* Active Mining Plan - white card */}
+      <div className="rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-card">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Active Mining Plan</h2>
@@ -155,22 +158,22 @@ export default function DashboardHome() {
 
         {activePlan ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Plan</p>
               <p className="mt-1 text-sm font-semibold text-slate-800">{activePlan.plan.name}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Daily Earnings</p>
               <p className="mt-1 text-sm font-semibold text-emerald-600">${activePlan.dailyEarnings.toFixed(2)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Progress</p>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
                 <div className="h-full rounded-full bg-gradient-to-r from-cmblue-500 to-cmblue-400" style={{ width: `${activePlan.progress}%` }} />
               </div>
               <p className="mt-2 text-[10px] text-slate-500">{activePlan.progressPercent || Math.round(activePlan.progress || 0)}%</p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-3">
               <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-500">Time Remaining</p>
               <p className="mt-1 text-sm font-semibold text-slate-800">{activePlan.timeRemaining}</p>
             </div>
@@ -186,7 +189,8 @@ export default function DashboardHome() {
         )}
       </div>
 
-      <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+      {/* Recent Transactions - white card */}
+      <div className="rounded-[26px] border border-slate-200/80 bg-white p-5 shadow-card">
         <div className="mb-4 flex items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Recent Transactions</h2>
@@ -198,7 +202,7 @@ export default function DashboardHome() {
         {recentTx.length > 0 ? (
           <div className="space-y-2">
             {recentTx.slice(0, 5).map((tx: any) => (
-              <div key={tx.id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div key={tx.id} className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-slate-50 p-3">
                 <div className="flex items-center gap-3">
                   <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${
                     tx.type === 'deposit' ? 'bg-emerald-100 text-emerald-600' :
