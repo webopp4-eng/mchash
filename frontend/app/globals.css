@@ -128,184 +128,411 @@
   background: #7bb9ff;
 }
 
-/* MOBILE OPTIMIZATION - Compact container sizes */
+/* MOBILE OPTIMIZATION - ULTRA COMPACT for phones */
 @media (max-width: 768px) {
+  /* AGGRESSIVE spacing reduction */
+  * {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   .mc-page {
-    gap: 0.75rem !important;
+    gap: 0.5rem !important;
+    padding: 0.5rem !important;
+    space-y: 0.5rem !important;
   }
 
   .mc-page-header {
-    gap: 0.5rem !important;
-    padding: 0.75rem !important;
+    gap: 0.25rem !important;
+    padding: 0.5rem !important;
+    min-height: auto;
+    border-radius: 12px;
+  }
+
+  .mc-page-header div {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .mc-page-header button {
+    padding: 0.4rem 0.8rem !important;
+    font-size: 0.7rem !important;
   }
 
   .mc-title {
-    font-size: 1.125rem;
+    font-size: 0.95rem !important;
+    font-weight: 700;
+    line-height: 1.1;
+    margin: 0 !important;
   }
 
   .mc-subtitle {
-    font-size: 0.75rem;
+    font-size: 0.65rem !important;
+    line-height: 1;
+    margin: 0.15rem 0 0 0 !important;
   }
 
   .mc-card {
-    padding: 0.75rem !important;
+    padding: 0.5rem !important;
+    border-radius: 12px;
+    gap: 0 !important;
   }
 
   .mc-glass-blue {
-    padding: 0.75rem !important;
+    padding: 0.5rem !important;
+    border-radius: 12px;
+    gap: 0.25rem !important;
   }
 
-  /* Reduce grid gaps on mobile */
+  .mc-glass-blue > div {
+    gap: 0.25rem !important;
+    padding: 0 !important;
+  }
+
+  .mc-glass-blue p {
+    margin: 0 !important;
+  }
+
+  /* Reduce grid gaps aggressively */
   .grid {
-    gap: 0.5rem !important;
+    gap: 0.3rem !important;
   }
 
-  /* Reduce text sizes on mobile */
-  .text-4xl {
-    font-size: 1.875rem;
-  }
-
+  /* Ultra-compact text sizes */
   .text-5xl {
-    font-size: 1.875rem;
+    font-size: 1.5rem !important;
+    line-height: 1.1;
+  }
+
+  .text-4xl {
+    font-size: 1.25rem !important;
+    line-height: 1.1;
   }
 
   .text-3xl {
-    font-size: 1.5rem;
+    font-size: 1.1rem !important;
+    line-height: 1.1;
   }
 
   .text-2xl {
-    font-size: 1.25rem;
+    font-size: 0.95rem !important;
+    line-height: 1.1;
   }
 
   .text-xl {
-    font-size: 1.125rem;
+    font-size: 0.85rem !important;
+    line-height: 1;
   }
 
-  /* Reduce padding on stat icons */
+  .text-lg {
+    font-size: 0.8rem !important;
+  }
+
+  .text-base {
+    font-size: 0.75rem !important;
+  }
+
+  /* Minimal stat icons */
   .mc-stat-icon {
-    width: 2rem;
-    height: 2rem;
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    padding: 0 !important;
   }
 
-  /* Reduce table sizes */
-  .mc-th,
+  .mc-stat-icon svg {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+  }
+
+  /* Reduce table to absolute minimum */
+  .mc-table-head {
+    gap: 0 !important;
+  }
+
+  .mc-th {
+    padding: 0.3rem !important;
+    font-size: 0.6rem !important;
+  }
+
   .mc-td {
-    padding: 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.3rem !important;
+    font-size: 0.65rem !important;
   }
 
-  /* Compact status badges */
+  .mc-row {
+    gap: 0 !important;
+    padding: 0.3rem 0 !important;
+  }
+
+  /* Minimal status badges */
   .mc-status {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.15rem 0.3rem !important;
+    font-size: 0.6rem !important;
+    margin: 0.2rem 0 0 0 !important;
   }
 
-  /* Reduce conic gradient circle on mobile */
+  /* Shrink conic circle significantly */
   .rounded-full {
-    width: 6rem;
-    height: 6rem;
+    width: 4rem !important;
+    height: 4rem !important;
   }
 
   .rounded-full > div {
-    width: 4.5rem;
-    height: 4.5rem;
+    width: 3rem !important;
+    height: 3rem !important;
   }
 
   .rounded-full > div > div {
-    font-size: 1.5rem;
+    font-size: 1rem !important;
   }
 
-  /* Compact form spacing */
-  .space-y-4 {
-    row-gap: 0.5rem !important;
+  .rounded-full > div > div p:first-child {
+    font-size: 1rem !important;
   }
 
-  .space-y-6 {
-    row-gap: 0.75rem !important;
+  .rounded-full > div > div p:last-child {
+    font-size: 0.6rem !important;
   }
 
-  /* Reduce overall page padding */
-  .mc-page {
-    padding: 0.75rem;
+  /* Aggressive space removal */
+  .space-y-1 { row-gap: 0.1rem !important; }
+  .space-y-2 { row-gap: 0.15rem !important; }
+  .space-y-3 { row-gap: 0.25rem !important; }
+  .space-y-4 { row-gap: 0.3rem !important; }
+  .space-y-5 { row-gap: 0.5rem !important; }
+  .space-y-6 { row-gap: 0.5rem !important; }
+  .space-y-8 { row-gap: 0.5rem !important; }
+
+  .space-x-1 { column-gap: 0.1rem !important; }
+  .space-x-2 { column-gap: 0.15rem !important; }
+  .space-x-3 { column-gap: 0.25rem !important; }
+  .space-x-4 { column-gap: 0.3rem !important; }
+
+  /* Header/footer compact */
+  h1, h2, h3, h4, h5, h6 {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* Compact header margins */
-  h1,
-  h2,
-  h3 {
-    margin: 0.25rem 0;
+  p {
+    margin: 0 !important;
   }
 
-  /* Balance section - full width on mobile */
+  /* Button sizing */
+  .mc-button {
+    padding: 0.35rem 0.7rem !important;
+    font-size: 0.65rem !important;
+    min-height: auto;
+  }
+
+  .mc-button-secondary {
+    padding: 0.35rem 0.7rem !important;
+    font-size: 0.65rem !important;
+    min-height: auto;
+  }
+
+  .mc-icon-button {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+    padding: 0 !important;
+  }
+
+  .mc-icon-button svg {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+  }
+
+  /* Input compact */
+  .mc-input {
+    padding: 0.4rem 0.5rem !important;
+    font-size: 0.7rem !important;
+    border-radius: 8px;
+  }
+
+  /* Flex compact */
+  .flex {
+    gap: 0.25rem !important;
+  }
+
+  /* Fixed header/nav ultra-compact */
+  .fixed.top-0 {
+    padding: 0.3rem 0.4rem !important;
+  }
+
+  .fixed.bottom-0 {
+    padding: 0.3rem 0.4rem !important;
+  }
+
+  /* Remove flex-row stacking */
+  .sm\:flex-row {
+    flex-direction: column !important;
+    gap: 0.25rem !important;
+  }
+
+  /* Make full width sections */
   .sm\:min-w-64 {
+    width: 100% !important;
     min-width: 100% !important;
   }
 
-  /* Stack flex layouts on mobile */
-  .sm\:flex-row {
-    flex-direction: column;
+  /* Border radius reduce */
+  .rounded-2xl {
+    border-radius: 10px !important;
   }
 
-  /* Reduce header top bar padding */
-  .fixed.top-0 {
-    padding: 0.5rem 0.75rem;
+  .rounded-xl {
+    border-radius: 8px !important;
   }
 }
 
-/* Extra compact for very small phones */
+/* Extra compact for very small phones (< 480px) */
 @media (max-width: 480px) {
   .mc-page {
-    gap: 0.5rem !important;
+    gap: 0.3rem !important;
+    padding: 0.3rem !important;
   }
 
   .mc-page-header,
   .mc-card,
   .mc-glass-blue {
-    padding: 0.625rem !important;
+    padding: 0.3rem !important;
   }
 
   .mc-title {
-    font-size: 1rem;
+    font-size: 0.8rem !important;
+  }
+
+  .mc-subtitle {
+    font-size: 0.6rem !important;
   }
 
   .grid {
-    gap: 0.5rem !important;
+    gap: 0.2rem !important;
   }
 
-  .text-4xl,
   .text-5xl,
+  .text-4xl,
   .text-3xl {
-    font-size: 1.25rem;
+    font-size: 1rem !important;
   }
 
   .text-2xl {
-    font-size: 1rem;
+    font-size: 0.85rem !important;
+  }
+
+  .text-xl {
+    font-size: 0.75rem !important;
   }
 
   .rounded-full {
-    width: 5rem;
-    height: 5rem;
+    width: 3.5rem !important;
+    height: 3.5rem !important;
   }
 
   .rounded-full > div {
-    width: 4rem;
-    height: 4rem;
+    width: 2.5rem !important;
+    height: 2.5rem !important;
   }
 
   .rounded-full > div > div {
-    font-size: 1.25rem;
+    font-size: 0.85rem !important;
   }
 
-  /* Minimum padding */
-  .px-4,
-  .px-5 {
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
+  .mc-stat-icon {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
   }
 
-  .py-3,
-  .py-4 {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
+  .mc-button,
+  .mc-button-secondary {
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.6rem !important;
+  }
+
+  .mc-icon-button {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+  }
+
+  .mc-input {
+    padding: 0.3rem 0.4rem !important;
+    font-size: 0.65rem !important;
+  }
+}
+
+/* Ultra-compact for phones < 360px */
+@media (max-width: 360px) {
+  .mc-page {
+    gap: 0.2rem !important;
+    padding: 0.2rem !important;
+  }
+
+  .mc-page-header,
+  .mc-card,
+  .mc-glass-blue {
+    padding: 0.25rem !important;
+    border-radius: 8px;
+  }
+
+  .mc-title {
+    font-size: 0.7rem !important;
+  }
+
+  .mc-subtitle {
+    font-size: 0.55rem !important;
+  }
+
+  .grid {
+    gap: 0.15rem !important;
+  }
+
+  .text-5xl,
+  .text-4xl,
+  .text-3xl,
+  .text-2xl {
+    font-size: 0.85rem !important;
+  }
+
+  .text-xl {
+    font-size: 0.7rem !important;
+  }
+
+  .rounded-full {
+    width: 3rem !important;
+    height: 3rem !important;
+  }
+
+  .rounded-full > div {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+  }
+
+  .rounded-full > div > div {
+    font-size: 0.75rem !important;
+  }
+
+  .mc-stat-icon {
+    width: 1.1rem !important;
+    height: 1.1rem !important;
+  }
+
+  .mc-button,
+  .mc-button-secondary {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.55rem !important;
+  }
+
+  .mc-icon-button {
+    width: 1.25rem !important;
+    height: 1.25rem !important;
+  }
+
+  .mc-input {
+    padding: 0.25rem 0.3rem !important;
+    font-size: 0.6rem !important;
+  }
+
+  .fixed.top-0 {
+    padding: 0.2rem 0.3rem !important;
   }
 }
