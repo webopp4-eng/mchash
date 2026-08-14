@@ -30,23 +30,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isChecking, setIsChecking] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
 
-  const deployMode = process.env.NEXT_PUBLIC_DEPLOY_MODE || 'public';
-  const localAdminOnly = process.env.NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY === 'true';
-
   useEffect(() => {
     setIsMounted(true);
     
     // Check authentication and admin role with retry logic
     const checkAdminAccess = async () => {
-      // Check if admin panel is available first
-      if (deployMode !== 'local-admin' || !localAdminOnly) {
-        console.warn('[AdminLayout] Public build detected. Admin routes are local-only.');
-        setAccessDenied(true);
-        setIsChecking(false);
-        router.push('/');
-        return;
-      }
-
       let retries = 0;
       
       while (retries < MAX_RETRIES) {
@@ -93,7 +81,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
     
     checkAdminAccess();
-  }, [router, deployMode, localAdminOnly]);
+  }, [router]);
 
   // Show loading while checking access
   if (isChecking || !isMounted) {

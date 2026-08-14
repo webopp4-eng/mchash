@@ -39,6 +39,11 @@ jobs:
         env:
           NODE_ENV: production
           NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_DEPLOY_MODE: github-pages
+          NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY: 'false'
+          NEXT_PUBLIC_ALLOWED_ADMIN_ORIGIN: https://webopp4-eng.github.io
+          NEXT_PUBLIC_ADMIN_ORIGIN: https://webopp4-eng.github.io
+          NEXT_PUBLIC_ADMIN_LOCAL_URL: https://webopp4-eng.github.io
 
       - name: Deployment diagnostics (local)
         working-directory: frontend
