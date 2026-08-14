@@ -8,6 +8,10 @@ function msBetween(start: Date, end: Date) {
   return Math.max(0, end.getTime() - start.getTime());
 }
 
+function getPlanFromPurchase(purchase: any) {
+  return purchase?.plan ?? purchase?.MiningPlan ?? purchase?.HashRentingPlan ?? null;
+}
+
 export function calculateDailyEarnings(hashRate: number, dailyRate: number): number {
   return hashRate * dailyRate;
 }
@@ -28,16 +32,16 @@ export function formatRemainingTime(remainingMs: number): string {
 
 export function buildMiningStats(purchase: any, session?: any) {
   const now = new Date();
-  const plan = purchase.plan;
+  const plan = getPlanFromPurchase(purchase);
   const startedAt = new Date(purchase.startedAt);
   const endsAt = new Date(purchase.endsAt);
   const totalMs = Math.max(1, endsAt.getTime() - startedAt.getTime());
   const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startedAt.getTime()));
   const remainingMs = Math.max(0, endsAt.getTime() - now.getTime());
-  const hashRate = Number(plan.hashRate ?? plan.hashPower ?? 0);
-  const dailyRate = Number(plan.dailyRate ?? (Number(plan.expectedYield || 0) / 100 / Math.max(1, Number(plan.durationDays || 1))));
+  const hashRate = Number(plan?.hashRate ?? plan?.hashPower ?? 0);
+  const dailyRate = Number(plan?.dailyRate ?? (Number(plan?.expectedYield || 0) / 100 / Math.max(1, Number(plan?.durationDays || 1))));
   const dailyEarnings = calculateDailyEarnings(hashRate, dailyRate);
-  const totalEarnings = calculateTotalEarnings(dailyEarnings, Number(plan.durationDays || 0));
+  const totalEarnings = calculateTotalEarnings(dailyEarnings, Number(plan?.durationDays || 0));
 
   return {
     plan,
@@ -63,7 +67,11 @@ export function buildMiningStats(purchase: any, session?: any) {
 
 async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renting') {
   const now = new Date();
-  const plan = purchase.plan;
+  const plan = getPlanFromPurchase(purchase);
+  if (!plan) {
+    return;
+  }
+
   const hashRate = Number(plan.hashRate ?? plan.hashPower ?? 0);
   const dailyRate = Number(plan.dailyRate ?? (Number(plan.expectedYield || 0) / 100 / Math.max(1, Number(plan.durationDays || 1))));
   const dailyEarnings = calculateDailyEarnings(hashRate, dailyRate);
@@ -212,11 +220,11 @@ export async function refreshMiningForUser(userId: string) {
   ]);
 
   for (const purchase of miningPurchases) {
-    await accruePurchase({ ...purchase, packageType: 'mining' }, 'mining');
+    await accruePurchase({ ...purchase, packageType: 'mining', plan: purchase.MiningPlan }, 'mining');
   }
 
   for (const purchase of hashRentingPurchases) {
-    await accruePurchase({ ...purchase, packageType: 'hash_renting' }, 'hash_renting');
+    await accruePurchase({ ...purchase, packageType: 'hash_renting', plan: purchase.HashRentingPlan }, 'hash_renting');
   }
 }
 
@@ -237,9 +245,9 @@ export async function getActivePlan(userId: string) {
   ]);
 
   const purchase = miningPurchase
-    ? { ...miningPurchase, packageType: 'mining' }
+    ? { ...miningPurchase, packageType: 'mining', plan: miningPurchase.MiningPlan }
     : hashRentingPurchase
-    ? { ...hashRentingPurchase, packageType: 'hash_renting' }
+    ? { ...hashRentingPurchase, packageType: 'hash_renting', plan: hashRentingPurchase.HashRentingPlan }
     : null;
   if (!purchase) return null;
 
