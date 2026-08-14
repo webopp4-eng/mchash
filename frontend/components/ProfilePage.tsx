@@ -24,153 +24,151 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen px-4 pb-28 pt-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        {/* Social-Media Style Profile */}
-        <section className="glass-card overflow-hidden">
-          {/* Cover Banner */}
-          <div className="relative h-28 bg-gradient-to-r from-cmblue-700 via-cmblue-600 to-cmblue-400 sm:h-36">
-            <div className="pointer-events-none absolute -right-6 -top-8 h-32 w-32 rounded-full bg-white/10" />
-            <div className="pointer-events-none absolute -bottom-10 left-1/4 h-28 w-28 rounded-full bg-white/5" />
-            <div className="pointer-events-none absolute right-1/3 top-4 h-16 w-16 rounded-full bg-white/10" />
+    <div className="mc-page max-w-6xl">
+      {/* Social-Media Style Profile */}
+      <section className="mc-card overflow-hidden p-0">
+        {/* Cover Banner */}
+        <div className="relative h-28 bg-gradient-to-r from-cmblue-700 via-cmblue-600 to-cmblue-400 sm:h-36">
+          <div className="pointer-events-none absolute -right-6 -top-8 h-32 w-32 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute -bottom-10 left-1/4 h-28 w-28 rounded-full bg-white/5" />
+          <div className="pointer-events-none absolute right-1/3 top-4 h-16 w-16 rounded-full bg-white/10" />
+        </div>
+
+        {/* Profile Info */}
+        <div className="px-4 pb-4 sm:px-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-end">
+              {/* Avatar */}
+              <div className="-mt-10 flex h-20 w-20 items-center justify-center rounded-3xl border-4 border-white bg-cmblue-600 text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:-mt-12 sm:h-24 sm:w-24">
+                <FaUserCircle className="h-10 w-10 sm:h-12 sm:w-12" />
+              </div>
+
+              <div className="text-center sm:text-left">
+                {/* Editable Username */}
+                <div className="flex items-center justify-center gap-2 sm:justify-start">
+                  {isEditing ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSaveUsername()}
+                        className="mc-input w-40"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleSaveUsername}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-cmblue-600 text-white transition hover:bg-cmblue-700"
+                      >
+                        <FaCheck className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h1 className="text-lg font-semibold text-slate-950 sm:text-xl">{username}</h1>
+                      <button
+                        onClick={() => {
+                          setEditValue(username);
+                          setIsEditing(true);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-cmblue-50 text-cmblue-600 transition hover:bg-cmblue-100"
+                      >
+                        <FaPencilAlt className="h-3 w-3" />
+                      </button>
+                    </>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-slate-500">msa@monistar.com</p>
+                <p className="mt-1 inline-flex items-center gap-1 mc-status bg-cmblue-50 text-cmblue-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  User ID: CMH-2481
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 sm:justify-end">
+              <span className="mc-status bg-emerald-50 text-emerald-600">Verified</span>
+              <span className="mc-status bg-cmblue-50 text-cmblue-600">Online</span>
+            </div>
           </div>
 
-          {/* Profile Info */}
-          <div className="px-4 pb-4 sm:px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-end">
-                {/* Avatar */}
-                <div className="-mt-10 flex h-20 w-20 items-center justify-center rounded-3xl border-4 border-white bg-cmblue-600 text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:-mt-12 sm:h-24 sm:w-24">
-                  <FaUserCircle className="h-10 w-10 sm:h-12 sm:w-12" />
-                </div>
+          {/* Stats Row */}
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3 text-center">
+              <p className="text-base font-bold text-slate-950">$1,578.25</p>
+              <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Balance</p>
+            </div>
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3 text-center">
+              <p className="text-base font-bold text-slate-950">2.45 TH/s</p>
+              <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Hash Rate</p>
+            </div>
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3 text-center">
+              <p className="text-base font-bold text-slate-950">7 Days</p>
+              <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Plan</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-                <div className="text-center sm:text-left">
-                  {/* Editable Username */}
-                  <div className="flex items-center justify-center gap-2 sm:justify-start">
-                    {isEditing ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="text"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSaveUsername()}
-                          className="w-40 rounded-xl border border-cmblue-200 bg-cmblue-50 px-2.5 py-1 text-sm font-semibold text-slate-900 outline-none focus:border-cmblue-400"
-                          autoFocus
-                        />
-                        <button
-                          onClick={handleSaveUsername}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-cmblue-600 text-white transition hover:bg-cmblue-700"
-                        >
-                          <FaCheck className="h-3 w-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{username}</h1>
-                        <button
-                          onClick={() => {
-                            setEditValue(username);
-                            setIsEditing(true);
-                          }}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-cmblue-50 text-cmblue-600 transition hover:bg-cmblue-100"
-                        >
-                          <FaPencilAlt className="h-3 w-3" />
-                        </button>
-                      </>
-                    )}
+      <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        {/* Settings & Menu */}
+        <section className="mc-card">
+          <div className="mb-4">
+            <p className="text-[10px] font-bold uppercase text-cmblue-600">Menu</p>
+            <h2 className="mt-1 text-base font-bold text-slate-950">Account Options</h2>
+          </div>
+
+          <div className="grid gap-2">
+            {items.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href || '#'}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-sky-50/50 p-3 transition hover:border-cmblue-200 hover:bg-cmblue-50/80"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                    <item.icon className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-bold text-slate-950">{item.label}</p>
+                    <p className="text-[10px] text-slate-500">{item.desc}</p>
                   </div>
-                  <p className="mt-0.5 text-xs text-slate-500">msa@monistar.com</p>
-                  <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-cmblue-50 px-2.5 py-0.5 text-[10px] font-semibold text-cmblue-700 shadow-sm">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    User ID: CMH-2481
-                  </p>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-center gap-2 sm:justify-end">
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">Verified</span>
-                <span className="rounded-full bg-cmblue-50 px-2.5 py-1 text-[10px] font-semibold text-cmblue-700">Online</span>
-              </div>
-            </div>
-
-            {/* Stats Row */}
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <p className="text-base font-semibold text-slate-900">$1,578.25</p>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">Balance</p>
-              </div>
-              <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <p className="text-base font-semibold text-slate-900">2.45 TH/s</p>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">Hash Rate</p>
-              </div>
-              <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <p className="text-base font-semibold text-slate-900">7 Days</p>
-                <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">Plan</p>
-              </div>
-            </div>
+                <span className="text-[10px] font-semibold text-cmblue-600">→</span>
+              </Link>
+            ))}
           </div>
         </section>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          {/* Settings & Menu */}
-          <section className="glass-card p-4">
-            <div className="mb-3">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Menu</p>
-              <h2 className="mt-0.5 text-base font-semibold text-slate-900">Account Options</h2>
+        {/* Account Activity */}
+        <section className="mc-card">
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase text-cmblue-600">Security</p>
+              <h2 className="mt-1 text-base font-bold text-slate-950">Account Activity</h2>
             </div>
+            <span className="mc-status bg-cmblue-50 text-cmblue-600">Online</span>
+          </div>
 
-            <div className="grid gap-2">
-              {items.map((item) => (
-                <Link
-                  key={item.label}
-                  href={item.href || '#'}
-                  className="flex items-center justify-between gap-3 rounded-[20px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)] transition hover:border-cmblue-200 hover:bg-cmblue-50/50"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-cmblue-50 text-cmblue-600">
-                      <item.icon className="h-3.5 w-3.5" />
-                    </span>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-900">{item.label}</p>
-                      <p className="text-[10px] text-slate-500">{item.desc}</p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-semibold text-cmblue-700">Open</span>
-                </Link>
-              ))}
+          <div className="space-y-2">
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+              <p className="text-xs text-slate-500">Last login</p>
+              <p className="mt-1 text-base font-bold text-slate-950">Today, 09:41</p>
             </div>
-          </section>
-
-          {/* Account Activity */}
-          <section className="glass-card p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Security</p>
-                <h2 className="mt-0.5 text-base font-semibold text-slate-900">Account Activity</h2>
-              </div>
-              <span className="rounded-full bg-cmblue-50 px-2.5 py-0.5 text-[10px] font-semibold text-cmblue-700">Online</span>
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+              <p className="text-xs text-slate-500">Verification</p>
+              <p className="mt-1 text-base font-bold text-slate-950">User verified by deposit</p>
             </div>
-
-            <div className="mt-4 space-y-2">
-              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <p className="text-xs text-slate-500">Last login</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">Today, 09:41</p>
-              </div>
-              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <p className="text-xs text-slate-500">Verification</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">User verified by deposit</p>
-              </div>
-              <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-                <p className="text-xs text-slate-500">Member since</p>
-                <p className="mt-1 text-base font-semibold text-slate-900">January 2025</p>
-              </div>
-              <button className="mt-2 w-full rounded-2xl bg-rose-500 px-3 py-2.5 text-xs font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.2)] transition hover:bg-rose-600">
-                <FaSignOutAlt className="mr-1.5 inline-block h-3.5 w-3.5" />
-                Log Out
-              </button>
+            <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+              <p className="text-xs text-slate-500">Member since</p>
+              <p className="mt-1 text-base font-bold text-slate-950">January 2025</p>
             </div>
-          </section>
-        </div>
+            <button className="mt-2 w-full rounded-[22px] bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-2.5 text-xs font-bold text-white transition hover:shadow-[0_10px_24px_rgba(239,68,68,0.22)]">
+              <FaSignOutAlt className="mr-1.5 inline-block h-3.5 w-3.5" />
+              Log Out
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );

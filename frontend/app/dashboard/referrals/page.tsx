@@ -44,123 +44,146 @@ export default function ReferralsPage() {
   const earnings = data?.earnings || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Referrals</h1>
-        <p className="mt-1 text-sm text-slate-500">Invite friends and earn commissions</p>
-      </div>
+    <div className="mc-page">
+      <section className="mc-page-header">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Bubble Team</p>
+          <h1 className="mc-title">Referral Program</h1>
+          <p className="mc-subtitle">Invite friends and earn commissions on their mining activity</p>
+        </div>
+      </section>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-[20px] border border-slate-200/80 bg-white p-4 shadow-card">
-          <div className="flex items-center gap-2 text-cmblue-600">
+        <section className="mc-card">
+          <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
             <FaUsers className="h-4 w-4" />
-            <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Total Referrals</span>
-          </div>
-          <p className="mt-2 text-xl font-bold text-slate-900">{data?.totalReferrals || 0}</p>
-        </div>
-        <div className="rounded-[20px] border border-slate-200/80 bg-white p-4 shadow-card">
-          <div className="flex items-center gap-2 text-emerald-600">
+          </span>
+          <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">Total Referrals</p>
+          <p className="mt-1 text-xl font-extrabold text-slate-950">{data?.totalReferrals || 0}</p>
+        </section>
+        <section className="mc-card">
+          <span className="mc-stat-icon bg-emerald-50 text-emerald-600">
             <FaUserPlus className="h-4 w-4" />
-            <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Active</span>
-          </div>
-          <p className="mt-2 text-xl font-bold text-slate-900">{data?.activeReferrals || 0}</p>
-        </div>
-        <div className="rounded-[20px] border border-slate-200/80 bg-white p-4 shadow-card">
-          <div className="flex items-center gap-2 text-amber-600">
+          </span>
+          <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">Active</p>
+          <p className="mt-1 text-xl font-extrabold text-slate-950">{data?.activeReferrals || 0}</p>
+        </section>
+        <section className="mc-card">
+          <span className="mc-stat-icon bg-amber-50 text-amber-600">
             <FaCoins className="h-4 w-4" />
-            <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Earned</span>
-          </div>
-          <p className="mt-2 text-xl font-bold text-slate-900">${Number(data?.totalEarned || 0).toFixed(2)}</p>
-        </div>
-        <div className="rounded-[20px] border border-slate-200/80 bg-white p-4 shadow-card">
-          <div className="flex items-center gap-2 text-purple-600">
+          </span>
+          <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">Total Earned</p>
+          <p className="mt-1 text-xl font-extrabold text-slate-950">${Number(data?.totalEarned || 0).toFixed(2)}</p>
+        </section>
+        <section className="mc-card">
+          <span className="mc-stat-icon bg-purple-50 text-purple-600">
             <FaLink className="h-4 w-4" />
-            <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Code</span>
-          </div>
-          <p className="mt-2 text-xl font-bold text-slate-900">{data?.referralCode || 'N/A'}</p>
-        </div>
+          </span>
+          <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">Referral Code</p>
+          <p className="mt-1 text-lg font-extrabold text-slate-950">{data?.referralCode || 'N/A'}</p>
+        </section>
       </div>
 
       {/* Referral Link */}
-      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-        <h2 className="text-sm font-semibold text-slate-900">Your Referral Link</h2>
-        <p className="mt-1 text-[10px] text-slate-500">Share this link to earn commissions</p>
-        <div className="mt-3 flex gap-2">
+      <section className="mc-card">
+        <div className="mb-4">
+          <h2 className="text-base font-bold text-slate-950">Your Referral Link</h2>
+          <p className="text-xs text-slate-500">Share this link to invite friends and earn commissions</p>
+        </div>
+        <div className="flex gap-2">
           <input
             readOnly
             value={data?.referralLink || ''}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-cmblue-400"
+            className="mc-input flex-1"
           />
           <button
             onClick={copyLink}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500"
+            className="mc-button min-w-max"
           >
             <FaCopy className="h-3.5 w-3.5" />
             {copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
-      </div>
+      </section>
 
       {/* Referred Users */}
-      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-slate-900">Referred Users</h2>
-          <p className="text-[10px] text-slate-500">Users who joined through your link</p>
+      <section className="mc-card">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Team Members</h2>
+            <p className="text-xs text-slate-500">Users who joined through your referral link</p>
+          </div>
+          <div className="rounded-full bg-cmblue-50 px-3 py-1 text-sm font-bold text-cmblue-700">
+            {referredUsers.length}
+          </div>
         </div>
 
         {referredUsers.length > 0 ? (
           <div className="space-y-2">
             {referredUsers.map((user: any) => (
-              <div key={user.id} className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50 p-3">
+              <div key={user.id} className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-600">
-                    <FaUsers className="h-3.5 w-3.5" />
+                  <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                    <FaUsers className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-slate-900">{user.username}</p>
-                    <p className="text-[10px] text-slate-500">{new Date(user.createdAt).toLocaleDateString()}</p>
+                    <p className="text-xs font-bold text-slate-950">{user.username}</p>
+                    <p className="text-[10px] text-slate-500">Joined {new Date(user.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <span className={`text-[10px] font-medium ${user.status === 'active' ? 'text-emerald-600' : 'text-slate-500'}`}>
+                <span className={`mc-status ${user.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
                   {user.status}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="py-6 text-center text-sm text-slate-500">No referrals yet</p>
+          <div className="py-8 text-center">
+            <FaUsers className="mx-auto h-10 w-10 text-cmblue-200" />
+            <p className="mt-3 text-sm font-semibold text-slate-500">No referrals yet</p>
+            <p className="text-xs text-slate-400">Share your link to start earning</p>
+          </div>
         )}
-      </div>
+      </section>
 
       {/* Referral Earnings */}
-      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-slate-900">Referral History</h2>
-          <p className="text-[10px] text-slate-500">Your commission earnings</p>
+      <section className="mc-card">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Commission History</h2>
+            <p className="text-xs text-slate-500">Your team reward earnings</p>
+          </div>
+          <div className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">
+            {earnings.length}
+          </div>
         </div>
 
         {earnings.length > 0 ? (
           <div className="space-y-2">
             {earnings.map((earning: any) => (
-              <div key={earning.id} className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-slate-50 p-3">
+              <div key={earning.id} className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
-                    <FaCoins className="h-3.5 w-3.5" />
+                  <span className="mc-stat-icon bg-amber-50 text-amber-600">
+                    <FaCoins className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold capitalize text-slate-900">{earning.sourceType} Commission</p>
+                    <p className="text-xs font-bold text-slate-950">{earning.sourceType} Commission</p>
                     <p className="text-[10px] text-slate-500">{new Date(earning.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
-                <p className="text-sm font-semibold text-emerald-600">+${Number(earning.amount).toFixed(2)}</p>
+                <p className="text-sm font-extrabold text-emerald-600">+${Number(earning.amount).toFixed(2)}</p>
               </div>
             ))}
           </div>
         ) : (
-          <p className="py-6 text-center text-sm text-slate-500">No referral earnings yet</p>
+          <div className="py-8 text-center">
+            <FaCoins className="mx-auto h-10 w-10 text-cmblue-200" />
+            <p className="mt-3 text-sm font-semibold text-slate-500">No earnings yet</p>
+            <p className="text-xs text-slate-400">Invite friends to start earning commissions</p>
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

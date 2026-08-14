@@ -52,72 +52,94 @@ export default function RankingsPage() {
   const currentUserRank = data?.currentUserRank;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
+    <div className="mc-page">
+      <section className="mc-page-header">
         <div>
-          <h1 className="text-2xl font-bold">Rankings</h1>
-          <p className="mt-1 text-sm text-slate-400">Leaderboard ranked by mining activity and rewards</p>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Analytics</p>
+          <h1 className="mc-title">Mining Rankings</h1>
+          <p className="mc-subtitle">Leaderboard ranked by mining hashrate and total earnings</p>
         </div>
-        <button onClick={loadRankings} className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10">
-          <FaSyncAlt className="h-4 w-4" />
+        <button onClick={loadRankings} className="mc-button-secondary">
+          <FaSyncAlt className="h-3.5 w-3.5" />
+          Refresh
         </button>
-      </div>
+      </section>
 
       {currentUserRank && (
-        <div className="rounded-[24px] border border-cmblue-500/30 bg-cmblue-500/10 p-5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cmblue-300">Your Rank</p>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cmblue-500/20 text-xl font-black text-cmblue-200">#{currentUserRank.rank}</span>
+        <section className="mc-card border-cmblue-200 bg-gradient-to-br from-cmblue-50/80 to-sky-50/80 ring-1 ring-cmblue-100">
+          <div className="mb-2 text-xs font-bold uppercase text-cmblue-600">Your Ranking</div>
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-4">
+              <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-cmblue-600 to-cmblue-700 text-2xl font-black text-white shadow-[0_10px_24px_rgba(0,130,255,0.3)]">
+                #{currentUserRank.rank}
+              </span>
               <div>
-                <p className="font-semibold">{currentUserRank.username}</p>
-                <p className="text-xs text-slate-400">{shortenAddress(currentUserRank.walletAddress, 6)}</p>
+                <p className="font-bold text-slate-950">{currentUserRank.username}</p>
+                <p className="text-xs text-slate-500">{shortenAddress(currentUserRank.walletAddress, 6)}</p>
               </div>
             </div>
-            <p className="text-sm font-semibold text-emerald-300">${Number(currentUserRank.totalEarned || 0).toFixed(2)} earned</p>
+            <div className="text-right">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase">TOTAL EARNED</p>
+              <p className="text-2xl font-extrabold text-emerald-600">${Number(currentUserRank.totalEarned || 0).toFixed(2)}</p>
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-        <div className="mb-4 flex items-center gap-2">
-          <FaTrophy className="h-4 w-4 text-amber-400" />
-          <h2 className="text-sm font-semibold text-cmblue-300">Leaderboard</h2>
+      <section className="mc-card">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Top Miners</h2>
+            <p className="text-xs text-slate-500">Ranked by total earnings and mining performance</p>
+          </div>
+          <div className="rounded-full bg-cmblue-50 px-3 py-1 text-sm font-bold text-cmblue-700">
+            Top {rankings.length}
+          </div>
         </div>
         {rankings.length > 0 ? (
           <div className="space-y-2">
             {rankings.map((entry: any) => (
-              <div key={entry.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div key={entry.id} className="flex flex-col gap-3 rounded-2xl border border-sky-100 bg-sky-50/50 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl font-black ${entry.rank <= 3 ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-500/20 text-slate-300'}`}>
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold ${
+                    entry.rank <= 3
+                      ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white'
+                      : 'bg-slate-200 text-slate-600'
+                  }`}>
                     {entry.rank <= 3 ? <FaMedal className="h-4 w-4" /> : `#${entry.rank}`}
                   </span>
                   <div>
-                    <p className="text-sm font-semibold">{entry.username}</p>
+                    <p className="text-xs font-bold text-slate-950">{entry.username}</p>
                     <p className="text-[10px] text-slate-500">{shortenAddress(entry.walletAddress, 6)}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3 text-right text-xs sm:min-w-80">
+                <div className="grid grid-cols-3 gap-4 text-right sm:min-w-fit">
                   <div>
-                    <p className="text-slate-500">Earned</p>
-                    <p className="font-semibold text-emerald-400">${Number(entry.totalEarned || 0).toFixed(2)}</p>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Earned</p>
+                    <p className="text-sm font-extrabold text-emerald-600">${Number(entry.totalEarned || 0).toFixed(0)}</p>
                   </div>
                   <div>
-                    <p className="text-slate-500">Hash</p>
-                    <p className="font-semibold"><FaBolt className="mr-1 inline h-3 w-3 text-cmblue-400" />{Number(entry.hashRate || 0).toFixed(1)}</p>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Hashrate</p>
+                    <p className="flex items-center justify-end gap-1 text-sm font-extrabold text-cmblue-600">
+                      <FaBolt className="h-3 w-3" />
+                      {Number(entry.hashRate || 0).toFixed(1)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-slate-500">Balance</p>
-                    <p className="font-semibold"><FaWallet className="mr-1 inline h-3 w-3 text-purple-400" />${Number(entry.platformBalance || 0).toFixed(2)}</p>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase">Balance</p>
+                    <p className="text-sm font-extrabold text-slate-950">${Number(entry.platformBalance || 0).toFixed(0)}</p>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="py-6 text-center text-sm text-slate-500">No ranking data yet</p>
+          <div className="py-8 text-center">
+            <FaTrophy className="mx-auto h-10 w-10 text-cmblue-200" />
+            <p className="mt-3 text-sm font-semibold text-slate-500">No ranking data yet</p>
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

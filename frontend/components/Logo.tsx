@@ -8,38 +8,18 @@ export default function Logo({ size = 44 }: { size?: number }) {
       xmlns="http://www.w3.org/2000/svg"
       className="shrink-0"
     >
-      {/* Rounded square background */}
-      <rect x="2" y="2" width="44" height="44" rx="14" fill="url(#cmhash-gradient)" />
-      <rect x="2" y="2" width="44" height="44" rx="14" stroke="rgba(255,255,255,0.35)" strokeWidth="1.5" />
-
-      {/* Decorative highlights */}
-      <circle cx="36" cy="10" r="12" fill="rgba(255,255,255,0.10)" />
-      <circle cx="10" cy="38" r="10" fill="rgba(255,255,255,0.06)" />
-
-      {/* Hash symbol # */}
-      <g stroke="#ffffff" strokeWidth="3.2" strokeLinecap="round">
-        {/* Left vertical */}
-        <line x1="18" y1="12" x2="15.5" y2="34" />
-        {/* Right vertical */}
-        <line x1="27" y1="12" x2="24.5" y2="34" />
-        {/* Top horizontal */}
-        <line x1="12" y1="20" x2="32" y2="20" />
-        {/* Bottom horizontal */}
-        <line x1="15" y1="28" x2="35" y2="28" />
-      </g>
-
-      {/* Bolt accent */}
-      <path
-        d="M33 18 L26 22 L29 25 L23 30 L31 26 L28 23 L34 19 Z"
-        fill="#7bb9ff"
-        opacity="0.9"
-      />
+      <path d="M4 10 L14 5 L24 20 L34 5 L44 10 L34 41 L24 27 L14 41 Z" fill="url(#cmhash-gradient)" />
+      <path d="M14 5 L24 20 L24 27 L14 41 Z" fill="#0b77e8" opacity="0.88" />
+      <path d="M34 5 L24 20 L24 27 L34 41 Z" fill="#1fc7ff" opacity="0.92" />
+      <path d="M7 12 L14 8 L14 34 L7 27 Z" fill="#0582ff" />
+      <path d="M41 12 L34 8 L34 34 L41 27 Z" fill="#0098ff" />
+      <path d="M14 5 L24 20 L34 5 L24 12 Z" fill="#8ee7ff" opacity="0.85" />
 
       <defs>
         <linearGradient id="cmhash-gradient" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#0ea1ff" />
-          <stop offset="0.5" stopColor="#0087f7" />
-          <stop offset="1" stopColor="#006bd4" />
+          <stop stopColor="#36d9ff" />
+          <stop offset="0.52" stopColor="#008cff" />
+          <stop offset="1" stopColor="#005ed2" />
         </linearGradient>
       </defs>
     </svg>

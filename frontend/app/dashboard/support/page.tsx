@@ -140,181 +140,193 @@ export default function SupportPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Support Center</h1>
-        <p className="mt-1 text-sm text-slate-500">Get help, find answers, and contact support</p>
-      </div>
+    <div className="mc-page">
+      <section className="mc-page-header">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Support</p>
+          <h1 className="mc-title">Help & Support</h1>
+          <p className="mc-subtitle">FAQs, guides, tutorials, and support tickets</p>
+        </div>
+      </section>
 
       {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-1 rounded-[20px] border border-slate-200/80 bg-white p-1.5 shadow-card">
+      <div className="flex flex-wrap gap-1.5 rounded-2xl bg-sky-50/50 p-1.5 ring-1 ring-sky-100">
         {[
           { id: 'faq', label: 'FAQ', icon: FaQuestionCircle },
           { id: 'knowledge', label: 'Knowledge Base', icon: FaBook },
-          { id: 'tutorial', label: 'Tutorial', icon: FaMobileAlt },
-          { id: 'tickets', label: 'My Tickets', icon: FaTicketAlt },
+          { id: 'tutorial', label: 'Tutorials', icon: FaMobileAlt },
+          { id: 'tickets', label: 'Support Tickets', icon: FaTicketAlt },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm font-medium transition-all ${
+            className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all ${
               activeTab === tab.id
-                ? 'bg-cmblue-50 text-cmblue-700 shadow-[0_0_15px_rgba(17,120,250,0.15)]'
-                : 'text-slate-500 hover:text-slate-800'
+                ? 'bg-cmblue-500 text-white shadow-[0_10px_24px_rgba(0,130,255,0.22)]'
+                : 'text-slate-600 hover:bg-white hover:text-cmblue-700'
             }}`}
           >
-            <tab.icon className="h-3 w-3" />
-            {tab.label}
+            <tab.icon className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{tab.label}</span>
           </button>
         ))}
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-600">{error}</div>
+        <div className="flex items-start gap-2 rounded-[22px] border border-rose-200/80 bg-rose-50/80 p-4 backdrop-blur-xl">
+          <div className="text-sm font-semibold text-rose-600">{error}</div>
+        </div>
       )}
       {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{success}</div>
+        <div className="flex items-start gap-2 rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 p-4 backdrop-blur-xl">
+          <div className="text-sm font-semibold text-emerald-600">{success}</div>
+        </div>
       )}
 
       {/* FAQ Tab */}
       {activeTab === 'faq' && (
-        <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-          <h2 className="text-sm font-semibold text-slate-900">Frequently Asked Questions</h2>
-          <div className="mt-4 space-y-3">
+        <section className="mc-card">
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-slate-950">Frequently Asked Questions</h2>
+            <p className="text-xs text-slate-500">Quick answers to common questions</p>
+          </div>
+          <div className="space-y-3">
             {faqs.map((faq) => (
-              <details key={faq.q} className="group rounded-xl border border-slate-200/80 bg-slate-50 p-4 open:bg-cmblue-50/50">
-                <summary className="flex cursor-pointer items-center justify-between text-sm font-semibold text-slate-900">
-                  {faq.q}
-                  <span className="text-slate-400 transition-transform group-open:rotate-45">+</span>
+              <details key={faq.q} className="group rounded-xl border border-sky-100 bg-sky-50/50 transition-all">
+                <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-semibold text-slate-950 hover:text-cmblue-700">
+                  <span className="text-sm">{faq.q}</span>
+                  <span className="text-cmblue-500 transition-transform group-open:rotate-180">↓</span>
                 </summary>
-                <p className="mt-3 text-xs text-slate-600 leading-relaxed">{faq.a}</p>
+                <div className="border-t border-sky-100 px-4 py-3">
+                  <p className="text-xs leading-relaxed text-slate-600">{faq.a}</p>
+                </div>
               </details>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
       {/* Knowledge Base Tab */}
       {activeTab === 'knowledge' && (
-        <div className="space-y-6">
-          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-            <h2 className="text-sm font-semibold text-slate-900">Knowledge Base</h2>
-            <p className="mt-1 text-xs text-slate-500">Guides and articles to help you get the most from CM HASH</p>
-          </div>
-
+        <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <section className="mc-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaShieldAlt className="h-4 w-4 text-cmblue-600" />
-                <h3 className="text-sm font-semibold text-slate-900">Security Best Practices</h3>
+                <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                  <FaShieldAlt className="h-4 w-4" />
+                </span>
+                <h3 className="font-bold text-slate-950">Security Best Practices</h3>
               </div>
               <ul className="space-y-2 text-xs text-slate-600">
                 <li>• Never share your private key or seed phrase</li>
-                <li>• Always verify you are on the official CM Hash site</li>
-                <li>• Enable 2FA on your wallet app when available</li>
-                <li>• Use strong, unique passwords for your accounts</li>
-                <li>• Never click suspicious links in emails or messages</li>
+                <li>• Always verify official website URLs</li>
+                <li>• Enable 2FA when available</li>
+                <li>• Use strong, unique passwords</li>
+                <li>• Never click suspicious links</li>
               </ul>
-            </div>
+            </section>
 
-            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <section className="mc-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaWallet className="h-4 w-4 text-purple-600" />
-                <h3 className="text-sm font-semibold text-slate-900">Supported Wallets</h3>
+                <span className="mc-stat-icon bg-purple-50 text-purple-600">
+                  <FaWallet className="h-4 w-4" />
+                </span>
+                <h3 className="font-bold text-slate-950">Supported Wallets</h3>
               </div>
               <ul className="space-y-2 text-xs text-slate-600">
-                <li>• <span className="font-semibold text-slate-800">Ethereum:</span> MetaMask, Rainbow, Coinbase Wallet</li>
-                <li>• <span className="font-semibold text-slate-800">Solana:</span> Phantom, Solflare, Trust Wallet</li>
-                <li>• <span className="font-semibold text-slate-800">BNB Chain:</span> MetaMask, Trust Wallet</li>
-                <li>• <span className="font-semibold text-slate-800">Mobile:</span> WalletConnect deep linking</li>
+                <li><span className="font-semibold text-slate-800">Ethereum:</span> MetaMask, Rainbow</li>
+                <li><span className="font-semibold text-slate-800">Solana:</span> Phantom, Solflare</li>
+                <li><span className="font-semibold text-slate-800">BNB Chain:</span> MetaMask, Trust</li>
+                <li><span className="font-semibold text-slate-800">Mobile:</span> WalletConnect</li>
               </ul>
-            </div>
+            </section>
 
-            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <section className="mc-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaClock className="h-4 w-4 text-emerald-600" />
-                <h3 className="text-sm font-semibold text-slate-900">Mining Rewards Schedule</h3>
+                <span className="mc-stat-icon bg-emerald-50 text-emerald-600">
+                  <FaClock className="h-4 w-4" />
+                </span>
+                <h3 className="font-bold text-slate-950">Rewards Schedule</h3>
               </div>
               <ul className="space-y-2 text-xs text-slate-600">
-                <li>• Rewards accrue every block in real-time</li>
-                <li>• Daily payouts are processed automatically</li>
-                <li>• Minimum payout: 0.001 USDT per session</li>
-                <li>• Bonus rewards are credited on plan completion</li>
-                <li>• Referral commissions are credited instantly</li>
+                <li>• Rewards accrue real-time</li>
+                <li>• Daily automatic payouts</li>
+                <li>• Minimum: 0.001 USDT</li>
+                <li>• Bonus on completion</li>
+                <li>• Referrals credited instantly</li>
               </ul>
-            </div>
+            </section>
 
-            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <section className="mc-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaCube className="h-4 w-4 text-amber-600" />
-                <h3 className="text-sm font-semibold text-slate-900">Supported Chains</h3>
+                <span className="mc-stat-icon bg-amber-50 text-amber-600">
+                  <FaCube className="h-4 w-4" />
+                </span>
+                <h3 className="font-bold text-slate-950">Supported Chains</h3>
               </div>
               <ul className="space-y-2 text-xs text-slate-600">
-                <li>• <span className="font-semibold text-slate-800">Ethereum (ETH):</span> ERC-20 USDT</li>
-                <li>• <span className="font-semibold text-slate-800">Solana (SOL):</span> SPL USDT</li>
-                <li>• <span className="font-semibold text-slate-800">BNB Smart Chain:</span> BEP-20 USDT</li>
+                <li>• <span className="font-semibold">Ethereum:</span> ERC-20 USDT</li>
+                <li>• <span className="font-semibold">Solana:</span> SPL USDT</li>
+                <li>• <span className="font-semibold">BNB:</span> BEP-20 USDT</li>
               </ul>
-            </div>
+            </section>
 
-            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <section className="mc-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaCoins className="h-4 w-4 text-cmblue-600" />
-                <h3 className="text-sm font-semibold text-slate-900">Earning Methods</h3>
+                <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                  <FaCoins className="h-4 w-4" />
+                </span>
+                <h3 className="font-bold text-slate-950">Earning Methods</h3>
               </div>
               <ul className="space-y-2 text-xs text-slate-600">
-                <li>• <span className="font-semibold text-slate-800">Mining:</span> Earn from your active plan</li>
-                <li>• <span className="font-semibold text-slate-800">Referrals:</span> 3-8% commission on referred purchases</li>
-                <li>• <span className="font-semibold text-slate-800">Hash Renting:</span> Rent hash power for yields</li>
-                <li>• <span className="font-semibold text-slate-800">Bonus Rewards:</span> Extra rewards on plan completion</li>
+                <li>• <span className="font-semibold">Mining:</span> Your plan rewards</li>
+                <li>• <span className="font-semibold">Referrals:</span> 3-8% commissions</li>
+                <li>• <span className="font-semibold">Hash Renting:</span> Direct yields</li>
+                <li>• <span className="font-semibold">Bonus:</span> Plan completion</li>
               </ul>
-            </div>
+            </section>
 
-            <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
+            <section className="mc-card">
               <div className="mb-3 flex items-center gap-2">
-                <FaServer className="h-4 w-4 text-sky-600" />
-                <h3 className="text-sm font-semibold text-slate-900">Platform Fees</h3>
+                <span className="mc-stat-icon bg-sky-50 text-cmblue-600">
+                  <FaServer className="h-4 w-4" />
+                </span>
+                <h3 className="font-bold text-slate-950">Platform Fees</h3>
               </div>
               <ul className="space-y-2 text-xs text-slate-600">
-                <li>• No fees for mining plan purchases</li>
-                <li>• Withdrawal fee: 0.5% (min 1 USDT)</li>
-                <li>• Hash renting management: Free</li>
-                <li>• Support: Free 24/7 via ticket system</li>
+                <li>• No mining purchase fees</li>
+                <li>• Withdrawal: 0.5% (min 1 USDT)</li>
+                <li>• Hash renting: Free</li>
+                <li>• Support: 24/7 free access</li>
               </ul>
-            </div>
+            </section>
           </div>
         </div>
       )}
 
       {/* Tutorial Tab */}
       {activeTab === 'tutorial' && (
-        <div className="space-y-6">
-          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-            <h2 className="text-sm font-semibold text-slate-900">Step-by-Step Tutorials</h2>
-            <p className="mt-1 text-xs text-slate-500">Walkthroughs to help you get started fast</p>
-          </div>
-
-          <div className="space-y-4">
-            {tutorials.map((tutorial) => (
-              <div key={tutorial.title} className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-card">
-                <div className="mb-4 flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-600">
-                    <tutorial.icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="text-lg font-semibold text-slate-900">{tutorial.title}</h3>
-                </div>
-                <ol className="space-y-3">
-                  {tutorial.steps.map((step, i) => (
-                    <li key={i} className="flex items-start gap-2.5">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-cmblue-50 text-xs font-bold text-cmblue-600">
-                        {i + 1}
-                      </span>
-                      <span className="text-xs text-slate-600 leading-relaxed">{step}</span>
-                    </li>
-                  ))}
-                </ol>
+        <div className="space-y-4">
+          {tutorials.map((tutorial) => (
+            <section key={tutorial.title} className="mc-card">
+              <div className="mb-4 flex items-center gap-3">
+                <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                  <tutorial.icon className="h-4 w-4" />
+                </span>
+                <h3 className="font-bold text-slate-950">{tutorial.title}</h3>
               </div>
-            ))}
-          </div>
+              <ol className="space-y-3">
+                {tutorial.steps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cmblue-50 text-xs font-bold text-cmblue-600">
+                      {i + 1}
+                    </span>
+                    <span className="text-xs leading-relaxed text-slate-600">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ))}
         </div>
       )}
 
@@ -322,21 +334,24 @@ export default function SupportPage() {
       {activeTab === 'tickets' && (
         <div className="space-y-4">
           {/* Create Ticket */}
-          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-            <h2 className="text-sm font-semibold text-slate-900">Create Support Ticket</h2>
-            <div className="mt-4 space-y-3">
+          <section className="mc-card">
+            <div className="mb-4">
+              <h2 className="text-base font-bold text-slate-950">Create Support Ticket</h2>
+              <p className="text-xs text-slate-500">Describe your issue and our team will help you</p>
+            </div>
+            <div className="space-y-3">
               <input
                 type="text"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="Subject"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
+                placeholder="What's your issue?"
+                className="mc-input"
               />
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
+                  className="mc-input"
                 >
                   <option value="general">General</option>
                   <option value="mining">Mining</option>
@@ -349,9 +364,9 @@ export default function SupportPage() {
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
+                  className="mc-input"
                 >
-                  <option value="low">Low</option>
+                  <option value="low">Low Priority</option>
                   <option value="normal">Normal</option>
                   <option value="high">High</option>
                   <option value="urgent">Urgent</option>
@@ -362,12 +377,12 @@ export default function SupportPage() {
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Describe your issue in detail..."
                 rows={4}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
+                className="mc-input"
               />
               <button
                 onClick={submitTicket}
                 disabled={submitting || !subject || !message}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-4 py-3 text-sm font-semibold text-white transition-all hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mc-button w-full"
               >
                 {submitting ? (
                   <>
@@ -376,56 +391,48 @@ export default function SupportPage() {
                   </>
                 ) : (
                   <>
-                    <FaPaperPlane className="h-4 w-4" />
+                    <FaPaperPlane className="h-3.5 w-3.5" />
                     Submit Ticket
                   </>
                 )}
               </button>
             </div>
-          </div>
+          </section>
 
           {/* Existing Tickets */}
-          <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-card">
-            <h2 className="text-sm font-semibold text-slate-900">Your Tickets</h2>
+          <section className="mc-card">
+            <div className="mb-4">
+              <h2 className="text-base font-bold text-slate-950">Your Support Tickets</h2>
+              <p className="text-xs text-slate-500">Track your support requests</p>
+            </div>
             {tickets.length > 0 ? (
-              <div className="mt-4 space-y-2">
+              <div className="space-y-2">
                 {tickets.map((ticket: any) => (
-                  <div key={ticket.id} className="rounded-xl border border-slate-200/80 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-slate-900">{ticket.subject}</p>
-                      <span className={`text-[10px] font-medium ${
-                        ticket.status === 'open' ? 'text-emerald-600' :
-                        ticket.status === 'pending' ? 'text-amber-600' :
-                        ticket.status === 'resolved' || ticket.status === 'closed' ? 'text-slate-500' : 'text-cmblue-600'
+                  <div key={ticket.id} className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-slate-950">{ticket.subject}</p>
+                      <span className={`mc-status ${
+                        ticket.status === 'open' ? 'bg-emerald-50 text-emerald-600' :
+                        ticket.status === 'pending' ? 'bg-amber-50 text-amber-600' :
+                        ticket.status === 'resolved' || ticket.status === 'closed' ? 'bg-slate-100 text-slate-500' : 'bg-cmblue-50 text-cmblue-600'
                       }`}>
                         {ticket.status}
                       </span>
                     </div>
                     <p className="mt-1 text-[10px] text-slate-500">
-                      {ticket.category} • Priority: {ticket.priority || 'Normal'} • {new Date(ticket.createdAt).toLocaleString()}
+                      {ticket.category} • Priority: {ticket.priority || 'Normal'}
                     </p>
-                    {ticket.messages && ticket.messages.length > 0 && (
-                      <div className="mt-2 space-y-1.5">
-                        {ticket.messages.map((msg: any) => (
-                          <div
-                            key={msg.id}
-                            className={`rounded-lg bg-white p-2 text-xs shadow-sm ${
-                              msg.senderRole === 'user' ? 'ml-6' : 'mr-6 border border-cmblue-200'
-                            }`}
-                          >
-                            <p className="text-[10px] text-slate-500 capitalize">{msg.senderRole}</p>
-                            <p className="mt-0.5 text-slate-700">{msg.message}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="py-6 text-center text-sm text-slate-500">No tickets yet. Create one above if you need help.</p>
+              <div className="py-8 text-center">
+                <FaHeadset className="mx-auto h-10 w-10 text-cmblue-200" />
+                <p className="mt-3 text-sm font-semibold text-slate-500">No tickets yet</p>
+                <p className="text-xs text-slate-400">Create one above if you need help</p>
+              </div>
             )}
-          </div>
+          </section>
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { FaBolt, FaClock, FaChartLine, FaCoins, FaCalendarAlt, FaCheckCircle, FaLink, FaGift, FaWallet } from 'react-icons/fa';
+import { FaBolt, FaClock, FaChartLine, FaCalendarAlt, FaCheckCircle, FaWallet } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -13,7 +13,7 @@ function formatRemainingTime(ms: number) {
   const hours = Math.floor((safeMs % DAY_MS) / (60 * 60 * 1000));
   const minutes = Math.floor((safeMs % (60 * 60 * 1000)) / (60 * 1000));
   const seconds = Math.floor((safeMs % (60 * 1000)) / 1000);
-  if (days > 0) return `${days}D ${hours}h ${minutes}m ${seconds}s`;
+  if (days > 0) return `${days}D ${hours}h ${minutes}m`;
   if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
   return `${minutes}m ${seconds}s`;
 }
@@ -65,188 +65,115 @@ export default function MinePage() {
 
   const activePlan = useMemo(() => deriveLivePlan(data?.activePlan, tick), [data, tick]);
 
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
+      </div>
+    );
+  }
+
+  const progress = activePlan ? activePlan.progressPercent : 0;
   const stats = [
-    { label: 'Hash Rate', value: activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s', icon: FaBolt },
-    { label: 'Daily Earnings', value: activePlan ? `$${Number(activePlan.dailyEarnings || 0).toFixed(2)}` : '$0.00', icon: FaBolt },
-    { label: 'Total Earned', value: activePlan ? `$${Number(activePlan.liveEarned || 0).toFixed(2)}` : '$0.00', icon: FaChartLine },
+    { label: 'Current Hashrate', value: activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s', icon: FaBolt, color: 'bg-cmblue-50 text-cmblue-600' },
+    { label: 'Daily Earnings', value: activePlan ? `$${Number(activePlan.dailyEarnings || 0).toFixed(2)}` : '$0.00', icon: FaWallet, color: 'bg-emerald-50 text-emerald-600' },
+    { label: 'Efficiency', value: activePlan && !activePlan.isExpired ? '98.6%' : '0%', icon: FaChartLine, color: 'bg-sky-50 text-cmblue-700' },
+    { label: 'Time Left', value: activePlan ? activePlan.timeRemaining : 'No session', icon: FaClock, color: 'bg-amber-50 text-amber-600' },
   ];
 
   const miningDetails = [
-    { label: 'Mining Plan', value: activePlan ? activePlan.plan?.name || 'Active' : 'No Plan', icon: FaBolt, badge: activePlan ? 'Active' : '—', badgeColor: activePlan ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' },
-    { label: 'Paid Plan', value: activePlan ? `$${Number(activePlan.amount || 0).toFixed(2)}` : '$0.00', icon: FaWallet, badge: activePlan ? 'Paid' : '—', badgeColor: activePlan ? 'bg-cmblue-50 text-cmblue-700' : 'bg-slate-100 text-slate-600' },
+    { label: 'Mining Plan', value: activePlan ? activePlan.plan?.name || 'Active Plan' : 'No Active Plan', icon: FaBolt, badge: activePlan ? 'Active' : 'Idle', badgeColor: activePlan ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' },
+    { label: 'Paid Plan', value: activePlan ? `$${Number(activePlan.amount || 0).toFixed(2)}` : '$0.00', icon: FaWallet, badge: activePlan ? 'Paid' : 'None', badgeColor: 'bg-cmblue-50 text-cmblue-700' },
     { label: 'Status', value: activePlan && !activePlan.isExpired ? 'Mining in progress' : 'Not mining', icon: FaCheckCircle, badge: activePlan && !activePlan.isExpired ? 'Running' : 'Idle', badgeColor: activePlan && !activePlan.isExpired ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' },
-    { label: 'Hash Rate', value: activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s', icon: FaBolt, badge: activePlan ? 'Optimal' : '—', badgeColor: activePlan ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' },
-    { label: 'Start Time', value: activePlan ? new Date(activePlan.startedAt).toLocaleString() : '—', icon: FaCalendarAlt, badge: '-', badgeColor: 'bg-slate-100 text-slate-600' },
-    { label: 'End Time', value: activePlan ? new Date(activePlan.endsAt).toLocaleString() : '—', icon: FaCalendarAlt, badge: '-', badgeColor: 'bg-slate-100 text-slate-600' },
-    { label: 'Live Countdown', value: activePlan ? activePlan.timeRemaining : '—', icon: FaClock, badge: activePlan ? `${activePlan.progressPercent}%` : '-', badgeColor: activePlan ? 'bg-cmblue-50 text-cmblue-700' : 'bg-slate-100 text-slate-600' },
-    { label: 'Daily Earnings', value: activePlan ? `$${Number(activePlan.dailyEarnings || 0).toFixed(2)} / day` : '$0.00', icon: FaBolt, badge: '+', badgeColor: 'bg-emerald-50 text-emerald-700' },
+    { label: 'Start Time', value: activePlan ? new Date(activePlan.startedAt).toLocaleString() : 'No start time', icon: FaCalendarAlt, badge: '-', badgeColor: 'bg-slate-100 text-slate-600' },
+    { label: 'End Time', value: activePlan ? new Date(activePlan.endsAt).toLocaleString() : 'No end time', icon: FaCalendarAlt, badge: '-', badgeColor: 'bg-slate-100 text-slate-600' },
     { label: 'Total Earnings', value: `$${Number(data?.user?.totalEarned || 0).toFixed(2)}`, icon: FaChartLine, badge: '+', badgeColor: 'bg-emerald-50 text-emerald-700' },
   ];
 
   return (
-    <div className="min-h-screen px-4 pb-28 pt-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        {/* Mobile View - Matches mine.png */}
-        <section className="mobile-only glass-card mb-4 p-4">
-          <div className="flex flex-col gap-3 text-center">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.26em] text-cmblue-600">Mining Dashboard</p>
-              <h1 className="mt-1 text-base font-semibold text-slate-900">CM HASH Mine</h1>
-            </div>
-            <div className="relative mx-auto flex h-36 w-36 items-center justify-center rounded-full bg-gradient-to-br from-cmblue-500 to-cmblue-300 shadow-[0_0_40px_rgba(17,120,250,0.35)]">
-              <div className="absolute inset-0 rounded-full border-2 border-dashed border-white/40 spin-slow" />
-              <div className="absolute inset-4 rounded-full border border-white/50 bg-white/20 pulse-ring" />
-              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cmblue-200 spin-reverse" />
-              <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-white text-slate-900 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-                <div>
-                  <p className="text-xl font-semibold">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
-                  <p className="text-[9px] uppercase tracking-[0.22em] text-slate-500">TH/s</p>
-                </div>
-              </div>
-            </div>
-            <span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-cmblue-700 shadow-card">
-              Status: {activePlan && !activePlan.isExpired ? 'Active' : 'Inactive'}
-            </span>
-          </div>
+    <div className="mc-page">
+      <section className="mc-page-header">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Mining Center</p>
+          <h1 className="mc-title">MC HASH Mine</h1>
+          <p className="mc-subtitle">Track hashrate, rewards, efficiency, and active plan progress.</p>
+        </div>
+        <span className={`mc-status ${activePlan && !activePlan.isExpired ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+          {activePlan && !activePlan.isExpired ? 'Status: Active' : 'Status: Inactive'}
+        </span>
+      </section>
 
-          <div className="mt-4 grid gap-2">
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3 shadow-card">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Mining Plan</p>
-                <span className="rounded-full bg-cmblue-50 px-2.5 py-0.5 text-[10px] font-semibold text-cmblue-700">
-                  {activePlan ? 'Active' : 'No Plan'}
-                </span>
+      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+        <section className="mc-card flex flex-col items-center justify-center text-center">
+          <div className="grid h-48 w-48 place-items-center rounded-full" style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
+            <div className="grid h-36 w-36 place-items-center rounded-full bg-white shadow-inner">
+              <div>
+                <p className="text-4xl font-extrabold text-slate-950">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
+                <p className="text-[10px] font-bold uppercase text-slate-400">TH/s</p>
               </div>
-              <p className="mt-1.5 text-lg font-semibold text-slate-900">
-                {activePlan ? activePlan.plan?.name || 'Active Plan' : 'No Active Plan'}
-              </p>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {stats.map((item) => (
-                <div key={item.label} className="rounded-[18px] border border-slate-200 bg-slate-50 p-2.5 shadow-card">
-                  <p className="text-[9px] uppercase tracking-[0.2em] text-slate-500">{item.label}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{item.value}</p>
-                </div>
-              ))}
-            </div>
-            <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3 shadow-card">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Time Remaining</p>
-                <p className="text-[10px] font-semibold text-slate-900">{activePlan ? `${activePlan.progressPercent}%` : '—'}</p>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-cmblue-600 to-cmblue-400"
-                  style={{ width: `${activePlan ? activePlan.progress : 0}%` }}
-                />
-              </div>
-              <p className="mt-1.5 text-[10px] text-slate-500">
-                {activePlan ? `${activePlan.timeRemaining} remaining` : 'No active session'}
-              </p>
-            </div>
-            {!activePlan && (
-              <Link
-                href="/dashboard/plans"
-                className="mt-1 rounded-2xl bg-cmblue-600 px-3 py-2.5 text-center text-[11px] font-semibold text-white shadow-blue-glow transition hover:bg-cmblue-700"
-              >
-                Buy Mining Plan
-              </Link>
-            )}
           </div>
+          <p className="mt-4 text-sm font-bold text-cmblue-600">{progress}% mining progress</p>
+          {!activePlan && (
+            <Link href="/dashboard/plans" className="mc-button mt-4 w-full max-w-xs">
+              Upgrade Plan
+            </Link>
+          )}
         </section>
 
-        {/* Desktop View */}
-        <section className="desktop-only hidden glass-card p-5">
-          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <section className="mc-card">
+          <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.26em] text-cmblue-600">Mining Dashboard</p>
-              <h1 className="mt-1 text-lg font-semibold text-slate-900">CM HASH Mine</h1>
+              <h2 className="text-base font-bold text-slate-950">Mining Performance</h2>
+              <p className="text-xs text-slate-500">Live contract and reward performance</p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 shadow-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {activePlan && !activePlan.isExpired ? 'Active' : 'Inactive'}
-              </span>
-              {activePlan && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-cmblue-50 px-3 py-1.5 text-[11px] font-semibold text-cmblue-700 shadow-sm">
-                  <span className="h-1.5 w-1.5 rounded-full bg-cmblue-500" />
-                  {activePlan.plan?.name || 'Plan'}
-                </span>
-              )}
-            </div>
+            <Link href="/dashboard/plans" className="mc-button-secondary min-h-8 px-3 py-1">
+              View plans
+            </Link>
           </div>
-
-          <div className="mb-5 flex items-center justify-center">
-            <div className="relative flex h-44 w-44 items-center justify-center rounded-full bg-gradient-to-br from-cmblue-500 to-cmblue-300 shadow-[0_0_48px_rgba(17,120,250,0.35)]">
-              <div className="absolute inset-0 rounded-full border-2 border-dashed border-white/40 spin-slow" />
-              <div className="absolute inset-4 rounded-full border border-white/50 bg-white/20 pulse-ring" />
-              <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cmblue-200 spin-reverse" />
-              <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-white text-slate-900 shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
-                <div className="text-center">
-                  <p className="text-2xl font-semibold">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
-                  <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">TH/s</p>
-                </div>
-              </div>
-              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-white px-3 py-1 text-[10px] font-semibold text-cmblue-700 shadow-sm">
-                Status: {activePlan && !activePlan.isExpired ? 'Active' : 'Inactive'}
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-5 grid gap-2 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {stats.map((item) => (
-              <div key={item.label} className="flex items-center justify-between rounded-[18px] bg-white p-3 shadow-sm">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-600">
-                    <item.icon className="h-3.5 w-3.5" />
-                  </span>
-                  <div>
-                    <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                    <p className="text-sm font-semibold text-slate-900">{item.value}</p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-cmblue-50 px-2.5 py-0.5 text-[10px] font-semibold text-cmblue-700">Live</span>
+              <div key={item.label} className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+                <span className={`mc-stat-icon ${item.color}`}>
+                  <item.icon className="h-4 w-4" />
+                </span>
+                <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
+                <p className="mt-1 text-sm font-extrabold text-slate-950">{item.value}</p>
               </div>
             ))}
           </div>
-
-          <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-card">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-cmblue-50 text-cmblue-600">
-                  <FaBolt className="h-3.5 w-3.5" />
-                </span>
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">Mining Details</h2>
-                  <p className="text-[10px] text-slate-500">Complete contract information</p>
-                </div>
-              </div>
-              <Link href="/dashboard/plans" className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-slate-900 shadow-sm transition hover:bg-slate-50">
-                View Plans
-              </Link>
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {miningDetails.map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-3 rounded-[18px] border border-slate-200 bg-slate-50 p-3 transition hover:border-cmblue-200 hover:bg-cmblue-50/40">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-cmblue-600 shadow-sm">
-                      <item.icon className="h-3.5 w-3.5" />
-                    </span>
-                    <div>
-                      <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                      <p className="mt-0.5 text-xs font-semibold text-slate-900">{item.value}</p>
-                    </div>
-                  </div>
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold ${item.badgeColor}`}>
-                    {item.badge}
-                  </span>
-                </div>
+          <div className="mt-5 h-36 rounded-2xl border border-sky-100 bg-white/80 p-4">
+            <div className="flex h-full items-end gap-2">
+              {[36, 52, 44, 66, 58, 82, 74, 92, 76, 88].map((height, index) => (
+                <div key={index} className="flex-1 rounded-t-xl bg-gradient-to-t from-cmblue-500 to-sky-300" style={{ height: `${activePlan ? height : 12}%` }} />
               ))}
             </div>
           </div>
         </section>
       </div>
+
+      <section className="mc-card">
+        <div className="mb-4">
+          <h2 className="text-base font-bold text-slate-950">Mining Details</h2>
+          <p className="text-xs text-slate-500">Complete contract information</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {miningDetails.map((item) => (
+            <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+              <div className="flex items-center gap-3">
+                <span className="mc-stat-icon bg-white text-cmblue-600">
+                  <item.icon className="h-4 w-4" />
+                </span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-950">{item.value}</p>
+                </div>
+              </div>
+              <span className={`mc-status ${item.badgeColor}`}>{item.badge}</span>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

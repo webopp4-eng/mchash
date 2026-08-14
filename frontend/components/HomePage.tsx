@@ -2,16 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FaArrowDown, FaArrowUp, FaBolt, FaCoins, FaGift, FaHistory, FaUserCircle, FaWallet } from 'react-icons/fa';
+import { FaArrowDown, FaArrowUp, FaBolt, FaCoins, FaGift, FaHistory, FaShieldAlt, FaUserCircle, FaWallet } from 'react-icons/fa';
 import WalletConnectionPanel from './WalletConnectionPanel';
 import { apiFetch, getUser, User } from '@/lib/auth';
-
-const quickStats = [
-  { label: 'Total Mined', value: '2.45 TH/s', icon: FaCoins },
-  { label: 'Active Plan', value: '7 Days', icon: FaWallet },
-  { label: 'Earnings', value: '$24.60', icon: FaArrowUp },
-  { label: 'Next Payout', value: '05:24:10', icon: FaHistory },
-];
 
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -40,210 +33,161 @@ export default function HomePage() {
     }
   };
 
-  const displayName = data?.user?.username || user?.username || 'MSa Monistar';
-  const displayEmail = data?.user?.email || user?.email || 'msa@monistar.com';
-  const balance = data?.user?.platformBalance || user?.platformBalance || '1578.25';
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
+      </div>
+    );
+  }
+
+  const displayName = data?.user?.username || user?.username || 'MC Hash Miner';
+  const displayEmail = data?.user?.email || 'wallet connected';
+  const balance = Number(data?.user?.platformBalance || user?.platformBalance || 0);
   const activePlan = data?.activePlan;
+  const progress = Math.min(100, Math.max(0, Number(activePlan?.progressPercent || 0)));
   const recentTx = data?.recentTransactions || [];
 
-  const quickStatsDynamic = [
-    { label: 'Hash Rate', value: activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s', icon: FaCoins },
-    { label: 'Active Plan', value: activePlan ? activePlan.plan?.name || 'Active' : 'No Plan', icon: FaWallet },
-    { label: 'Earnings', value: `$${Number(data?.user?.totalEarned || 0).toFixed(2)}`, icon: FaArrowUp },
-    { label: 'Time Left', value: activePlan?.timeRemaining || '—', icon: FaHistory },
+  const quickStats = [
+    { label: 'Active Hashrate', value: activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s', icon: FaBolt, color: 'bg-cmblue-50 text-cmblue-600' },
+    { label: 'TVS Metric', value: activePlan ? `${progress}%` : '0%', icon: FaCoins, color: 'bg-sky-50 text-cmblue-700' },
+    { label: 'Mining Status', value: activePlan ? 'Active' : 'Idle', icon: FaShieldAlt, color: activePlan ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500' },
+    { label: 'Earnings', value: `$${Number(data?.user?.totalEarned || 0).toFixed(2)}`, icon: FaArrowUp, color: 'bg-amber-50 text-amber-600' },
   ];
 
-  const transactions = (recentTx.length > 0 ? recentTx.slice(0, 5) : [
-    { label: 'Mining Reward', value: '+ $2.45', time: '2 min ago', type: 'Mining', icon: FaBolt, iconBg: 'bg-cmblue-50', iconColor: 'text-cmblue-600', positive: true },
-    { label: 'Deposit', value: '+ $50.00', time: 'Aug 05, 2025', type: 'Deposit', icon: FaArrowDown, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600', positive: true },
-    { label: 'Withdrawal', value: '- $25.00', time: 'Aug 04, 2025', type: 'Withdrawal', icon: FaArrowUp, iconBg: 'bg-rose-50', iconColor: 'text-rose-600', positive: false },
-    { label: 'Referral Bonus', value: '+ $10.00', time: 'Aug 03, 2025', type: 'Bonus', icon: FaGift, iconBg: 'bg-amber-50', iconColor: 'text-amber-600', positive: true },
-    { label: 'Mining Reward', value: '+ $2.45', time: 'Aug 02, 2025', type: 'Mining', icon: FaBolt, iconBg: 'bg-cmblue-50', iconColor: 'text-cmblue-600', positive: true },
-  ]).map((tx: any) => ({
-    ...tx,
-    label: tx.type ? (tx.type === 'deposit' ? 'Deposit' : tx.type === 'withdrawal' ? 'Withdrawal' : tx.type === 'purchase' ? 'Plan Purchase' : 'Referral Bonus') : tx.label,
-    time: new Date(tx.createdAt).toLocaleString(),
-    value: `${Number(tx.amount) >= 0 ? '+' : ''}$${Number(tx.amount).toFixed(2)}`,
-    positive: Number(tx.amount) >= 0,
-    icon: tx.type === 'deposit' ? FaArrowDown : tx.type === 'withdrawal' ? FaArrowUp : tx.type === 'purchase' ? FaWallet : FaBolt,
-    iconBg: tx.type === 'deposit' ? 'bg-emerald-50' : tx.type === 'withdrawal' ? 'bg-rose-50' : 'bg-cmblue-50',
-    iconColor: tx.type === 'deposit' ? 'text-emerald-600' : tx.type === 'withdrawal' ? 'text-rose-600' : 'text-cmblue-600',
-  }));
+  const fallbackTransactions = [
+    { label: 'Mining Reward', amount: 2.45, time: '2 min ago', type: 'reward' },
+    { label: 'Deposit', amount: 50, time: 'Recent', type: 'deposit' },
+    { label: 'Withdrawal', amount: -25, time: 'Recent', type: 'withdrawal' },
+    { label: 'Referral Bonus', amount: 10, time: 'Recent', type: 'referral' },
+  ];
+
+  const transactions = (recentTx.length > 0 ? recentTx.slice(0, 5) : fallbackTransactions).map((tx: any) => {
+    const type = tx.type || 'reward';
+    const amount = Number(tx.amount || 0);
+    return {
+      label: tx.label || (type === 'deposit' ? 'Deposit' : type === 'withdrawal' ? 'Withdrawal' : type === 'purchase' ? 'Plan Purchase' : type === 'referral' ? 'Team Reward' : 'Mining Reward'),
+      value: `${amount >= 0 ? '+' : ''}$${amount.toFixed(2)}`,
+      time: tx.createdAt ? new Date(tx.createdAt).toLocaleString() : tx.time,
+      positive: amount >= 0,
+      icon: type === 'deposit' ? FaArrowDown : type === 'withdrawal' ? FaArrowUp : type === 'referral' ? FaGift : FaBolt,
+      iconClass: type === 'deposit' ? 'bg-emerald-50 text-emerald-600' : type === 'withdrawal' ? 'bg-rose-50 text-rose-600' : type === 'referral' ? 'bg-amber-50 text-amber-600' : 'bg-cmblue-50 text-cmblue-600',
+    };
+  });
 
   return (
-    <div className="min-h-screen px-4 pb-28 pt-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        {/* Mobile View - Matches home.png */}
-        <section className="mobile-only glass-card mb-4 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 rounded-2xl border border-white/80 bg-white/80 px-2.5 py-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-700">
-                <FaUserCircle className="h-3.5 w-3.5" />
-              </span>
-              <div>
-                <p className="text-xs font-medium text-slate-900">{displayName}</p>
-                <p className="text-[9px] text-slate-500">{displayEmail}</p>
-              </div>
+    <div className="mc-page">
+      <section className="mc-page-header">
+        <div className="flex items-center gap-3">
+          <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+            <FaUserCircle className="h-5 w-5" />
+          </span>
+          <div>
+            <p className="text-[10px] font-bold uppercase text-cmblue-600">Dashboard</p>
+            <h1 className="mc-title">Welcome back, {displayName}</h1>
+            <p className="mc-subtitle">{displayEmail}</p>
+          </div>
+        </div>
+        <Link href="/dashboard/settings" className="mc-button-secondary">
+          Profile & settings
+        </Link>
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        <section className="mc-glass-blue">
+          <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase text-white/75">Total Balance</p>
+              <p className="mt-3 text-4xl font-extrabold sm:text-5xl">${balance.toFixed(2)}</p>
+              <p className="mt-2 text-sm text-white/80">
+                {activePlan ? `${progress}% active plan progress` : 'No active mining plan yet'}
+              </p>
             </div>
-            <div className="text-right">
-              <p className="text-[10px] text-slate-500">Welcome back,</p>
-              <h1 className="mt-0.5 text-base font-semibold text-slate-900">CM HASH</h1>
+            <div className="grid grid-cols-2 gap-2 sm:min-w-64">
+              <Link href="/dashboard/transactions" className="rounded-2xl bg-white/18 p-3 text-center text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25">
+                Deposit
+              </Link>
+              <Link href="/dashboard/withdrawals" className="rounded-2xl bg-white/18 p-3 text-center text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25">
+                Withdraw
+              </Link>
             </div>
           </div>
+        </section>
 
-          <div className="relative mt-4 overflow-hidden rounded-[24px] bg-gradient-to-br from-cmblue-600 to-cmblue-500 p-4 text-white shadow-[0_16px_40px_rgba(17,120,250,0.3)]">
-            <div className="pointer-events-none absolute right-3 top-3 text-[3rem] opacity-10">💼</div>
-            <p className="text-[9px] uppercase tracking-[0.3em] text-cmblue-100/70">Total Balance</p>
-            <p className="mt-2 text-2xl font-semibold">${Number(balance).toFixed(2)}</p>
-            <p className="mt-0.5 text-[10px] text-cmblue-100/80">
-              {activePlan ? `${activePlan.progressPercent || 0}% plan progress` : '+0.00% this week'}
+        <section className="mc-card flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase text-slate-400">Mining Progress</p>
+            <p className="mt-2 text-3xl font-extrabold text-slate-950">
+              {activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}
             </p>
+            <p className="text-sm font-semibold text-cmblue-600">TH/s active hashrate</p>
+            <span className={`mt-3 mc-status ${activePlan ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+              {activePlan ? 'Status: Active' : 'Status: Idle'}
+            </span>
           </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {quickStatsDynamic.map((item) => (
-              <div key={item.label} className="rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-card">
-                <div className="flex items-center gap-2 text-slate-900">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-cmblue-600 shadow-sm">
-                    <item.icon className="h-3.5 w-3.5" />
-                  </span>
-                  <div>
-                    <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                    <p className="mt-1 text-sm font-semibold">{item.value}</p>
-                  </div>
-                </div>
+          <div className="grid h-32 w-32 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
+            <div className="grid h-24 w-24 place-items-center rounded-full bg-white shadow-inner">
+              <div className="text-center">
+                <p className="text-2xl font-extrabold text-slate-950">{progress}%</p>
+                <p className="text-[10px] font-bold text-slate-400">TVS</p>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Link
-              href="/dashboard/transactions"
-              className="rounded-2xl bg-cmblue-600 px-3 py-2 text-center text-[11px] font-semibold text-white shadow-blue-glow transition hover:bg-cmblue-700"
-            >
-              Deposit
-            </Link>
-            <Link
-              href="/dashboard/withdrawals"
-              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-center text-[11px] font-semibold text-slate-900 shadow-card transition hover:bg-slate-100"
-            >
-              Withdraw
-            </Link>
-          </div>
-
-          <div className="mt-3">
-            <WalletConnectionPanel compact showTitle={false} darkMode={false} />
-          </div>
-        </section>
-
-        {/* Desktop View */}
-        <section className="desktop-only hidden glass-card p-5">
-          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/80 px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.12)]">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-700">
-                <FaUserCircle className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-sm font-medium text-slate-900">{displayName}</p>
-                <p className="text-[10px] text-slate-500">{displayEmail}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-500">Welcome back,</p>
-              <h1 className="text-xl font-semibold text-slate-900">CM HASH Dashboard</h1>
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <div className="space-y-4">
-              <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-cmblue-600 to-cmblue-500 p-5 text-white shadow-[0_16px_40px_rgba(17,120,250,0.3)]">
-                <div className="pointer-events-none absolute right-6 top-6 text-[3rem] opacity-10">💼</div>
-                <p className="text-[10px] uppercase tracking-[0.28em] text-cmblue-100/80">Total Balance</p>
-                <p className="mt-2 text-3xl font-semibold">${Number(balance).toFixed(2)}</p>
-                <p className="mt-0.5 text-[11px] text-cmblue-100/80">
-                  {activePlan ? `${activePlan.progressPercent || 0}% plan progress` : '+0.00% this week'}
-                </p>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Link href="/dashboard/transactions" className="rounded-2xl bg-white/20 px-3 py-2 text-center text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/30">
-                    Deposit
-                  </Link>
-                  <Link href="/dashboard/withdrawals" className="rounded-2xl border border-white/40 bg-white/10 px-3 py-2 text-center text-[11px] font-semibold text-white backdrop-blur transition hover:bg-white/20">
-                    Withdraw
-                  </Link>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {quickStatsDynamic.map((item) => (
-                  <div key={item.label} className="rounded-[18px] bg-slate-50 p-3 shadow-card">
-                    <p className="text-[9px] uppercase tracking-[0.16em] text-slate-500">{item.label}</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[24px] bg-white/90 p-4 shadow-card">
-              <div className="mb-3 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500">Recent Activity</p>
-                  <h2 className="text-base font-semibold text-slate-900">Transactions</h2>
-                </div>
-                <Link href="/dashboard/transactions" className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-slate-900 shadow-sm transition hover:bg-slate-50">
-                  View all
-                </Link>
-              </div>
-              <div className="space-y-2">
-                {transactions.slice(0, 3).map((item: any) => (
-                  <div key={item.label + item.time} className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <span className={`flex h-7 w-7 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}>
-                        <item.icon className="h-3 w-3" />
-                      </span>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-900">{item.label}</p>
-                        <p className="text-[10px] text-slate-500">{item.time}</p>
-                      </div>
-                    </div>
-                    <p className={`text-xs font-semibold ${item.positive ? 'text-emerald-600' : 'text-rose-600'}`}>{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[24px] bg-white/90 p-4 shadow-card">
-              <WalletConnectionPanel compact showTitle={true} darkMode={false} />
             </div>
           </div>
         </section>
+      </div>
 
-        {/* Transaction History - visible on both mobile & desktop */}
-        <section className="mt-4 glass-card p-4 sm:p-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {quickStats.map((item) => (
+          <section key={item.label} className="mc-card">
+            <span className={`mc-stat-icon ${item.color}`}>
+              <item.icon className="h-4 w-4" />
+            </span>
+            <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
+            <p className="mt-1 text-xl font-extrabold text-slate-950">{item.value}</p>
+          </section>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
+        <section className="mc-card">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-500">Complete account activity</p>
-              <h2 className="text-base font-semibold text-slate-900">Transaction History</h2>
+              <h2 className="text-base font-bold text-slate-950">Recent Activity</h2>
+              <p className="text-xs text-slate-500">Rewards, deposits, withdrawals, and team bonuses</p>
             </div>
-            <Link href="/dashboard/transactions" className="rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-slate-900 shadow-sm transition hover:bg-slate-50">
+            <Link href="/dashboard/transactions" className="mc-button-secondary min-h-8 px-3 py-1">
               View all
             </Link>
           </div>
-          <div className="grid gap-2 lg:grid-cols-2">
+          <div className="space-y-2">
             {transactions.map((item: any) => (
-              <div key={item.label + item.time} className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 px-3 py-2.5">
-                <div className="flex items-center gap-2.5">
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${item.iconBg} ${item.iconColor}`}>
-                    <item.icon className="h-3.5 w-3.5" />
+              <div key={item.label + item.time} className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+                <div className="flex items-center gap-3">
+                  <span className={`mc-stat-icon ${item.iconClass}`}>
+                    <item.icon className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-slate-900">{item.label}</p>
-                    <p className="text-[10px] text-slate-500">{item.time} • {item.type || item.label}</p>
+                    <p className="text-xs font-bold text-slate-950">{item.label}</p>
+                    <p className="text-[10px] text-slate-500">{item.time}</p>
                   </div>
                 </div>
-                <p className={`text-xs font-semibold ${item.positive ? 'text-emerald-600' : 'text-rose-600'}`}>{item.value}</p>
+                <p className={`text-sm font-extrabold ${item.positive ? 'text-emerald-600' : 'text-rose-600'}`}>{item.value}</p>
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="mc-card">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+              <FaHistory className="h-4 w-4" />
+            </span>
+            <div>
+              <h2 className="text-base font-bold text-slate-950">Wallet Connection</h2>
+              <p className="text-xs text-slate-500">Connected wallet and chain details</p>
+            </div>
+          </div>
+          <WalletConnectionPanel compact showTitle={false} darkMode={false} />
         </section>
       </div>
     </div>

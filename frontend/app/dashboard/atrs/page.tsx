@@ -59,74 +59,100 @@ export default function ATRsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
+    <div className="mc-page">
+      <section className="mc-page-header">
         <div>
-          <h1 className="text-2xl font-bold">ATRs</h1>
-          <p className="mt-1 text-sm text-slate-400">Active total rewards and mining reward activity</p>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Reports</p>
+          <h1 className="mc-title">Activity Reports</h1>
+          <p className="mc-subtitle">Active total rewards (ATR), mining history, and performance</p>
         </div>
-        <button onClick={loadATRs} className="rounded-xl border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10">
-          <FaSyncAlt className="h-4 w-4" />
+        <button onClick={loadATRs} className="mc-button-secondary">
+          <FaSyncAlt className="h-3.5 w-3.5" />
+          Refresh
         </button>
-      </div>
+      </section>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-[20px] border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
-            <div className="flex items-center gap-2">
-              <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${stat.color}`}>
-                <stat.icon className="h-4 w-4" />
-              </span>
-              <span className="text-[10px] uppercase tracking-[0.16em] text-slate-500">{stat.label}</span>
-            </div>
-            <p className="mt-3 text-xl font-bold">{stat.value}</p>
-          </div>
+          <section key={stat.label} className="mc-card">
+            <span className="mc-stat-icon bg-emerald-50 text-emerald-600">
+              <stat.icon className="h-4 w-4" />
+            </span>
+            <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">{stat.label}</p>
+            <p className="mt-1 text-xl font-extrabold text-slate-950">{stat.value}</p>
+          </section>
         ))}
       </div>
 
-      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-        <div className="mb-4">
-          <h2 className="text-sm font-semibold text-cmblue-300">Reward Activity</h2>
-          <p className="text-[10px] text-slate-500">Mining, referrals, and hash renting rewards</p>
+      <section className="mc-card">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Reward Activity</h2>
+            <p className="text-xs text-slate-500">Mining, referral, and renting rewards history</p>
+          </div>
+          <div className="rounded-full bg-cmblue-50 px-3 py-1 text-sm font-bold text-cmblue-700">
+            {rewards.length}
+          </div>
         </div>
         {rewards.length > 0 ? (
           <div className="space-y-2">
             {rewards.map((reward: any) => (
-              <div key={reward.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+              <div key={reward.id} className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
-                    <FaGift className="h-3.5 w-3.5" />
+                  <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                    <FaGift className="h-4 w-4" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold capitalize">{reward.type.replace(/_/g, ' ')}</p>
+                    <p className="text-xs font-bold text-slate-950 capitalize">{reward.type.replace(/_/g, ' ')}</p>
                     <p className="text-[10px] text-slate-500">{new Date(reward.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
-                <p className="text-sm font-semibold text-emerald-400">+${Number(reward.amount || 0).toFixed(2)}</p>
+                <p className="text-sm font-extrabold text-emerald-600">+${Number(reward.amount || 0).toFixed(2)}</p>
               </div>
             ))}
           </div>
         ) : (
-          <p className="py-6 text-center text-sm text-slate-500">No reward activity yet</p>
+          <div className="py-8 text-center">
+            <FaGift className="mx-auto h-10 w-10 text-cmblue-200" />
+            <p className="mt-3 text-sm font-semibold text-slate-500">No reward activity yet</p>
+          </div>
         )}
-      </div>
+      </section>
 
-      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-        <h2 className="text-sm font-semibold text-cmblue-300">Mining Sessions</h2>
+      <section className="mc-card">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Mining Sessions</h2>
+            <p className="text-xs text-slate-500">Your active and completed mining sessions</p>
+          </div>
+          <div className="rounded-full bg-cmblue-50 px-3 py-1 text-sm font-bold text-cmblue-700">
+            {sessions.length}
+          </div>
+        </div>
         {sessions.length > 0 ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             {sessions.map((session: any) => (
-              <div key={session.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs font-semibold capitalize">{session.status}</p>
-                <p className="mt-2 text-lg font-bold">{Number(session.hashRate || 0).toFixed(2)} TH/s</p>
-                <p className="mt-1 text-[10px] text-slate-500">Total mined: {Number(session.totalMined || 0).toFixed(4)}</p>
+              <div key={session.id} className="rounded-2xl border border-sky-100 bg-sky-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase text-slate-600">
+                    <span className={`mc-status ${session.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                      {session.status}
+                    </span>
+                  </p>
+                </div>
+                <p className="mt-3 text-2xl font-extrabold text-slate-950">{Number(session.hashRate || 0).toFixed(2)}</p>
+                <p className="text-xs font-semibold text-slate-500">TH/s Hashrate</p>
+                <p className="mt-2 text-[10px] text-slate-600">Mined: {Number(session.totalMined || 0).toFixed(4)} BTC</p>
               </div>
             ))}
           </div>
         ) : (
-          <p className="py-6 text-center text-sm text-slate-500">No mining sessions yet</p>
+          <div className="py-8 text-center">
+            <FaBolt className="mx-auto h-10 w-10 text-cmblue-200" />
+            <p className="mt-3 text-sm font-semibold text-slate-500">No mining sessions yet</p>
+          </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

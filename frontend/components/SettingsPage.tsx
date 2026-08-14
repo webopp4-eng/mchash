@@ -73,240 +73,233 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="min-h-screen px-4 pb-28 pt-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
-        {/* Header */}
-        <section className="glass-card mb-4 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Settings</p>
-              <h1 className="mt-0.5 text-base font-semibold text-slate-900">CM HASH Settings</h1>
-            </div>
-            <div className="rounded-2xl border border-white/80 bg-white/70 px-3 py-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-500">Account</p>
-              <p className="mt-0.5 text-xs font-semibold text-emerald-700">Active</p>
-            </div>
+    <div className="mc-page">
+      {/* Header */}
+      <section className="mc-page-header">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Settings</p>
+          <h1 className="mc-title">Account Settings</h1>
+          <p className="mc-subtitle">Manage your preferences and security</p>
+        </div>
+        <span className="mc-status bg-emerald-50 text-emerald-600">Active Account</span>
+      </section>
+
+      {savedMessage && (
+        <div className="flex items-center gap-2 rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-sm font-semibold text-emerald-600 backdrop-blur-xl">
+          <FaCheck className="h-4 w-4" />
+          {savedMessage}
+        </div>
+      )}
+
+      {/* Notifications Settings */}
+      <section className="mc-card">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+            <FaBell className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="font-bold text-slate-950">Notifications</h2>
+            <p className="text-xs text-slate-500">Control what alerts you receive</p>
           </div>
-        </section>
+        </div>
 
-        {savedMessage && (
-          <div className="mb-4 flex items-center gap-2 rounded-[18px] border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-semibold text-emerald-700 shadow-sm">
-            <FaCheck className="h-3.5 w-3.5" />
-            {savedMessage}
-          </div>
-        )}
-
-        {/* Notifications Settings */}
-        <section className="glass-card mb-4 p-4">
-          <div className="mb-3 flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-cmblue-50 text-cmblue-600">
-              <FaBell className="h-3.5 w-3.5" />
-            </span>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Notifications</h2>
-              <p className="text-[10px] text-slate-500">Control what you receive</p>
-            </div>
-          </div>
-
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-600">
-                  <FaBolt className="h-3 w-3" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Mining Updates</p>
-                  <p className="text-[10px] text-slate-500">Get notified about your mining progress</p>
-                </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                <FaBolt className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-950">Mining Updates</p>
+                <p className="text-[10px] text-slate-500">Mining progress and rewards</p>
               </div>
-              <Switch checked={notifications.miningUpdates} onChange={() => handleToggle('miningUpdates')} />
             </div>
-
-            <div className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <FaCheck className="h-3 w-3" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Deposit Alerts</p>
-                  <p className="text-[10px] text-slate-500">Get notified when a deposit is confirmed</p>
-                </div>
-              </div>
-              <Switch checked={notifications.depositAlerts} onChange={() => handleToggle('depositAlerts')} />
-            </div>
-
-            <div className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-                  <FaUnlockAlt className="h-3 w-3" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Withdrawal Alerts</p>
-                  <p className="text-[10px] text-slate-500">Get notified when a withdrawal is processed</p>
-                </div>
-              </div>
-              <Switch checked={notifications.withdrawalAlerts} onChange={() => handleToggle('withdrawalAlerts')} />
-            </div>
-
-            <div className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                  <FaEnvelope className="h-3 w-3" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Marketing Emails</p>
-                  <p className="text-[10px] text-slate-500">Receive promotional offers and news</p>
-                </div>
-              </div>
-              <Switch checked={notifications.marketingEmails} onChange={() => handleToggle('marketingEmails')} />
-            </div>
-          </div>
-        </section>
-
-        {/* Security Settings */}
-        <section className="glass-card mb-4 p-4">
-          <div className="mb-3 flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-cmblue-50 text-cmblue-600">
-              <FaShieldAlt className="h-3.5 w-3.5" />
-            </span>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Security</h2>
-              <p className="text-[10px] text-slate-500">Protect your account</p>
-            </div>
+            <Switch checked={notifications.miningUpdates} onChange={() => handleToggle('miningUpdates')} />
           </div>
 
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-cmblue-50 text-cmblue-600">
-                  <FaLock className="h-3 w-3" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Two-Factor Authentication</p>
-                  <p className="text-[10px] text-slate-500">Add an extra layer of security to your account</p>
-                </div>
+          <div className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-emerald-50 text-emerald-600">
+                <FaCheck className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-950">Deposit Alerts</p>
+                <p className="text-[10px] text-slate-500">When deposits are confirmed</p>
               </div>
-              <Switch checked={twoFactor} onChange={() => setTwoFactor(!twoFactor)} />
             </div>
-
-            <div className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <FaMobileAlt className="h-3 w-3" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Device Alerts</p>
-                  <p className="text-[10px] text-slate-500">Get notified on new device logins</p>
-                </div>
-              </div>
-              <Switch checked={deviceAlerts} onChange={() => setDeviceAlerts(!deviceAlerts)} />
-            </div>
-
-            <div className="flex items-center justify-between rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-                  <FaExclamationTriangle className="h-3 w-3" />
-                </span>
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Login Alerts</p>
-                  <p className="text-[10px] text-slate-500">Email me about suspicious login attempts</p>
-                </div>
-              </div>
-              <Switch checked={loginAlerts} onChange={() => setLoginAlerts(!loginAlerts)} />
-            </div>
-          </div>
-        </section>
-
-        {/* Password Recovery / Reset */}
-        <section className="glass-card mb-4 p-4">
-          <div className="mb-3 flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-2xl bg-cmblue-50 text-cmblue-600">
-              <FaUnlockAlt className="h-3.5 w-3.5" />
-            </span>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">Password Recovery & Reset</h2>
-              <p className="text-[10px] text-slate-500">Manage your recovery email and password</p>
-            </div>
+            <Switch checked={notifications.depositAlerts} onChange={() => handleToggle('depositAlerts')} />
           </div>
 
-          <div className="grid gap-2">
-            <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <p className="text-xs font-semibold text-slate-900">Recovery Email</p>
-              <p className="mt-0.5 text-[10px] text-slate-500">Used to recover your account if you forget your password</p>
-              <div className="mt-2 flex gap-2">
+          <div className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-rose-50 text-rose-600">
+                <FaUnlockAlt className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-950">Withdrawal Alerts</p>
+                <p className="text-[10px] text-slate-500">When withdrawals are processed</p>
+              </div>
+            </div>
+            <Switch checked={notifications.withdrawalAlerts} onChange={() => handleToggle('withdrawalAlerts')} />
+          </div>
+
+          <div className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-amber-50 text-amber-600">
+                <FaEnvelope className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-950">Marketing Emails</p>
+                <p className="text-[10px] text-slate-500">Promotional offers and updates</p>
+              </div>
+            </div>
+            <Switch checked={notifications.marketingEmails} onChange={() => handleToggle('marketingEmails')} />
+          </div>
+        </div>
+      </section>
+
+      {/* Security Settings */}
+      <section className="mc-card">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+            <FaShieldAlt className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="font-bold text-slate-950">Security</h2>
+            <p className="text-xs text-slate-500">Protect your account</p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+                <FaLock className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-950">Two-Factor Auth</p>
+                <p className="text-[10px] text-slate-500">Extra security layer for your account</p>
+              </div>
+            </div>
+            <Switch checked={twoFactor} onChange={() => setTwoFactor(!twoFactor)} />
+          </div>
+
+          <div className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-emerald-50 text-emerald-600">
+                <FaMobileAlt className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-950">Device Alerts</p>
+                <p className="text-[10px] text-slate-500">Notifications on new logins</p>
+              </div>
+            </div>
+            <Switch checked={deviceAlerts} onChange={() => setDeviceAlerts(!deviceAlerts)} />
+          </div>
+
+          <div className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-rose-50 text-rose-600">
+                <FaExclamationTriangle className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-bold text-slate-950">Login Alerts</p>
+                <p className="text-[10px] text-slate-500">Suspicious login attempts</p>
+              </div>
+            </div>
+            <Switch checked={loginAlerts} onChange={() => setLoginAlerts(!loginAlerts)} />
+          </div>
+        </div>
+      </section>
+
+      {/* Password Recovery / Reset */}
+      <section className="mc-card">
+        <div className="mb-4 flex items-center gap-3">
+          <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
+            <FaUnlockAlt className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="font-bold text-slate-950">Password & Recovery</h2>
+            <p className="text-xs text-slate-500">Manage account recovery and password</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <p className="text-xs font-bold text-slate-950">Recovery Email</p>
+            <p className="mt-0.5 text-[10px] text-slate-500">Used to recover your account</p>
+            <div className="mt-2.5 flex gap-2">
+              <input
+                type="email"
+                value={recoveryEmail}
+                onChange={(e) => setRecoveryEmail(e.target.value)}
+                className="mc-input flex-1"
+              />
+              <button
+                onClick={() => {
+                  setSavedMessage('Recovery email updated');
+                  setTimeout(() => setSavedMessage(null), 2000);
+                }}
+                className="mc-button shrink-0 px-3"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-950">Change Password</p>
+                <p className="text-[10px] text-slate-500">Update your account password</p>
+              </div>
+              <button
+                onClick={() => setShowPasswordForm(!showPasswordForm)}
+                className="mc-button-secondary shrink-0 px-3 py-2"
+              >
+                {showPasswordForm ? 'Cancel' : 'Change'}
+              </button>
+            </div>
+
+            {showPasswordForm && (
+              <div className="mt-3 space-y-2">
                 <input
-                  type="email"
-                  value={recoveryEmail}
-                  onChange={(e) => setRecoveryEmail(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
-                  placeholder="Enter recovery email"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="mc-input"
+                  placeholder="Current password"
                 />
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="mc-input"
+                  placeholder="New password (min 8 characters)"
+                />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="mc-input"
+                  placeholder="Confirm new password"
+                />
+                {passwordMessage && (
+                  <p className={`text-xs font-bold ${passwordMessage.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {passwordMessage.text}
+                  </p>
+                )}
                 <button
-                  onClick={() => {
-                    setSavedMessage('Recovery email updated');
-                    setTimeout(() => setSavedMessage(null), 2000);
-                  }}
-                  className="shrink-0 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-700"
+                  onClick={handlePasswordChange}
+                  className="mc-button w-full"
                 >
-                  Save
+                  Update Password
                 </button>
               </div>
-            </div>
-
-            <div className="rounded-[18px] border border-slate-200 bg-slate-50 p-3 shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-slate-900">Change Password</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">Update your account password</p>
-                </div>
-                <button
-                  onClick={() => setShowPasswordForm(!showPasswordForm)}
-                  className="shrink-0 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-700"
-                >
-                  {showPasswordForm ? 'Cancel' : 'Change Password'}
-                </button>
-              </div>
-
-              {showPasswordForm && (
-                <div className="mt-3 space-y-2">
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
-                    placeholder="Current password"
-                  />
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
-                    placeholder="New password (min 8 characters)"
-                  />
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 outline-none transition focus:border-cmblue-400 focus:ring-1 focus:ring-cmblue-200"
-                    placeholder="Confirm new password"
-                  />
-                  {passwordMessage && (
-                    <p className={`text-[10px] font-semibold ${passwordMessage.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {passwordMessage.text}
-                    </p>
-                  )}
-                  <button
-                    onClick={handlePasswordChange}
-                    className="w-full rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-700"
-                  >
-                    Update Password
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
