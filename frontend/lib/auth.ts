@@ -9,6 +9,7 @@ export interface User {
   referralCode: string;
   platformBalance: string;
   role: string;
+  avatar?: string;
 }
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_RENDER_API_URL || 'https://mchash.onrender.com';

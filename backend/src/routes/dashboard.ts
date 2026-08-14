@@ -40,6 +40,42 @@ router.get('/hash-renting', async (_req, res) => {
   }
 });
 
+// Live market prices - public endpoint (CoinGecko)
+router.get('/market-prices', async (_req, res) => {
+  try {
+    const response = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether,binancecoin&vs_currencies=usd&include_24hr_change=true',
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!response.ok) {
+      throw new Error(`CoinGecko API error: ${response.status}`);
+    }
+    const data = await response.json();
+    res.json({
+      prices: {
+        BTC: { price: data.bitcoin?.usd || 0, change24h: data.bitcoin?.usd_24h_change || 0 },
+        ETH: { price: data.ethereum?.usd || 0, change24h: data.ethereum?.usd_24h_change || 0 },
+        USDT: { price: data.tether?.usd || 1, change24h: data.tether?.usd_24h_change || 0 },
+        BNB: { price: data.binancecoin?.usd || 0, change24h: data.binancecoin?.usd_24h_change || 0 },
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Market prices error:', error);
+    // Fallback to cached/default values if API fails
+    res.json({
+      prices: {
+        BTC: { price: 0, change24h: 0 },
+        ETH: { price: 0, change24h: 0 },
+        USDT: { price: 1, change24h: 0 },
+        BNB: { price: 0, change24h: 0 },
+      },
+      updatedAt: new Date().toISOString(),
+      source: 'fallback',
+    });
+  }
+});
+
 // All remaining dashboard routes require auth
 router.use(authenticateToken, loadUser);
 

@@ -27,7 +27,7 @@ export default function AdminSettings() {
   const updateSetting = async (key: string, value: string) => {
     try {
       await apiFetch('/api/admin/settings', {
-        method: 'PATCH',
+        method: 'PUT',
         body: JSON.stringify({ key, value }),
       });
       setSaved(true);

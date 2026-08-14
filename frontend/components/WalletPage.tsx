@@ -28,12 +28,23 @@ export default function WalletPage() {
   const [depositMessage, setDepositMessage] = useState<string | null>(null);
   const [depositError, setDepositError] = useState<string | null>(null);
   const [submittingDeposit, setSubmittingDeposit] = useState(false);
+  const [marketPrices, setMarketPrices] = useState<any>(null);
 
   useEffect(() => {
     setUser(getUser());
     loadWallet();
     loadPaymentAccounts();
+    loadMarketPrices();
   }, []);
+
+  const loadMarketPrices = async () => {
+    try {
+      const res = await apiFetch('/api/market-prices');
+      setMarketPrices(res.prices || null);
+    } catch (err) {
+      console.error('Failed to load market prices:', err);
+    }
+  };
 
   const loadWallet = async () => {
     try {
@@ -151,18 +162,18 @@ export default function WalletPage() {
   const walletType = data?.walletType || user?.walletType || 'Wallet';
   const recent = data?.recentTransactions || [];
 
+  const btcPrice = Number(marketPrices?.BTC?.price || 0);
+  const ethPrice = Number(marketPrices?.ETH?.price || 0);
+  const usdtPrice = Number(marketPrices?.USDT?.price || 1);
+
   const assets = [
     { symbol: 'MC Coin', value: balance, units: balance.toFixed(2), icon: FaWallet, color: 'bg-cmblue-50 text-cmblue-600' },
-    { symbol: 'USDT', value: balance * 0.42, units: (balance * 0.42).toFixed(2), icon: SiTether, color: 'bg-emerald-50 text-emerald-600' },
-    { symbol: 'BTC', value: balance * 0.18, units: '0.0045', icon: FaBitcoin, color: 'bg-amber-50 text-amber-600' },
-    { symbol: 'ETH', value: balance * 0.24, units: '0.0821', icon: FaEthereum, color: 'bg-sky-50 text-cmblue-700' },
+    { symbol: 'USDT', value: balance * usdtPrice, units: (balance * usdtPrice).toFixed(2), icon: SiTether, color: 'bg-emerald-50 text-emerald-600' },
+    { symbol: 'BTC', value: btcPrice > 0 ? balance * 0.18 : 0, units: btcPrice > 0 ? (balance * 0.18 / btcPrice).toFixed(6) : '0.000000', icon: FaBitcoin, color: 'bg-amber-50 text-amber-600' },
+    { symbol: 'ETH', value: ethPrice > 0 ? balance * 0.24 : 0, units: ethPrice > 0 ? (balance * 0.24 / ethPrice).toFixed(6) : '0.000000', icon: FaEthereum, color: 'bg-sky-50 text-cmblue-700' },
   ];
 
-  const recentTransactions = (recent.length > 0 ? recent : [
-    { label: 'Mining Reward', amount: 2.45, status: 'Completed' },
-    { label: 'Deposit', amount: 50, status: 'Completed' },
-    { label: 'Withdrawal', amount: -25, status: 'Completed' },
-  ]).map((tx: any) => ({
+  const recentTransactions = (recent.length > 0 ? recent : []).map((tx: any) => ({
     label: tx.type ? (tx.type === 'deposit' ? 'Deposit' : tx.type === 'withdrawal' ? 'Withdrawal' : tx.type === 'purchase' ? 'Plan Purchase' : 'Mining Reward') : tx.label,
     value: `${Number(tx.amount || 0) >= 0 ? '+' : ''}$${Number(tx.amount || 0).toFixed(2)}`,
     status: tx.status || 'Completed',

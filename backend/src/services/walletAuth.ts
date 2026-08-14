@@ -332,6 +332,9 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
     referralCode = 'CMH' + crypto.randomBytes(4).toString('hex').toUpperCase();
   } while (await prisma.referral.findUnique({ where: { code: referralCode } }));
 
+  // Assign a random default avatar (1-5)
+  const avatarNumber = Math.floor(Math.random() * 5) + 1;
+
   // Create user
   const user = await prisma.user.create({
     data: {
@@ -346,6 +349,7 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
       role: 'user',
       platformBalance: 0,
       authMethod: 'WALLET',
+      avatar: `avatar-${avatarNumber}`,
       updatedAt: new Date(),
     },
   });

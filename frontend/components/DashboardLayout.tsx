@@ -101,7 +101,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="space-y-3 border-t border-sky-100 p-4">
           <div className="rounded-2xl bg-gradient-to-br from-cmblue-50 to-white p-3 ring-1 ring-sky-100">
           <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-cmblue-500 to-cmblue-700 text-xs font-bold text-white">
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-xs font-bold text-white ${
+              user?.avatar === 'avatar-1' ? 'bg-gradient-to-br from-cmblue-500 to-cmblue-700' :
+              user?.avatar === 'avatar-2' ? 'bg-gradient-to-br from-emerald-500 to-teal-700' :
+              user?.avatar === 'avatar-3' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
+              user?.avatar === 'avatar-4' ? 'bg-gradient-to-br from-rose-500 to-pink-700' :
+              'bg-gradient-to-br from-violet-500 to-purple-700'
+            }`}>
               {user?.username?.slice(0, 2).toUpperCase() || 'MC'}
             </div>
             <div className="min-w-0 flex-1">

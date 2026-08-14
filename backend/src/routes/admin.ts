@@ -75,10 +75,96 @@ router.patch('/users/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status' });
     }
     const user = await prisma.user.update({ where: { id }, data: { status } });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: uuid(),
+        userId: id,
+        action: 'USER_STATUS_CHANGE',
+        details: { status, adminId: (req as AuthRequest).user?.id },
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
     res.json({ success: true, user });
   } catch (error) {
     console.error('User status error:', error);
     res.status(500).json({ error: 'Failed to update user status' });
+  }
+});
+
+// ============ ADMIN CREDIT SYSTEM ============
+router.post('/users/:id/credit', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, balanceType, reason } = req.body;
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Credit amount must be greater than 0' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const creditAmount = Number(amount);
+    const type = balanceType || 'platformBalance';
+
+    // Validate balance type
+    const validTypes = ['platformBalance', 'totalEarned', 'totalDeposited'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'Invalid balance type' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { [type]: { increment: creditAmount } },
+    });
+
+    // Create transaction record
+    await prisma.transaction.create({
+      data: {
+        id: uuid(),
+        userId: id,
+        type: 'admin_credit',
+        amount: creditAmount,
+        currency: 'USDT',
+        chain: user.chain || 'ethereum',
+        status: 'completed',
+        metadata: { balanceType: type, reason: reason || 'Admin credit', adminId: (req as AuthRequest).user?.id },
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        id: uuid(),
+        userId: id,
+        type: 'credit',
+        title: 'Account Credited',
+        message: `Your account has been credited with ${creditAmount.toFixed(2)} USDT.${reason ? ` Reason: ${reason}` : ''}`,
+      },
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: uuid(),
+        userId: id,
+        action: 'ADMIN_CREDIT',
+        details: { amount: creditAmount, balanceType: type, reason: reason || null, adminId: (req as AuthRequest).user?.id },
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    res.json({ success: true, user: updatedUser });
+  } catch (error) {
+    console.error('Admin credit error:', error);
+    res.status(500).json({ error: 'Failed to credit user' });
   }
 });
 
@@ -298,6 +384,18 @@ router.post('/payment-accounts', async (req, res) => {
     }
 
     const account = await prisma.paymentAccount.create({ data: payload });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: uuid(),
+        action: 'PAYMENT_ACCOUNT_CREATE',
+        details: { accountId: account.id, name: account.name, type: account.type, adminId: (req as AuthRequest).user?.id },
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
     res.status(201).json({ success: true, paymentAccount: account });
   } catch (error) {
     console.error('Create payment account error:', error);
@@ -338,6 +436,21 @@ router.patch('/payment-accounts/:id', async (req, res) => {
       data,
     });
 
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: uuid(),
+        action: 'PAYMENT_ACCOUNT_UPDATE',
+        details: {
+          accountId: id,
+          updatedFields: Object.keys(data).filter((key) => data[key] !== undefined),
+          adminId: (req as AuthRequest).user?.id,
+        },
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
     res.json({ success: true, paymentAccount: account });
   } catch (error) {
     console.error('Update payment account error:', error);
@@ -349,6 +462,18 @@ router.delete('/payment-accounts/:id', async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.paymentAccount.delete({ where: { id } });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: uuid(),
+        action: 'PAYMENT_ACCOUNT_DELETE',
+        details: { accountId: id, adminId: (req as AuthRequest).user?.id },
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
     res.json({ success: true });
   } catch (error) {
     console.error('Delete payment account error:', error);

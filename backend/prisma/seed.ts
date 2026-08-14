@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { v4 as uuid } from 'uuid';
 
 declare const process: {
   exit(code?: number): never;
@@ -91,9 +92,9 @@ async function main() {
   for (const plan of plans) {
     const existing = await prisma.miningPlan.findFirst({ where: { name: plan.name } });
     if (!existing) {
-      await prisma.miningPlan.create({ data: plan });
+      await prisma.miningPlan.create({ data: { id: uuid(), ...plan, updatedAt: new Date() } });
     } else {
-      await prisma.miningPlan.update({ where: { id: existing.id }, data: plan });
+      await prisma.miningPlan.update({ where: { id: existing.id }, data: { ...plan, updatedAt: new Date() } });
     }
   }
 
@@ -133,9 +134,115 @@ async function main() {
   for (const plan of hashRentingPlans) {
     const existing = await prisma.hashRentingPlan.findFirst({ where: { name: plan.name } });
     if (!existing) {
-      await prisma.hashRentingPlan.create({ data: plan });
+      await prisma.hashRentingPlan.create({ data: { id: uuid(), ...plan, updatedAt: new Date() } });
     } else {
-      await prisma.hashRentingPlan.update({ where: { id: existing.id }, data: plan });
+      await prisma.hashRentingPlan.update({ where: { id: existing.id }, data: { ...plan, updatedAt: new Date() } });
+    }
+  }
+
+  // Payment accounts — multiple accounts per payment method (bank, crypto, momo, opay, other)
+  const paymentAccounts = [
+    {
+      type: 'bank',
+      name: 'Bank Account A',
+      label: 'Primary Bank Account',
+      bankName: 'Access Bank',
+      accountHolder: 'CM HASH LTD',
+      accountNumber: '0234567890',
+      currency: 'NGN',
+      isDefault: true,
+      active: true,
+      sortOrder: 1,
+    },
+    {
+      type: 'bank',
+      name: 'Bank Account B',
+      label: 'Backup Bank Account',
+      bankName: 'GTBank',
+      accountHolder: 'CM HASH LTD',
+      accountNumber: '0456789012',
+      currency: 'NGN',
+      isDefault: false,
+      active: true,
+      sortOrder: 2,
+    },
+    {
+      type: 'crypto',
+      name: 'USDT TRC20 Wallet',
+      label: 'USDT (TRC20)',
+      walletAddress: 'TXYZ1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      network: 'tron',
+      currency: 'USDT',
+      isDefault: true,
+      active: true,
+      sortOrder: 1,
+    },
+    {
+      type: 'crypto',
+      name: 'USDT ERC20 Wallet',
+      label: 'USDT (ERC20)',
+      walletAddress: '0x0000000000000000000000000000000000000000',
+      network: 'ethereum',
+      currency: 'USDT',
+      isDefault: false,
+      active: true,
+      sortOrder: 2,
+    },
+    {
+      type: 'momo',
+      name: 'MoMo MTN',
+      label: 'MTN Mobile Money',
+      accountHolder: 'CM HASH',
+      accountNumber: '0245556789',
+      bankName: 'MTN',
+      currency: 'GHS',
+      isDefault: true,
+      active: true,
+      sortOrder: 1,
+    },
+    {
+      type: 'momo',
+      name: 'MoMo Vodafone',
+      label: 'Vodafone Cash',
+      accountHolder: 'CM HASH',
+      accountNumber: '0502223344',
+      bankName: 'Vodafone',
+      currency: 'GHS',
+      isDefault: false,
+      active: true,
+      sortOrder: 2,
+    },
+    {
+      type: 'opay',
+      name: 'OPay Account A',
+      label: 'OPay Primary',
+      accountHolder: 'CM HASH',
+      accountNumber: '7012345678',
+      currency: 'NGN',
+      isDefault: true,
+      active: true,
+      sortOrder: 1,
+    },
+  ];
+
+  for (const account of paymentAccounts) {
+    const existing = await prisma.paymentAccount.findFirst({ where: { name: account.name } });
+    if (!existing) {
+      await prisma.paymentAccount.create({
+        data: {
+          id: uuid(),
+          ...account,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await prisma.paymentAccount.update({
+        where: { id: existing.id },
+        data: {
+          ...account,
+          updatedAt: new Date(),
+        },
+      });
     }
   }
 
@@ -146,13 +253,14 @@ async function main() {
     { key: 'referral_levels', value: '3' },
     { key: 'platform_name', value: 'CM HASH' },
     { key: 'support_email', value: 'support@cmhash.io' },
+    { key: 'default_currency', value: 'USDT' },
   ];
 
   for (const setting of settings) {
     await prisma.adminSetting.upsert({
       where: { key: setting.key },
-      update: setting,
-      create: setting,
+      update: { ...setting, updatedAt: new Date() },
+      create: { id: uuid(), ...setting, updatedAt: new Date() },
     });
   }
 

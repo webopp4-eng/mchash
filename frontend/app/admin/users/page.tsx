@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaSearch, FaUsers, FaWallet, FaBolt } from 'react-icons/fa';
+import { FaSearch, FaUsers, FaWallet, FaBolt, FaCoins, FaPlus } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
 
@@ -9,6 +9,11 @@ export default function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [creditUser, setCreditUser] = useState<any | null>(null);
+  const [creditForm, setCreditForm] = useState({ amount: '', balanceType: 'platformBalance', reason: '' });
+  const [creditMessage, setCreditMessage] = useState<string | null>(null);
+  const [creditError, setCreditError] = useState<string | null>(null);
+  const [submittingCredit, setSubmittingCredit] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -34,6 +39,40 @@ export default function AdminUsers() {
       loadUsers();
     } catch (err) {
       console.error('Failed to update user:', err);
+    }
+  };
+
+  const submitCredit = async () => {
+    if (!creditUser) return;
+    if (!creditForm.amount || Number(creditForm.amount) <= 0) {
+      setCreditError('Enter a valid credit amount.');
+      return;
+    }
+
+    setSubmittingCredit(true);
+    setCreditError(null);
+    setCreditMessage(null);
+
+    try {
+      await apiFetch(`/api/admin/users/${creditUser.id}/credit`, {
+        method: 'POST',
+        body: JSON.stringify({
+          amount: Number(creditForm.amount),
+          balanceType: creditForm.balanceType,
+          reason: creditForm.reason || null,
+        }),
+      });
+      setCreditMessage(`Successfully credited ${creditUser.username || 'user'} with ${creditForm.amount} USDT.`);
+      setCreditForm({ amount: '', balanceType: 'platformBalance', reason: '' });
+      setTimeout(() => {
+        setCreditUser(null);
+        setCreditMessage(null);
+      }, 1500);
+      loadUsers();
+    } catch (error: any) {
+      setCreditError(error.message || 'Failed to credit user.');
+    } finally {
+      setSubmittingCredit(false);
     }
   };
 
@@ -93,6 +132,71 @@ export default function AdminUsers() {
         </div>
       </div>
 
+      {/* Credit Modal */}
+      {creditUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase text-cmblue-600">Admin Credit</p>
+                <h2 className="text-xl font-extrabold text-slate-950">Credit {creditUser.username || 'User'}</h2>
+                <p className="text-xs text-slate-500">{shortenAddress(creditUser.walletAddress || '', 8)}</p>
+              </div>
+              <button onClick={() => { setCreditUser(null); setCreditMessage(null); setCreditError(null); }} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">Close</button>
+            </div>
+
+            {creditError && <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{creditError}</div>}
+            {creditMessage && <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{creditMessage}</div>}
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Balance type</label>
+                <select
+                  value={creditForm.balanceType}
+                  onChange={(e) => setCreditForm({ ...creditForm, balanceType: e.target.value })}
+                  className="mc-input"
+                >
+                  <option value="platformBalance">Platform Balance</option>
+                  <option value="totalEarned">Total Earned</option>
+                  <option value="totalDeposited">Total Deposited</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Amount (USDT)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={creditForm.amount}
+                  onChange={(e) => setCreditForm({ ...creditForm, amount: e.target.value })}
+                  placeholder="100.00"
+                  className="mc-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Reason</label>
+                <textarea
+                  value={creditForm.reason}
+                  onChange={(e) => setCreditForm({ ...creditForm, reason: e.target.value })}
+                  rows={3}
+                  placeholder="Optional reason for credit"
+                  className="mc-input resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => { setCreditUser(null); setCreditMessage(null); setCreditError(null); }} className="mc-button-secondary">Cancel</button>
+              <button onClick={submitCredit} disabled={submittingCredit} className="mc-button">
+                {submittingCredit ? 'Crediting...' : 'Apply Credit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Users Table */}
       <div className="mc-table-wrap">
         <table className="mc-table">
@@ -134,6 +238,12 @@ export default function AdminUsers() {
                 </td>
                 <td className="mc-td">
                   <div className="flex gap-1.5">
+                    <button
+                      onClick={() => { setCreditUser(user); setCreditForm({ amount: '', balanceType: 'platformBalance', reason: '' }); setCreditError(null); setCreditMessage(null); }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100"
+                    >
+                      <FaCoins className="h-2.5 w-2.5" /> Credit
+                    </button>
                     {user.status !== 'active' && (
                       <button
                         onClick={() => updateStatus(user.id, 'active')}

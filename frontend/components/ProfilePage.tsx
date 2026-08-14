@@ -1,20 +1,34 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FaBell, FaCogs, FaHeadset, FaLock, FaPencilAlt, FaSignOutAlt, FaUserCircle, FaCheck } from 'react-icons/fa';
+import { getUser, logout, User } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import { shortenAddress } from '@/lib/wallet';
 
 const items = [
-  { icon: FaCogs, label: 'Settings', desc: 'Manage your preferences', href: '/settings' },
-  { icon: FaHeadset, label: 'Support', desc: 'Get help & contact us' },
-  { icon: FaBell, label: 'Notifications', desc: 'View all notifications' },
-  { icon: FaLock, label: 'Security', desc: 'Manage account security' },
+  { icon: FaCogs, label: 'Settings', desc: 'Manage your preferences', href: '/dashboard/settings' },
+  { icon: FaHeadset, label: 'Support', desc: 'Get help & contact us', href: '/dashboard/support' },
+  { icon: FaBell, label: 'Notifications', desc: 'View all notifications', href: '/dashboard/withdrawals' },
+  { icon: FaLock, label: 'Security', desc: 'Manage account security', href: '/dashboard/settings' },
 ];
 
 export default function ProfilePage() {
-  const [username, setUsername] = useState('MSa Monistar');
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [username, setUsername] = useState('User');
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(username);
+
+  useEffect(() => {
+    const currentUser = getUser();
+    setUser(currentUser);
+    if (currentUser?.username) {
+      setUsername(currentUser.username);
+      setEditValue(currentUser.username);
+    }
+  }, []);
 
   const handleSaveUsername = () => {
     if (editValue.trim()) {
@@ -22,6 +36,12 @@ export default function ProfilePage() {
     }
     setIsEditing(false);
   };
+
+  const avatarClass = user?.avatar === 'avatar-1' ? 'bg-gradient-to-br from-cmblue-500 to-cmblue-700' :
+    user?.avatar === 'avatar-2' ? 'bg-gradient-to-br from-emerald-500 to-teal-700' :
+    user?.avatar === 'avatar-3' ? 'bg-gradient-to-br from-amber-500 to-orange-700' :
+    user?.avatar === 'avatar-4' ? 'bg-gradient-to-br from-rose-500 to-pink-700' :
+    'bg-gradient-to-br from-violet-500 to-purple-700';
 
   return (
     <div className="mc-page max-w-6xl">
@@ -39,8 +59,8 @@ export default function ProfilePage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-end">
               {/* Avatar */}
-              <div className="-mt-10 flex h-20 w-20 items-center justify-center rounded-3xl border-4 border-white bg-cmblue-600 text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:-mt-12 sm:h-24 sm:w-24">
-                <FaUserCircle className="h-10 w-10 sm:h-12 sm:w-12" />
+              <div className={`-mt-10 flex h-20 w-20 items-center justify-center rounded-3xl border-4 border-white text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:-mt-12 sm:h-24 sm:w-24 ${avatarClass}`}>
+                <span className="text-2xl font-extrabold sm:text-3xl">{username?.slice(0, 2).toUpperCase() || 'MC'}</span>
               </div>
 
               <div className="text-center sm:text-left">
@@ -78,10 +98,10 @@ export default function ProfilePage() {
                     </>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">msa@monistar.com</p>
+                <p className="mt-0.5 text-xs text-slate-500">{user?.walletAddress ? shortenAddress(user.walletAddress, 8) : 'No wallet connected'}</p>
                 <p className="mt-1 inline-flex items-center gap-1 mc-status bg-cmblue-50 text-cmblue-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  User ID: CMH-2481
+                  User ID: {user?.referralCode || 'CMH-0000'}
                 </p>
               </div>
             </div>
@@ -95,16 +115,16 @@ export default function ProfilePage() {
           {/* Stats Row */}
           <div className="mt-4 grid grid-cols-3 gap-2">
             <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3 text-center">
-              <p className="text-base font-bold text-slate-950">$1,578.25</p>
+              <p className="text-base font-bold text-slate-950">${Number(user?.platformBalance || 0).toFixed(2)}</p>
               <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Balance</p>
             </div>
             <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3 text-center">
-              <p className="text-base font-bold text-slate-950">2.45 TH/s</p>
-              <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Hash Rate</p>
+              <p className="text-base font-bold text-slate-950">{user?.chain || 'N/A'}</p>
+              <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Network</p>
             </div>
             <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3 text-center">
-              <p className="text-base font-bold text-slate-950">7 Days</p>
-              <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Plan</p>
+              <p className="text-base font-bold text-slate-950">{user?.walletType || 'Wallet'}</p>
+              <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Type</p>
             </div>
           </div>
         </div>
@@ -152,18 +172,18 @@ export default function ProfilePage() {
 
           <div className="space-y-2">
             <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
-              <p className="text-xs text-slate-500">Last login</p>
-              <p className="mt-1 text-base font-bold text-slate-950">Today, 09:41</p>
+              <p className="text-xs text-slate-500">Wallet address</p>
+              <p className="mt-1 break-all text-base font-bold text-slate-950">{user?.walletAddress || 'No wallet connected'}</p>
             </div>
             <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
               <p className="text-xs text-slate-500">Verification</p>
-              <p className="mt-1 text-base font-bold text-slate-950">User verified by deposit</p>
+              <p className="mt-1 text-base font-bold text-slate-950">User verified by wallet signature</p>
             </div>
             <div className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
               <p className="text-xs text-slate-500">Member since</p>
-              <p className="mt-1 text-base font-bold text-slate-950">January 2025</p>
+              <p className="mt-1 text-base font-bold text-slate-950">{user?.referralCode ? 'Active member' : 'New member'}</p>
             </div>
-            <button className="mt-2 w-full rounded-[22px] bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-2.5 text-xs font-bold text-white transition hover:shadow-[0_10px_24px_rgba(239,68,68,0.22)]">
+            <button onClick={() => logout(router)} className="mt-2 w-full rounded-[22px] bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-2.5 text-xs font-bold text-white transition hover:shadow-[0_10px_24px_rgba(239,68,68,0.22)]">
               <FaSignOutAlt className="mr-1.5 inline-block h-3.5 w-3.5" />
               Log Out
             </button>
