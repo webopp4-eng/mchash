@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FaBolt, FaCheck, FaWallet, FaClock, FaGift, FaUsers, FaCube } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { getUser } from '@/lib/auth';
+import { toastEmitter } from '@/components/NotificationToast';
 
 export default function PlansPage() {
   const router = useRouter();
@@ -41,7 +42,17 @@ export default function PlansPage() {
 
     try {
       const user = getUser();
-      if (!user) throw new Error('Please connect your wallet first');
+      if (!user) {
+        throw new Error('Please connect your wallet first');
+      }
+
+      const balance = Number(user.platformBalance || 0);
+      const cost = Number(plan.price || 0);
+      
+      if (balance < cost) {
+        const needed = (cost - balance).toFixed(2);
+        throw new Error(`Insufficient balance. You need $${needed} more to purchase this plan`);
+      }
 
       const res = await apiFetch(`/api/plans/${plan.id}/purchase`, {
         method: 'POST',
@@ -55,10 +66,15 @@ export default function PlansPage() {
         localStorage.setItem('cmhash_user', JSON.stringify(updatedUser));
       }
 
-      setSuccess(`${plan.name} plan activated successfully. Mining has started.`);
-      setTimeout(() => router.push('/dashboard/mining'), 800);
+      const message = `${plan.name} plan activated successfully. Mining has started.`;
+      setSuccess(message);
+      toastEmitter.success('Mining Started', `${plan.name} plan purchased for $${cost.toFixed(2)}`);
+      
+      setTimeout(() => router.push('/dashboard/mining'), 1000);
     } catch (err: any) {
-      setError(err.message);
+      const errorMsg = err.message || 'Failed to purchase plan';
+      setError(errorMsg);
+      toastEmitter.error('Purchase Failed', errorMsg);
     } finally {
       setPurchasing(null);
     }
@@ -71,7 +87,17 @@ export default function PlansPage() {
 
     try {
       const user = getUser();
-      if (!user) throw new Error('Please connect your wallet first');
+      if (!user) {
+        throw new Error('Please connect your wallet first');
+      }
+
+      const balance = Number(user.platformBalance || 0);
+      const cost = Number(plan.price || 0);
+      
+      if (balance < cost) {
+        const needed = (cost - balance).toFixed(2);
+        throw new Error(`Insufficient balance. You need $${needed} more to rent this hash power`);
+      }
 
       const res = await apiFetch(`/api/hash-renting/${plan.id}/purchase`, {
         method: 'POST',
@@ -85,10 +111,15 @@ export default function PlansPage() {
         localStorage.setItem('cmhash_user', JSON.stringify(updatedUser));
       }
 
-      setSuccess(`${plan.name} hash renting activated. Mining has started.`);
-      setTimeout(() => router.push('/dashboard/mining'), 800);
+      const message = `${plan.name} hash renting activated. Mining has started.`;
+      setSuccess(message);
+      toastEmitter.success('Hash Renting Started', `${plan.name} rented for $${cost.toFixed(2)}`);
+      
+      setTimeout(() => router.push('/dashboard/mining'), 1000);
     } catch (err: any) {
-      setError(err.message);
+      const errorMsg = err.message || 'Failed to rent hash power';
+      setError(errorMsg);
+      toastEmitter.error('Rental Failed', errorMsg);
     } finally {
       setPurchasing(null);
     }
