@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaArrowDown } from 'react-icons/fa';
+import { FaArrowDown, FaCheck, FaTimes, FaEye } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
 
 export default function AdminDeposits() {
   const [deposits, setDeposits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDeposits();
@@ -21,6 +22,23 @@ export default function AdminDeposits() {
       console.error('Failed to load deposits:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAction = async (depositId: string, status: 'approved' | 'rejected') => {
+    setProcessingId(depositId);
+    try {
+      const res = await apiFetch(`/api/admin/deposits/${depositId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      if (res.success) {
+        await loadDeposits();
+      }
+    } catch (err) {
+      console.error('Failed to update deposit:', err);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -38,26 +56,11 @@ export default function AdminDeposits() {
         <div>
           <p className="text-[10px] font-bold uppercase text-cmblue-600">Transactions</p>
           <h1 className="mc-title">Deposit Management</h1>
-          <p className="mc-subtitle">View incoming platform deposits and confirmation status.</p>
+          <p className="mc-subtitle">Review pending deposits, confirm receiving accounts, and approve manual deposits.</p>
         </div>
         <div className="rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-extrabold text-emerald-600 ring-1 ring-emerald-100">
-          {deposits.length} deposits
+          {deposits.length} records
         </div>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {['All', 'Deposit', 'Withdrawal', 'Transfer', 'Mining Reward', 'Team Reward', 'Service Charge'].map((tab) => (
-          <button
-            key={tab}
-            className={`shrink-0 rounded-xl px-4 py-2 text-xs font-bold ${
-              tab === 'Deposit'
-                ? 'bg-cmblue-500 text-white shadow-[0_10px_24px_rgba(0,130,255,0.22)]'
-                : 'border border-sky-100 bg-white/80 text-slate-500 hover:bg-cmblue-50 hover:text-cmblue-700'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
       </div>
 
       <div className="mc-table-wrap">
@@ -65,32 +68,65 @@ export default function AdminDeposits() {
           <thead>
             <tr className="mc-table-head">
               <th className="mc-th">User</th>
+              <th className="mc-th">Account</th>
+              <th className="mc-th">Method</th>
               <th className="mc-th">Amount</th>
-              <th className="mc-th">Token</th>
-              <th className="mc-th">From</th>
+              <th className="mc-th">Reference</th>
               <th className="mc-th">Status</th>
-              <th className="mc-th">Date</th>
+              <th className="mc-th">Actions</th>
             </tr>
           </thead>
           <tbody>
             {deposits.map((deposit) => (
-              <tr key={deposit.id} className="mc-row">
+              <tr key={deposit.id} className="mc-row align-top">
                 <td className="mc-td">
-                  <p className="text-xs font-bold text-slate-950">{deposit.user?.username || 'Unknown'}</p>
-                  <p className="text-[10px] text-slate-500">{shortenAddress(deposit.user?.walletAddress || '', 6)}</p>
+                  <p className="text-xs font-bold text-slate-950">{deposit.User?.username || 'Unknown'}</p>
+                  <p className="text-[10px] text-slate-500">{shortenAddress(deposit.User?.walletAddress || '', 6)}</p>
                 </td>
+                <td className="mc-td">
+                  <p className="text-xs font-bold text-slate-950">{deposit.PaymentAccount?.name || 'Manual'}</p>
+                  <p className="text-[10px] text-slate-500">{deposit.PaymentAccount?.label || deposit.PaymentAccount?.accountNumber || deposit.PaymentAccount?.walletAddress || 'No account'}</p>
+                </td>
+                <td className="mc-td text-xs font-semibold text-slate-600">{deposit.method || deposit.PaymentAccount?.type || 'manual'}</td>
                 <td className="mc-td text-sm font-bold text-emerald-600">+${Number(deposit.amount).toFixed(2)}</td>
-                <td className="mc-td text-xs font-semibold">{deposit.token}</td>
-                <td className="mc-td text-[10px] text-slate-500">{shortenAddress(deposit.walletAddress, 8)}</td>
+                <td className="mc-td text-[10px] text-slate-500">
+                  <div className="max-w-[140px] break-all">{deposit.txHash || deposit.note || '—'}</div>
+                  {deposit.proofUrl && (
+                    <a href={deposit.proofUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-cmblue-600">
+                      <FaEye className="h-2.5 w-2.5" /> Proof
+                    </a>
+                  )}
+                </td>
                 <td className="mc-td">
                   <span className={`mc-status ${
-                    deposit.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' :
-                    deposit.status === 'failed' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
+                    deposit.status === 'approved' || deposit.status === 'completed' ? 'bg-emerald-50 text-emerald-600' :
+                    deposit.status === 'rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
                   }`}>
                     {deposit.status}
                   </span>
                 </td>
-                <td className="mc-td text-[10px] text-slate-500">{new Date(deposit.createdAt).toLocaleDateString()}</td>
+                <td className="mc-td">
+                  {deposit.status === 'pending' ? (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleAction(deposit.id, 'approved')}
+                        disabled={processingId === deposit.id}
+                        className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-60"
+                      >
+                        <FaCheck className="h-2.5 w-2.5" /> Approve
+                      </button>
+                      <button
+                        onClick={() => handleAction(deposit.id, 'rejected')}
+                        disabled={processingId === deposit.id}
+                        className="inline-flex items-center gap-1 rounded-xl bg-rose-500 px-2 py-1 text-[10px] font-bold text-white disabled:opacity-60"
+                      >
+                        <FaTimes className="h-2.5 w-2.5" /> Reject
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-500">Processed</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
