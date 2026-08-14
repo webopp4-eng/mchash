@@ -63,8 +63,12 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
         localStorage.setItem('cmhash_token', data.token);
       }
 
-      // Success - redirect to dashboard
-      router.push('/dashboard');
+      // Success - redirect based on role
+      if (data.user?.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError('An error occurred. Please try again.');
       console.error('Login error:', err);
