@@ -36,10 +36,21 @@ export default function WithdrawalsPage() {
       const user = getUser();
       if (!user) throw new Error('Please connect your wallet first');
 
+      const numAmount = Number(amount);
+      if (!numAmount || numAmount <= 0) {
+        throw new Error('Please enter a valid amount greater than 0');
+      }
+      if (numAmount > 1000000) {
+        throw new Error('Amount exceeds maximum limit of $1,000,000');
+      }
+      if (numAmount < 10) {
+        throw new Error('Minimum withdrawal amount is $10');
+      }
+
       const res = await apiFetch('/api/withdrawals', {
         method: 'POST',
         body: JSON.stringify({
-          amount: Number(amount),
+          amount: numAmount,
           currency: 'USDT',
           chain: user.chain,
         }),
