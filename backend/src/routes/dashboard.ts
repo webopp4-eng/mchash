@@ -227,7 +227,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
 
     const platformBalance = Number(user.platformBalance);
     const planPrice = Number(plan.price);
-    if (platformBalance < planPrice) {
+    if (planPrice > 0 && platformBalance < planPrice) {
       return res.status(400).json({ error: `Insufficient platform balance. You need ${planPrice.toFixed(2)} ${plan.currency}.` });
     }
 
@@ -235,10 +235,12 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
     const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
     const [updatedUser, purchase] = await prisma.$transaction(async (tx) => {
-      const updated = await tx.user.update({
-        where: { id: userId },
-        data: { platformBalance: { decrement: planPrice } },
-      });
+      const updated = planPrice > 0
+        ? await tx.user.update({
+            where: { id: userId },
+            data: { platformBalance: { decrement: planPrice } },
+          })
+        : user;
 
       const createdPurchase = await tx.miningPurchase.create({
         data: {
@@ -272,7 +274,7 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
           id: uuid(),
           userId,
           type: 'purchase',
-          amount: -planPrice,
+          amount: planPrice > 0 ? -planPrice : 0,
           currency: plan.currency,
           chain: chain || plan.chain,
           txHash: txHash || null,
@@ -357,10 +359,10 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'You already have an active mining package' });
     }
 
-    // Validate balance
+    // Validate balance only for paid plans
     const platformBalance = Number(user.platformBalance);
     const planPrice = Number(plan.price);
-    if (platformBalance < planPrice) {
+    if (planPrice > 0 && platformBalance < planPrice) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
@@ -368,10 +370,12 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
     const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
     const [updatedUser, purchase] = await prisma.$transaction(async (tx) => {
-      const updated = await tx.user.update({
-        where: { id: userId },
-        data: { platformBalance: { decrement: planPrice } },
-      });
+      const updated = planPrice > 0
+        ? await tx.user.update({
+            where: { id: userId },
+            data: { platformBalance: { decrement: planPrice } },
+          })
+        : user;
 
       const createdPurchase = await tx.hashRentingPurchase.create({
         data: {
@@ -405,7 +409,7 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
           id: uuid(),
           userId,
           type: 'hash_renting',
-          amount: -planPrice,
+          amount: planPrice > 0 ? -planPrice : 0,
           currency: plan.currency,
           chain: chain || user.chain,
           txHash: txHash || null,
