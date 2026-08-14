@@ -318,7 +318,6 @@ model User {
   emailVerifiedAt     DateTime?
   fullName            String?
   passwordHash        String?
-  avatar              String?               @default("avatar-1")
   AuditLog            AuditLog[]
   Deposit             Deposit[]
   HashRentingPurchase HashRentingPurchase[]

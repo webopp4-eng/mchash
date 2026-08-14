@@ -734,9 +734,6 @@ router.post('/email/register', async (req, res) => {
       referralCode = 'CMH' + crypto.randomBytes(4).toString('hex').toUpperCase();
     } while (await prisma.referral.findUnique({ where: { code: referralCode } }));
 
-    // Assign a random default avatar (1-5)
-    const avatarNumber = Math.floor(Math.random() * 5) + 1;
-
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -751,7 +748,6 @@ router.post('/email/register', async (req, res) => {
         status: 'active',
         role: 'user',
         platformBalance: 0,
-        avatar: `avatar-${avatarNumber}`,
         updatedAt: new Date(),
       },
     });
