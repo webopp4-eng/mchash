@@ -42,9 +42,26 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
   const [mobileWallets, setMobileWallets] = useState<any[]>([]);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Fetch connected wallets on mount
+  // Fetch connected wallets on mount (only if authenticated)
   useEffect(() => {
-    fetchWallets();
+    const checkAuthAndFetch = async () => {
+      try {
+        // First check if user is authenticated
+        const sessionRes = await fetch(`${API_URL}/api/auth/session-check`, {
+          credentials: 'include',
+        });
+        const sessionData = await sessionRes.json();
+        
+        // Only fetch wallets if user is authenticated
+        if (sessionData.authenticated) {
+          await fetchWallets();
+        }
+      } catch (err) {
+        console.error('Error checking auth or fetching wallets:', err);
+      }
+    };
+
+    checkAuthAndFetch();
     const platform = detectMobilePlatform();
     setIsMobile(platform.isMobile);
     setMobileWallets(getAvailableMobileWallets());
@@ -101,6 +118,17 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
     setConnecting(true);
     setError(null);
     try {
+      // Check if user is authenticated before connecting wallet
+      const sessionRes = await fetch(`${API_URL}/api/auth/session-check`, {
+        credentials: 'include',
+      });
+      const sessionData = await sessionRes.json();
+      if (!sessionData.authenticated) {
+        setError('Please log in first before adding additional wallets');
+        setConnecting(false);
+        return;
+      }
+
       // Connect to wallet provider
       let walletInfo: WalletInfo;
       if (chain === 'solana') {
