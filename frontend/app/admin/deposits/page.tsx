@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { FaArrowDown, FaCheck, FaTimes, FaEye } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
+import { toastEmitter } from '@/components/NotificationToast';
 
 export default function AdminDeposits() {
   const [deposits, setDeposits] = useState<any[]>([]);
@@ -28,14 +29,29 @@ export default function AdminDeposits() {
   const handleAction = async (depositId: string, status: 'approved' | 'rejected') => {
     setProcessingId(depositId);
     try {
+      const deposit = deposits.find(d => d.id === depositId);
       const res = await apiFetch(`/api/admin/deposits/${depositId}`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
+      
       if (res.success) {
+        const amount = deposit ? Number(deposit.amount).toFixed(2) : 'unknown';
+        const user = deposit?.User?.username || 'User';
+        
+        if (status === 'approved') {
+          toastEmitter.success('Deposit Approved', `$${amount} deposit from ${user} has been credited`);
+        } else {
+          toastEmitter.warning('Deposit Rejected', `$${amount} deposit from ${user} has been rejected`);
+        }
+        
         await loadDeposits();
+      } else {
+        throw new Error(res.error || 'Failed to update deposit');
       }
-    } catch (err) {
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to process deposit';
+      toastEmitter.error('Action Failed', errorMsg);
       console.error('Failed to update deposit:', err);
     } finally {
       setProcessingId(null);

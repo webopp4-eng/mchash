@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { FaSearch, FaUsers, FaWallet, FaBolt, FaCoins, FaPlus } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
+import { toastEmitter } from '@/components/NotificationToast';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
@@ -32,20 +33,32 @@ export default function AdminUsers() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      await apiFetch(`/api/admin/users/${id}/status`, {
+      const res = await apiFetch(`/api/admin/users/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
-      loadUsers();
-    } catch (err) {
+      
+      if (res.success) {
+        const user = users.find(u => u.id === id);
+        const statusLabel = status === 'active' ? 'Activated' : 'Suspended';
+        toastEmitter.success('Status Updated', `${user?.username || 'User'} has been ${statusLabel}`);
+        loadUsers();
+      } else {
+        throw new Error(res.error || 'Failed to update user status');
+      }
+    } catch (err: any) {
+      toastEmitter.error('Update Failed', err.message || 'Failed to update user status');
       console.error('Failed to update user:', err);
     }
   };
 
   const submitCredit = async () => {
     if (!creditUser) return;
-    if (!creditForm.amount || Number(creditForm.amount) <= 0) {
+    
+    const amount = Number(creditForm.amount);
+    if (!creditForm.amount || amount <= 0) {
       setCreditError('Enter a valid credit amount.');
+      toastEmitter.error('Invalid Amount', 'Please enter a valid credit amount');
       return;
     }
 
@@ -54,23 +67,34 @@ export default function AdminUsers() {
     setCreditMessage(null);
 
     try {
-      await apiFetch(`/api/admin/users/${creditUser.id}/credit`, {
+      const res = await apiFetch(`/api/admin/users/${creditUser.id}/credit`, {
         method: 'POST',
         body: JSON.stringify({
-          amount: Number(creditForm.amount),
+          amount,
           balanceType: creditForm.balanceType,
           reason: creditForm.reason || null,
         }),
       });
-      setCreditMessage(`Successfully credited ${creditUser.username || 'user'} with ${creditForm.amount} USDT.`);
-      setCreditForm({ amount: '', balanceType: 'platformBalance', reason: '' });
-      setTimeout(() => {
-        setCreditUser(null);
-        setCreditMessage(null);
-      }, 1500);
-      loadUsers();
+      
+      if (res.success) {
+        const typeLabel = creditForm.balanceType === 'platformBalance' ? 'Platform Balance' : 'Total Earned';
+        const message = `Successfully credited ${creditUser.username || 'user'} with $${amount.toFixed(2)} ${typeLabel}.`;
+        setCreditMessage(message);
+        toastEmitter.success('User Credited', `$${amount.toFixed(2)} added to ${creditUser.username || 'user'}`);
+        
+        setCreditForm({ amount: '', balanceType: 'platformBalance', reason: '' });
+        setTimeout(() => {
+          setCreditUser(null);
+          setCreditMessage(null);
+        }, 1500);
+        loadUsers();
+      } else {
+        throw new Error(res.error || 'Failed to credit user');
+      }
     } catch (error: any) {
-      setCreditError(error.message || 'Failed to credit user.');
+      const errorMsg = error.message || 'Failed to credit user.';
+      setCreditError(errorMsg);
+      toastEmitter.error('Credit Failed', errorMsg);
     } finally {
       setSubmittingCredit(false);
     }
