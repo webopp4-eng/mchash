@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { FaWallet, FaPlus, FaEdit, FaTrash, FaToggleOn, FaToggleOff, FaSyncAlt } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
+import { toastEmitter } from '@/components/NotificationToast';
 
 interface PaymentAccount {
   id: string;
@@ -131,6 +132,7 @@ export default function AdminTreasury() {
     const normalizedType = form.type === 'card' ? 'other' : form.type;
     if (!form.name || !form.accountNumber) {
       setError('Account name and account number are required.');
+      toastEmitter.error('Validation Error', 'Account name and account number are required');
       return;
     }
 
@@ -160,14 +162,23 @@ export default function AdminTreasury() {
         }),
       });
 
-      setSuccess(editing ? 'Account updated successfully!' : 'Account created successfully!');
+      const message = editing ? 'Account updated successfully!' : 'Account created successfully!';
+      setSuccess(message);
+      if (editing) {
+        toastEmitter.success('Account Updated', `${form.name} has been updated`);
+      } else {
+        toastEmitter.success('Account Created', `New payment account ${form.name} created`);
+      }
+      
       setShowForm(false);
       setEditing(null);
       resetForm();
       loadAccounts();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
-      setError(err.message || 'Failed to save account');
+      const errorMsg = err.message || 'Failed to save account';
+      setError(errorMsg);
+      toastEmitter.error('Save Failed', errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -175,12 +186,17 @@ export default function AdminTreasury() {
 
   const toggleAccount = async (id: string, active: boolean) => {
     try {
+      const account = accounts.find(a => a.id === id);
       await apiFetch(`/api/admin/payment-accounts/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ active: !active }),
       });
+      
+      const newStatus = !active ? 'Enabled' : 'Disabled';
+      toastEmitter.success('Status Changed', `${account?.name} has been ${newStatus}`);
       loadAccounts();
-    } catch (err) {
+    } catch (err: any) {
+      toastEmitter.error('Toggle Failed', err.message || 'Failed to toggle account');
       console.error('Failed to toggle account:', err);
     }
   };
@@ -188,11 +204,14 @@ export default function AdminTreasury() {
   const deleteAccount = async (id: string) => {
     if (!confirm('Delete this payment account?')) return;
     try {
+      const account = accounts.find(a => a.id === id);
       await apiFetch(`/api/admin/payment-accounts/${id}`, {
         method: 'DELETE',
       });
+      toastEmitter.success('Account Deleted', `${account?.name} has been deleted`);
       loadAccounts();
-    } catch (err) {
+    } catch (err: any) {
+      toastEmitter.error('Delete Failed', err.message || 'Failed to delete account');
       console.error('Failed to delete account:', err);
     }
   };

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaBolt, FaClock, FaWallet } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
+import { toastEmitter } from '@/components/NotificationToast';
 
 export default function AdminPlans() {
   const [plans, setPlans] = useState<any[]>([]);
@@ -38,22 +39,32 @@ export default function AdminPlans() {
 
   const handleSubmit = async () => {
     try {
+      // Validate required fields
+      if (!form.name?.trim() || !form.price || !form.hashRate || !form.dailyRate || !form.durationDays) {
+        toastEmitter.error('Validation Error', 'Please fill in all required fields');
+        return;
+      }
+
       if (editing) {
         await apiFetch(`/api/admin/plans/${editing.id}`, {
           method: 'PATCH',
           body: JSON.stringify(form),
         });
+        toastEmitter.success('Plan Updated', `Plan \"${form.name}\" has been updated successfully`);
       } else {
         await apiFetch('/api/admin/plans', {
           method: 'POST',
           body: JSON.stringify(form),
         });
+        toastEmitter.success('Plan Created', `New plan \"${form.name}\" has been created`);
       }
       setShowForm(false);
       setEditing(null);
       setForm({ name: '', description: '', price: '', hashRate: '', dailyRate: '', durationDays: '', bonusReward: '', referralBonus: '', chain: 'ethereum' });
       loadPlans();
-    } catch (err) {
+    } catch (err: any) {
+      const errorMsg = err.message || 'Failed to save plan';
+      toastEmitter.error('Save Failed', errorMsg);
       console.error('Failed to save plan:', err);
     }
   };
@@ -61,9 +72,12 @@ export default function AdminPlans() {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this plan?')) return;
     try {
+      const plan = plans.find(p => p.id === id);
       await apiFetch(`/api/admin/plans/${id}`, { method: 'DELETE' });
+      toastEmitter.success('Plan Deleted', `Plan \"${plan?.name}\" has been deleted`);
       loadPlans();
-    } catch (err) {
+    } catch (err: any) {
+      toastEmitter.error('Delete Failed', err.message || 'Failed to delete plan');
       console.error('Failed to delete plan:', err);
     }
   };
