@@ -6,6 +6,7 @@ import { FaArrowDown, FaArrowUp, FaBitcoin, FaCopy, FaEthereum, FaExchangeAlt, F
 import { SiTether } from 'react-icons/si';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
+import { toastEmitter } from './NotificationToast';
 
 const paymentMethods = [
   { value: 'bank', label: 'Bank Transfer' },
@@ -101,20 +102,48 @@ export default function WalletPage() {
 
   const submitDeposit = async () => {
     const walletAddress = data?.walletAddress || user?.walletAddress || '';
+    
+    // Comprehensive validation
     if (!walletAddress) {
       setDepositError('Connect your wallet to continue with a crypto deposit.');
+      toastEmitter.error('Wallet Not Connected', 'Please connect your wallet first');
       return;
     }
-    if (!depositForm.amount || Number(depositForm.amount) <= 0) {
-      setDepositError('Enter a valid deposit amount.');
+    
+    const amount = Number(depositForm.amount);
+    if (!depositForm.amount || amount <= 0) {
+      setDepositError('Enter a valid deposit amount greater than 0.');
+      toastEmitter.error('Invalid Amount', 'Please enter a valid deposit amount');
       return;
     }
+    
+    if (amount < 10) {
+      setDepositError('Minimum deposit amount is $10.');
+      toastEmitter.error('Amount Too Low', 'Minimum deposit is $10');
+      return;
+    }
+    
+    if (amount > 1000000) {
+      setDepositError('Maximum deposit amount is $1,000,000.');
+      toastEmitter.error('Amount Too High', 'Maximum deposit is $1,000,000');
+      return;
+    }
+    
     if (!selectedAccountId) {
       setDepositError('Select an active receiving account for this payment method.');
+      toastEmitter.error('No Account Selected', 'Please select a payment account');
       return;
     }
-    if (!depositForm.txHash && selectedMethod === 'crypto') {
-      setDepositError('Crypto deposits require a TXID / hash.');
+    
+    if (!depositForm.txHash || !depositForm.txHash.trim()) {
+      setDepositError('Transaction reference or TXID is required.');
+      toastEmitter.error('Missing Reference', 'Please provide a transaction reference');
+      return;
+    }
+    
+    if (selectedMethod === 'crypto' && (!depositForm.proofUrl || depositForm.proofUrl === '')) {
+      setDepositError('Crypto deposits require proof upload.');
+      toastEmitter.error('Missing Proof', 'Please upload payment proof');
       return;
     }
 
@@ -126,7 +155,7 @@ export default function WalletPage() {
       await apiFetch('/api/deposits', {
         method: 'POST',
         body: JSON.stringify({
-          amount: Number(depositForm.amount),
+          amount,
           currency: depositForm.currency,
           paymentAccountId: selectedAccountId,
           method: selectedMethod,
@@ -137,12 +166,19 @@ export default function WalletPage() {
         }),
       });
 
-      setDepositMessage('Deposit submitted and awaiting verification.');
+      const message = `Deposit of $${amount.toFixed(2)} submitted and awaiting verification.`;
+      setDepositMessage(message);
+      toastEmitter.success('Deposit Submitted', `Your $${amount.toFixed(2)} deposit is pending verification`);
+      
+      // Reset form
       setDepositForm({ amount: '', currency: 'USDT', txHash: '', note: '', proofUrl: '' });
       setSelectedMethod('bank');
-      setTimeout(() => setDepositOpen(false), 1200);
+      
+      setTimeout(() => setDepositOpen(false), 1500);
     } catch (error: any) {
-      setDepositError(error.message || 'Unable to submit deposit.');
+      const errorMsg = error.message || 'Unable to submit deposit.';
+      setDepositError(errorMsg);
+      toastEmitter.error('Deposit Failed', errorMsg);
     } finally {
       setSubmittingDeposit(false);
     }

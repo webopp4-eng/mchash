@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { FaArrowUp, FaWallet, FaCheckCircle, FaClock } from 'react-icons/fa';
 import { apiFetch, getUser } from '@/lib/auth';
+import { toastEmitter } from '@/components/NotificationToast';
 
 export default function WithdrawalsPage() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -34,7 +35,9 @@ export default function WithdrawalsPage() {
 
     try {
       const user = getUser();
-      if (!user) throw new Error('Please connect your wallet first');
+      if (!user) {
+        throw new Error('Please connect your wallet first');
+      }
 
       const numAmount = Number(amount);
       if (!numAmount || numAmount <= 0) {
@@ -56,12 +59,16 @@ export default function WithdrawalsPage() {
         }),
       });
 
-      setSuccess('Withdrawal request submitted successfully!');
+      const message = `Withdrawal of $${numAmount.toFixed(2)} requested successfully!`;
+      setSuccess(message);
+      toastEmitter.success('Withdrawal Requested', `$${numAmount.toFixed(2)} will be sent to your wallet`);
       setAmount('');
       loadWithdrawals();
       setTimeout(() => setSuccess(null), 5000);
     } catch (err: any) {
-      setError(err.message);
+      const errorMsg = err.message || 'Withdrawal failed. Please try again.';
+      setError(errorMsg);
+      toastEmitter.error('Withdrawal Failed', errorMsg);
     } finally {
       setSubmitting(false);
     }
