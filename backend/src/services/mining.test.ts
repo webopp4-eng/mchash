@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildMiningStats } from './mining';
+import { buildMiningStats, getMiningRewardCurrency, shouldRecordMiningReward } from './mining';
 
 const now = new Date();
 const purchase = {
@@ -25,4 +25,8 @@ const stats = buildMiningStats(purchase as any);
 assert.equal(stats.plan.name, 'Starter');
 assert.equal(stats.hashRate, 100);
 assert.equal(stats.dailyEarnings, 20);
+assert.equal(getMiningRewardCurrency('mc coin'), 'MC Coin');
+assert.equal(getMiningRewardCurrency('ETH'), 'ETH');
+assert.equal(shouldRecordMiningReward(0), false);
+assert.equal(shouldRecordMiningReward(0.00000002), true);
 console.log('mining stats test passed');

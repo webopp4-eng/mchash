@@ -354,14 +354,16 @@ router.get('/payment-accounts', async (_req, res) => {
 router.post('/payment-accounts', async (req, res) => {
   try {
     const { type, name, label, bankName, accountHolder, accountNumber, walletAddress, network, currency, isDefault, active, sortOrder } = req.body;
+    const validTypes = ['bank', 'crypto', 'momo', 'opay', 'other'];
+    const normalizedType = validTypes.includes(type) ? type : 'other';
 
-    if (!name) {
-      return res.status(400).json({ error: 'Name is required' });
+    if (!name || !accountNumber) {
+      return res.status(400).json({ error: 'Account name and account number are required.' });
     }
 
     const payload = {
       id: uuid(),
-      type: type || 'bank',
+      type: normalizedType,
       name,
       label: label || name,
       bankName: bankName || null,
@@ -407,9 +409,11 @@ router.patch('/payment-accounts/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { type, name, label, bankName, accountHolder, accountNumber, walletAddress, network, currency, isDefault, active, sortOrder } = req.body;
+    const validTypes = ['bank', 'crypto', 'momo', 'opay', 'other'];
+    const normalizedType = type && validTypes.includes(type) ? type : type === 'card' ? 'other' : undefined;
 
     const data: Record<string, unknown> = {
-      type: type || undefined,
+      type: normalizedType || undefined,
       name: name || undefined,
       label: label || undefined,
       bankName: bankName || undefined,

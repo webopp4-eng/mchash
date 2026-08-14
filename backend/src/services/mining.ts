@@ -12,6 +12,21 @@ function getPlanFromPurchase(purchase: any) {
   return purchase?.plan ?? purchase?.MiningPlan ?? purchase?.HashRentingPlan ?? null;
 }
 
+export function getMiningRewardCurrency(currency?: string | null): string {
+  const normalized = String(currency || '').trim();
+  if (!normalized) return 'USDT';
+  const lower = normalized.toLowerCase();
+  if (lower === 'mc coin' || lower === 'mccoin' || lower === 'mc') return 'MC Coin';
+  if (lower === 'eth' || lower === 'ethereum') return 'ETH';
+  if (lower === 'usdt' || lower === 'tether') return 'USDT';
+  if (lower === 'usdc') return 'USDC';
+  return normalized;
+}
+
+export function shouldRecordMiningReward(amount: number): boolean {
+  return Number.isFinite(amount) && amount > MIN_ACCRUAL;
+}
+
 export function calculateDailyEarnings(hashRate: number, dailyRate: number): number {
   return hashRate * dailyRate;
 }
@@ -75,6 +90,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
   const hashRate = Number(plan.hashRate ?? plan.hashPower ?? 0);
   const dailyRate = Number(plan.dailyRate ?? (Number(plan.expectedYield || 0) / 100 / Math.max(1, Number(plan.durationDays || 1))));
   const dailyEarnings = calculateDailyEarnings(hashRate, dailyRate);
+  const rewardCurrency = getMiningRewardCurrency(plan.currency || purchase.currency);
   const accrualEnd = new Date(Math.min(now.getTime(), purchase.endsAt.getTime()));
 
   let session = await prisma.miningSession.findFirst({
@@ -101,7 +117,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
   const earned = (dailyEarnings * elapsedMs) / DAY_MS;
   const shouldComplete = purchase.endsAt <= now;
 
-  if (earned > MIN_ACCRUAL) {
+  if (shouldRecordMiningReward(earned)) {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: purchase.userId },
@@ -124,7 +140,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
           userId: purchase.userId,
           type: 'mining',
           amount: earned,
-          currency: 'USDT',
+          currency: rewardCurrency,
           chain: purchase.chain || plan.chain,
           status: 'completed',
           metadata: {
@@ -133,6 +149,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
             packageType,
             accruedFrom: lastAccruedAt.toISOString(),
             accruedTo: accrualEnd.toISOString(),
+            rewardCurrency,
           },
         },
       }),
@@ -165,7 +182,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
 
     // Credit bonus reward if not yet credited
     const bonusReward = Number(plan.bonusReward || 0);
-    if (bonusReward > 0) {
+    if (shouldRecordMiningReward(bonusReward)) {
       const alreadyCredited = await prisma.transaction.findFirst({
         where: {
           userId: purchase.userId,
@@ -188,7 +205,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
               userId: purchase.userId,
               type: 'mining',
               amount: bonusReward,
-              currency: plan.currency || 'USDT',
+              currency: getMiningRewardCurrency(plan.currency || purchase.currency),
               chain: purchase.chain || plan.chain,
               status: 'completed',
               metadata: {
@@ -196,6 +213,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
                 planName: plan.name,
                 packageType,
                 bonusCredited: true,
+                rewardCurrency: getMiningRewardCurrency(plan.currency || purchase.currency),
               },
             },
           }),

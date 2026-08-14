@@ -395,6 +395,84 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
     });
   }
 
+  // Auto-start default mining for new users
+  try {
+    const defaultPlan = await prisma.miningPlan.findFirst({
+      where: { active: true },
+      orderBy: { price: 'asc' },
+    });
+
+    if (defaultPlan) {
+      const now = new Date();
+      const endsAt = new Date(now.getTime() + defaultPlan.durationDays * 24 * 60 * 60 * 1000);
+
+      // Create mining purchase
+      const purchase = await prisma.miningPurchase.create({
+        data: {
+          id: uuid(),
+          userId: user.id,
+          planId: defaultPlan.id,
+          amount: 0,
+          currency: defaultPlan.currency,
+          chain: chain,
+          status: 'active',
+          startedAt: now,
+          endsAt,
+        },
+      });
+
+      // Create mining session
+      await prisma.miningSession.create({
+        data: {
+          id: uuid(),
+          userId: user.id,
+          purchaseId: purchase.id,
+          hashRate: defaultPlan.hashRate,
+          status: 'active',
+          startedAt: now,
+          lastPayoutAt: now,
+        },
+      });
+
+      // Create transaction record
+      await prisma.transaction.create({
+        data: {
+          id: uuid(),
+          userId: user.id,
+          type: 'purchase',
+          amount: 0,
+          currency: defaultPlan.currency,
+          chain,
+          status: 'completed',
+          metadata: {
+            planId: defaultPlan.id,
+            planName: defaultPlan.name,
+            packageType: 'mining',
+            autoStarted: true,
+          },
+        },
+      });
+
+      // Create notification
+      await prisma.notification.create({
+        data: {
+          id: uuid(),
+          userId: user.id,
+          type: 'purchase',
+          title: 'Mining Activated',
+          message: `Default mining plan "${defaultPlan.name}" has been automatically activated. Start earning now!`,
+        },
+      });
+
+      if (process.env.ENABLE_DEBUG_LOGGING) {
+        console.log(`[AUTH-DEBUG:MINING] Auto-started mining for new user: ${user.id}, plan: ${defaultPlan.name}`);
+      }
+    }
+  } catch (miningError) {
+    console.error('[AUTH-DEBUG:MINING] Failed to auto-start mining:', miningError);
+    // Don't fail user creation if mining setup fails
+  }
+
   return { user, created: true };
 }
 

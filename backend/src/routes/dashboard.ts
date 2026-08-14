@@ -591,6 +591,12 @@ router.get('/wallet', async (req: AuthRequest, res) => {
       chain: user?.chain,
       walletType: user?.walletType,
       wallets: user?.Wallet,
+      balances: {
+        'MC Coin': Number(user?.platformBalance || 0),
+        USDT: Number(user?.platformBalance || 0),
+        ETH: 0,
+        BTC: 0,
+      },
       deposits,
       paymentAccounts,
     });

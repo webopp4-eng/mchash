@@ -9,7 +9,7 @@ import { shortenAddress } from '@/lib/wallet';
 
 const paymentMethods = [
   { value: 'bank', label: 'Bank Transfer' },
-  { value: 'crypto', label: 'Crypto Transfer' },
+  { value: 'crypto', label: 'Crypto Wallet' },
   { value: 'momo', label: 'Mobile Money' },
   { value: 'opay', label: 'OPay' },
   { value: 'other', label: 'Other' },
@@ -166,11 +166,16 @@ export default function WalletPage() {
   const ethPrice = Number(marketPrices?.ETH?.price || 0);
   const usdtPrice = Number(marketPrices?.USDT?.price || 1);
 
+  const mcCoinBalance = Number(data?.balances?.['MC Coin'] ?? data?.balances?.mcCoin ?? balance ?? 0);
+  const usdtBalance = Number(data?.balances?.USDT ?? data?.balances?.usdt ?? balance ?? 0);
+  const ethBalance = Number(data?.balances?.ETH ?? data?.balances?.eth ?? 0);
+  const btcBalance = Number(data?.balances?.BTC ?? data?.balances?.btc ?? 0);
+
   const assets = [
-    { symbol: 'MC Coin', value: balance, units: balance.toFixed(2), icon: FaWallet, color: 'bg-cmblue-50 text-cmblue-600' },
-    { symbol: 'USDT', value: balance * usdtPrice, units: (balance * usdtPrice).toFixed(2), icon: SiTether, color: 'bg-emerald-50 text-emerald-600' },
-    { symbol: 'BTC', value: btcPrice > 0 ? balance * 0.18 : 0, units: btcPrice > 0 ? (balance * 0.18 / btcPrice).toFixed(6) : '0.000000', icon: FaBitcoin, color: 'bg-amber-50 text-amber-600' },
-    { symbol: 'ETH', value: ethPrice > 0 ? balance * 0.24 : 0, units: ethPrice > 0 ? (balance * 0.24 / ethPrice).toFixed(6) : '0.000000', icon: FaEthereum, color: 'bg-sky-50 text-cmblue-700' },
+    { symbol: 'MC Coin', value: mcCoinBalance, units: mcCoinBalance.toFixed(2), icon: FaWallet, color: 'bg-cmblue-50 text-cmblue-600' },
+    { symbol: 'USDT', value: usdtBalance, units: usdtBalance.toFixed(2), icon: SiTether, color: 'bg-emerald-50 text-emerald-600' },
+    { symbol: 'BTC', value: btcBalance, units: btcBalance.toFixed(6), icon: FaBitcoin, color: 'bg-amber-50 text-amber-600' },
+    { symbol: 'ETH', value: ethBalance, units: ethBalance.toFixed(6), icon: FaEthereum, color: 'bg-sky-50 text-cmblue-700' },
   ];
 
   const recentTransactions = (recent.length > 0 ? recent : []).map((tx: any) => ({

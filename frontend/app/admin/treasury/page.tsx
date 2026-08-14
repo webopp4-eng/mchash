@@ -22,6 +22,14 @@ interface PaymentAccount {
   updatedAt: string;
 }
 
+const PAYMENT_METHOD_OPTIONS = [
+  { value: 'bank', label: 'Bank Transfer' },
+  { value: 'crypto', label: 'Crypto Wallet' },
+  { value: 'momo', label: 'Mobile Money' },
+  { value: 'opay', label: 'OPay' },
+  { value: 'other', label: 'Other' },
+];
+
 export default function AdminTreasury() {
   const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,8 +128,9 @@ export default function AdminTreasury() {
   };
 
   const handleSubmit = async () => {
-    if (!form.name) {
-      setError('Account name is required');
+    const normalizedType = form.type === 'card' ? 'other' : form.type;
+    if (!form.name || !form.accountNumber) {
+      setError('Account name and account number are required.');
       return;
     }
 
@@ -136,9 +145,9 @@ export default function AdminTreasury() {
       await apiFetch(endpoint, {
         method,
         body: JSON.stringify({
-          type: form.type,
+          type: normalizedType,
           name: form.name,
-          label: form.label,
+          label: form.label || form.name,
           bankName: form.bankName,
           accountHolder: form.accountHolder,
           accountNumber: form.accountNumber,
@@ -224,16 +233,16 @@ export default function AdminTreasury() {
           <h2 className="text-base font-bold text-slate-950">{editing ? 'Edit' : 'Add'} Payment Account</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="mc-input">
-              <option value="bank">Bank Transfer</option>
-              <option value="crypto">Crypto Wallet</option>
-              <option value="card">Card</option>
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
             <input type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Account Name" className="mc-input" />
+            <input type="text" value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} placeholder="Account Number / Wallet Address" className="mc-input" />
             <input type="text" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Display Label" className="mc-input sm:col-span-2" />
-            <input type="text" value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} placeholder="Bank Name (optional)" className="mc-input" />
-            <input type="text" value={form.accountHolder} onChange={(e) => setForm({ ...form, accountHolder: e.target.value })} placeholder="Account Holder" className="mc-input" />
-            <input type="text" value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })} placeholder="Account / Wallet Number" className="mc-input sm:col-span-2" />
-            <input type="text" value={form.walletAddress} onChange={(e) => setForm({ ...form, walletAddress: e.target.value })} placeholder="Wallet Address (for crypto)" className="mc-input sm:col-span-2" />
+            <input type="text" value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} placeholder="Bank Name / Provider (optional)" className="mc-input" />
+            <input type="text" value={form.accountHolder} onChange={(e) => setForm({ ...form, accountHolder: e.target.value })} placeholder="Account Holder (optional)" className="mc-input" />
+            <input type="text" value={form.walletAddress} onChange={(e) => setForm({ ...form, walletAddress: e.target.value })} placeholder="Wallet Address (optional)" className="mc-input sm:col-span-2" />
             <select value={form.network} onChange={(e) => setForm({ ...form, network: e.target.value })} className="mc-input">
               <option value="ethereum">Ethereum</option>
               <option value="bnb">BNB Smart Chain</option>
