@@ -30,18 +30,27 @@ model AuditLog {
 }
 
 model Deposit {
-  id            String    @id @db.Uuid
-  userId        String    @db.Uuid
-  walletAddress String
-  chain         String
-  amount        Decimal   @db.Decimal(18, 8)
-  token         String
-  txHash        String    @unique
-  status        String    @default("pending")
-  confirmedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  User          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               String         @id @db.Uuid
+  userId           String         @db.Uuid
+  paymentAccountId String?        @db.Uuid
+  walletAddress    String?
+  chain            String?
+  amount           Decimal        @db.Decimal(18, 8)
+  token            String         @default("USDT")
+  currency         String         @default("USDT")
+  txHash           String?        @unique
+  status           String         @default("pending")
+  method           String         @default("manual")
+  proofUrl         String?
+  note             String?
+  approvedAt       DateTime?
+  confirmedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  PaymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
+  User             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([paymentAccountId])
+  @@index([status])
   @@index([txHash])
   @@index([userId])
 }
@@ -162,6 +171,28 @@ model Notification {
 
   @@index([read])
   @@index([userId])
+}
+
+model PaymentAccount {
+  id             String   @id @db.Uuid
+  type           String   @default("bank")
+  name           String
+  label          String?
+  bankName       String?
+  accountHolder  String?
+  accountNumber  String?
+  walletAddress  String?
+  network        String?
+  currency       String   @default("USDT")
+  isDefault      Boolean  @default(false)
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+  Deposit        Deposit[]
+
+  @@index([active])
+  @@index([type])
 }
 
 model Referral {

@@ -166,6 +166,18 @@ router.delete('/plans/:id', async (req, res) => {
 });
 
 // ============ RECEIVING WALLET MANAGEMENT ============
+router.get('/treasury', async (_req, res) => {
+  try {
+    const wallets = await prisma.treasuryWallet.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ wallets });
+  } catch (error) {
+    console.error('Treasury wallets error:', error);
+    res.status(500).json({ error: 'Failed to load treasury wallets' });
+  }
+});
+
 router.get('/receiving-wallets', async (_req, res) => {
   try {
     const wallets = await prisma.treasuryWallet.findMany({
@@ -240,11 +252,118 @@ router.delete('/receiving-wallets/:id', async (req, res) => {
   }
 });
 
+// ============ PAYMENT ACCOUNT MANAGEMENT ============
+router.get('/payment-accounts', async (_req, res) => {
+  try {
+    const accounts = await prisma.paymentAccount.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
+    res.json({ paymentAccounts: accounts });
+  } catch (error) {
+    console.error('Payment accounts error:', error);
+    res.status(500).json({ error: 'Failed to load payment accounts' });
+  }
+});
+
+router.post('/payment-accounts', async (req, res) => {
+  try {
+    const { type, name, label, bankName, accountHolder, accountNumber, walletAddress, network, currency, isDefault, active, sortOrder } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Name is required' });
+    }
+
+    const payload = {
+      id: uuid(),
+      type: type || 'bank',
+      name,
+      label: label || name,
+      bankName: bankName || null,
+      accountHolder: accountHolder || null,
+      accountNumber: accountNumber || null,
+      walletAddress: walletAddress || null,
+      network: network || null,
+      currency: currency || 'USDT',
+      isDefault: Boolean(isDefault),
+      active: active !== undefined ? Boolean(active) : true,
+      sortOrder: Number(sortOrder || 0),
+      updatedAt: new Date(),
+    };
+
+    if (payload.isDefault) {
+      await prisma.paymentAccount.updateMany({
+        where: { isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+
+    const account = await prisma.paymentAccount.create({ data: payload });
+    res.status(201).json({ success: true, paymentAccount: account });
+  } catch (error) {
+    console.error('Create payment account error:', error);
+    res.status(500).json({ error: 'Failed to create payment account' });
+  }
+});
+
+router.patch('/payment-accounts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, name, label, bankName, accountHolder, accountNumber, walletAddress, network, currency, isDefault, active, sortOrder } = req.body;
+
+    const data: Record<string, unknown> = {
+      type: type || undefined,
+      name: name || undefined,
+      label: label || undefined,
+      bankName: bankName || undefined,
+      accountHolder: accountHolder || undefined,
+      accountNumber: accountNumber || undefined,
+      walletAddress: walletAddress || undefined,
+      network: network || undefined,
+      currency: currency || undefined,
+      isDefault: isDefault !== undefined ? Boolean(isDefault) : undefined,
+      active: active !== undefined ? Boolean(active) : undefined,
+      sortOrder: sortOrder !== undefined ? Number(sortOrder) : undefined,
+      updatedAt: new Date(),
+    };
+
+    if (data.isDefault === true) {
+      await prisma.paymentAccount.updateMany({
+        where: { isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+
+    const account = await prisma.paymentAccount.update({
+      where: { id },
+      data,
+    });
+
+    res.json({ success: true, paymentAccount: account });
+  } catch (error) {
+    console.error('Update payment account error:', error);
+    res.status(500).json({ error: 'Failed to update payment account' });
+  }
+});
+
+router.delete('/payment-accounts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.paymentAccount.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete payment account error:', error);
+    res.status(500).json({ error: 'Failed to delete payment account' });
+  }
+});
+
 // ============ FINANCIAL MANAGEMENT ============
 router.get('/deposits', async (_req, res) => {
   try {
     const deposits = await prisma.deposit.findMany({
-      include: { User: { select: { username: true, walletAddress: true } } },
+      include: {
+        User: { select: { username: true, walletAddress: true, email: true } },
+        PaymentAccount: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
@@ -252,6 +371,109 @@ router.get('/deposits', async (_req, res) => {
   } catch (error) {
     console.error('Admin deposits error:', error);
     res.status(500).json({ error: 'Failed to load deposits' });
+  }
+});
+
+router.patch('/deposits/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNote } = req.body;
+    const validStatuses = ['pending', 'approved', 'rejected', 'completed'];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid deposit status' });
+    }
+
+    const deposit = await prisma.deposit.findUnique({ where: { id } });
+    if (!deposit) {
+      return res.status(404).json({ error: 'Deposit not found' });
+    }
+
+    if (status === 'rejected') {
+      const updated = await prisma.deposit.update({
+        where: { id },
+        data: {
+          status: 'rejected',
+          note: adminNote || deposit.note,
+          approvedAt: null,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          id: uuid(),
+          userId: deposit.userId,
+          type: 'deposit',
+          title: 'Deposit Rejected',
+          message: `Your deposit request for ${Number(deposit.amount).toFixed(2)} ${deposit.currency} was rejected.${adminNote ? ` Reason: ${adminNote}` : ''}`,
+        },
+      });
+
+      return res.json({ success: true, deposit: updated });
+    }
+
+    if (status === 'approved' || status === 'completed') {
+      if (deposit.status === 'approved' || deposit.status === 'completed') {
+        return res.status(400).json({ error: 'Deposit has already been processed' });
+      }
+
+      const amount = Number(deposit.amount);
+      const processed = await prisma.$transaction([
+        prisma.user.update({
+          where: { id: deposit.userId },
+          data: {
+            platformBalance: { increment: amount },
+            totalDeposited: { increment: amount },
+          },
+        }),
+        prisma.deposit.update({
+          where: { id },
+          data: {
+            status: status === 'completed' ? 'completed' : 'approved',
+            approvedAt: new Date(),
+            confirmedAt: status === 'completed' ? new Date() : deposit.confirmedAt,
+            note: adminNote || deposit.note,
+          },
+        }),
+        prisma.transaction.create({
+          data: {
+            id: uuid(),
+            userId: deposit.userId,
+            type: 'deposit',
+            amount,
+            currency: deposit.currency,
+            chain: deposit.chain || 'ethereum',
+            txHash: deposit.txHash || null,
+            status: 'completed',
+            metadata: { depositId: deposit.id, source: deposit.method || 'manual', paymentAccountId: deposit.paymentAccountId },
+          },
+        }),
+        prisma.notification.create({
+          data: {
+            id: uuid(),
+            userId: deposit.userId,
+            type: 'deposit',
+            title: 'Deposit Approved',
+            message: `Your ${deposit.currency} deposit of ${amount.toFixed(2)} has been approved and credited to your balance.`,
+          },
+        }),
+      ]);
+
+      return res.json({ success: true, deposit: processed[1] });
+    }
+
+    const updated = await prisma.deposit.update({
+      where: { id },
+      data: {
+        status,
+        note: adminNote || deposit.note,
+      },
+    });
+
+    res.json({ success: true, deposit: updated });
+  } catch (error) {
+    console.error('Deposit update error:', error);
+    res.status(500).json({ error: 'Failed to update deposit' });
   }
 });
 

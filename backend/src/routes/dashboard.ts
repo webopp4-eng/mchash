@@ -439,6 +439,98 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
   }
 });
 
+// ============ PAYMENT ACCOUNTS / DEPOSITS ============
+router.get('/payment-accounts', async (req: AuthRequest, res) => {
+  try {
+    const paymentAccounts = await prisma.paymentAccount.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
+
+    res.json({ paymentAccounts });
+  } catch (error) {
+    console.error('Payment accounts error:', error);
+    res.status(500).json({ error: 'Failed to load payment accounts' });
+  }
+});
+
+router.get('/deposits', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const deposits = await prisma.deposit.findMany({
+      where: { userId },
+      include: { PaymentAccount: true },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    res.json({ deposits });
+  } catch (error) {
+    console.error('User deposits error:', error);
+    res.status(500).json({ error: 'Failed to load deposits' });
+  }
+});
+
+router.post('/deposits', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { amount, currency, chain, paymentAccountId, walletAddress, txHash, proofUrl, note, method } = req.body;
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Deposit amount is required' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const normalizedAmount = Number(amount);
+
+    let paymentAccount = null;
+    if (paymentAccountId) {
+      paymentAccount = await prisma.paymentAccount.findUnique({ where: { id: paymentAccountId } });
+      if (!paymentAccount || !paymentAccount.active) {
+        return res.status(404).json({ error: 'Selected payment account is unavailable' });
+      }
+    }
+
+    const deposit = await prisma.deposit.create({
+      data: {
+        id: uuid(),
+        userId,
+        paymentAccountId: paymentAccount?.id || null,
+        walletAddress: walletAddress || user.walletAddress || null,
+        chain: chain || user.chain || 'ethereum',
+        amount: normalizedAmount,
+        currency: currency || paymentAccount?.currency || 'USDT',
+        token: currency || paymentAccount?.currency || 'USDT',
+        txHash: txHash || null,
+        status: 'pending',
+        method: method || paymentAccount?.type || 'manual',
+        proofUrl: proofUrl || null,
+        note: note || null,
+      },
+      include: { PaymentAccount: true },
+    });
+
+    await prisma.notification.create({
+      data: {
+        id: uuid(),
+        userId,
+        type: 'deposit',
+        title: 'Deposit Submitted',
+        message: `Your ${currency || 'USDT'} deposit request for ${normalizedAmount.toFixed(2)} is pending admin review.`,
+      },
+    });
+
+    res.status(201).json({ success: true, deposit });
+  } catch (error) {
+    console.error('Create deposit error:', error);
+    res.status(500).json({ error: 'Failed to submit deposit' });
+  }
+});
+
 // ============ WALLET ============
 router.get('/wallet', async (req: AuthRequest, res) => {
   try {
@@ -452,6 +544,10 @@ router.get('/wallet', async (req: AuthRequest, res) => {
       orderBy: { createdAt: 'desc' },
       take: 20,
     });
+    const paymentAccounts = await prisma.paymentAccount.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+    });
 
     res.json({
       platformBalance: user?.platformBalance,
@@ -460,6 +556,7 @@ router.get('/wallet', async (req: AuthRequest, res) => {
       walletType: user?.walletType,
       wallets: user?.Wallet,
       deposits,
+      paymentAccounts,
     });
   } catch (error) {
     console.error('Wallet error:', error);
