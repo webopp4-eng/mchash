@@ -127,3 +127,185 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #7bb9ff;
 }
+
+/* MOBILE OPTIMIZATION - Compact container sizes */
+@media (max-width: 768px) {
+  .mc-page {
+    gap: 0.75rem !important;
+  }
+
+  .mc-page-header {
+    gap: 0.5rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .mc-title {
+    font-size: 1.125rem;
+  }
+
+  .mc-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .mc-card {
+    padding: 0.75rem !important;
+  }
+
+  .mc-glass-blue {
+    padding: 0.75rem !important;
+  }
+
+  /* Reduce grid gaps on mobile */
+  .grid {
+    gap: 0.5rem !important;
+  }
+
+  /* Reduce text sizes on mobile */
+  .text-4xl {
+    font-size: 1.875rem;
+  }
+
+  .text-5xl {
+    font-size: 1.875rem;
+  }
+
+  .text-3xl {
+    font-size: 1.5rem;
+  }
+
+  .text-2xl {
+    font-size: 1.25rem;
+  }
+
+  .text-xl {
+    font-size: 1.125rem;
+  }
+
+  /* Reduce padding on stat icons */
+  .mc-stat-icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  /* Reduce table sizes */
+  .mc-th,
+  .mc-td {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  /* Compact status badges */
+  .mc-status {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  /* Reduce conic gradient circle on mobile */
+  .rounded-full {
+    width: 6rem;
+    height: 6rem;
+  }
+
+  .rounded-full > div {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+
+  .rounded-full > div > div {
+    font-size: 1.5rem;
+  }
+
+  /* Compact form spacing */
+  .space-y-4 {
+    row-gap: 0.5rem !important;
+  }
+
+  .space-y-6 {
+    row-gap: 0.75rem !important;
+  }
+
+  /* Reduce overall page padding */
+  .mc-page {
+    padding: 0.75rem;
+  }
+
+  /* Compact header margins */
+  h1,
+  h2,
+  h3 {
+    margin: 0.25rem 0;
+  }
+
+  /* Balance section - full width on mobile */
+  .sm\:min-w-64 {
+    min-width: 100% !important;
+  }
+
+  /* Stack flex layouts on mobile */
+  .sm\:flex-row {
+    flex-direction: column;
+  }
+
+  /* Reduce header top bar padding */
+  .fixed.top-0 {
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Extra compact for very small phones */
+@media (max-width: 480px) {
+  .mc-page {
+    gap: 0.5rem !important;
+  }
+
+  .mc-page-header,
+  .mc-card,
+  .mc-glass-blue {
+    padding: 0.625rem !important;
+  }
+
+  .mc-title {
+    font-size: 1rem;
+  }
+
+  .grid {
+    gap: 0.5rem !important;
+  }
+
+  .text-4xl,
+  .text-5xl,
+  .text-3xl {
+    font-size: 1.25rem;
+  }
+
+  .text-2xl {
+    font-size: 1rem;
+  }
+
+  .rounded-full {
+    width: 5rem;
+    height: 5rem;
+  }
+
+  .rounded-full > div {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  .rounded-full > div > div {
+    font-size: 1.25rem;
+  }
+
+  /* Minimum padding */
+  .px-4,
+  .px-5 {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  .py-3,
+  .py-4 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+}
