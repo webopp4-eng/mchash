@@ -133,23 +133,24 @@ export default function AdminTreasury() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="mc-page">
+      <div className="mc-page-header">
         <div>
-          <h1 className="text-2xl font-bold">Receiving Wallets</h1>
-          <p className="mt-1 text-sm text-slate-400">Manage treasury receiving wallets per blockchain network</p>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Wallet</p>
+          <h1 className="mc-title">Receiving Wallets</h1>
+          <p className="mc-subtitle">Manage treasury receiving wallets per blockchain network.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={loadWallets}
-            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-300 transition hover:bg-white/10"
+            className="mc-button-secondary"
           >
             <FaSyncAlt className="h-3 w-3" />
             Refresh
           </button>
           <button
             onClick={openCreate}
-            className="flex items-center gap-2 rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-cmblue-500"
+            className="mc-button"
           >
             <FaPlus className="h-3.5 w-3.5" />
             Add Wallet
@@ -158,21 +159,42 @@ export default function AdminTreasury() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-400">{error}</div>
+        <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-600">{error}</div>
       )}
       {success && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-400">{success}</div>
+        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm font-semibold text-emerald-600">{success}</div>
       )}
 
+      <div className="mc-glass-blue">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase text-white/75">Wallet Total Balance</p>
+            <p className="mt-3 text-4xl font-extrabold">${wallets.reduce((sum, wallet) => sum + Number(wallet.balance || 0), 0).toFixed(2)}</p>
+            <p className="mt-2 text-sm text-white/80">{wallets.length} configured receiving wallets across supported chains.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {['Deposit', 'Withdraw', 'Transfer'].map((action) => (
+              <button
+                key={action}
+                onClick={action === 'Deposit' ? openCreate : undefined}
+                className="rounded-xl bg-white/18 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25"
+              >
+                {action}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {showForm && (
-        <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-          <h2 className="text-sm font-semibold text-cmblue-300">{editing ? 'Edit' : 'Add'} Receiving Wallet</h2>
+        <div className="mc-card">
+          <h2 className="text-base font-bold text-slate-950">{editing ? 'Edit' : 'Add'} Receiving Wallet</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <select
               value={form.network}
               onChange={(e) => setForm({ ...form, network: e.target.value })}
               disabled={!!editing}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cmblue-500/50 disabled:opacity-50"
+              className="mc-input disabled:opacity-50"
             >
               <option value="solana">Solana (SOL)</option>
               <option value="ethereum">Ethereum (ETH)</option>
@@ -181,7 +203,7 @@ export default function AdminTreasury() {
             <select
               value={form.supportedCurrency}
               onChange={(e) => setForm({ ...form, supportedCurrency: e.target.value })}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cmblue-500/50"
+              className="mc-input"
             >
               <option value="USDT">USDT</option>
               <option value="USDC">USDC</option>
@@ -191,27 +213,27 @@ export default function AdminTreasury() {
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
               placeholder="Wallet Address"
-              className="sm:col-span-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cmblue-500/50"
+              className="mc-input sm:col-span-2"
             />
             <input
               type="text"
               value={form.label}
               onChange={(e) => setForm({ ...form, label: e.target.value })}
               placeholder="Label (optional)"
-              className="sm:col-span-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white outline-none focus:border-cmblue-500/50"
+              className="mc-input sm:col-span-2"
             />
           </div>
           <div className="mt-4 flex gap-2">
             <button
               onClick={handleSubmit}
               disabled={submitting || !form.address || !form.network}
-              className="rounded-xl bg-cmblue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-cmblue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mc-button"
             >
               {submitting ? 'Saving...' : editing ? 'Update' : 'Create'} Wallet
             </button>
             <button
               onClick={() => { setShowForm(false); setEditing(null); resetForm(); setError(null); setSuccess(null); }}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-white/10"
+              className="mc-button-secondary"
             >
               Cancel
             </button>
@@ -222,40 +244,40 @@ export default function AdminTreasury() {
       {/* Treasury Wallets Grid */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {wallets.map((wallet) => (
-          <div key={wallet.id} className="rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+          <div key={wallet.id} className="mc-card">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
+                <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
                   <FaWallet className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-semibold capitalize">{wallet.network} Treasury</p>
+                  <p className="text-sm font-bold capitalize text-slate-950">{wallet.network} Treasury</p>
                   {wallet.label && <p className="text-[10px] text-slate-500">{wallet.label}</p>}
                 </div>
               </div>
               <div className="flex gap-1">
                 <button
                   onClick={() => openEdit(wallet)}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 transition hover:text-blue-400"
+                  className="mc-icon-button h-8 w-8"
                 >
                   <FaEdit className="h-3 w-3" />
                 </button>
                 <button
                   onClick={() => deleteWallet(wallet.id)}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 transition hover:text-rose-400"
+                  className="mc-icon-button h-8 w-8 hover:text-rose-600"
                 >
                   <FaTrash className="h-3 w-3" />
                 </button>
               </div>
             </div>
             <p className="mt-3 break-all text-[10px] text-slate-500">{wallet.address}</p>
-            <p className="mt-1 text-[10px] text-slate-500">Currency: {wallet.supportedCurrency}</p>
+            <p className="mt-1 text-[10px] font-semibold text-slate-500">Currency: {wallet.supportedCurrency}</p>
             <div className="mt-3 flex items-center justify-between">
-              <p className="text-sm font-semibold">${Number(wallet.balance || 0).toFixed(2)}</p>
+              <p className="text-lg font-extrabold text-slate-950">${Number(wallet.balance || 0).toFixed(2)}</p>
               <button
                 onClick={() => toggleWallet(wallet.id, wallet.active)}
                 className="flex items-center gap-1 text-[10px] font-medium ${
-                  wallet.active ? 'text-emerald-400' : 'text-slate-500'
+                  wallet.active ? 'text-emerald-600' : 'text-slate-500'
                 }"
               >
                 {wallet.active ? <FaToggleOn className="h-4 w-4" /> : <FaToggleOff className="h-4 w-4" />}
@@ -263,10 +285,10 @@ export default function AdminTreasury() {
               </button>
             </div>
             {wallet.transactions && wallet.transactions.length > 0 && (
-              <div className="mt-3 border-t border-white/10 pt-3">
+              <div className="mt-3 border-t border-sky-100 pt-3">
                 <p className="text-[10px] text-slate-500">Recent Activity</p>
                 {wallet.transactions.slice(0, 3).map((tx: any) => (
-                  <p key={tx.id} className="mt-1 text-[10px] text-slate-400">
+                  <p key={tx.id} className="mt-1 text-[10px] text-slate-500">
                     {tx.type} • {Number(tx.amount).toFixed(2)} {tx.currency}
                   </p>
                 ))}
@@ -277,9 +299,9 @@ export default function AdminTreasury() {
       </div>
 
       {wallets.length === 0 && !showForm && (
-        <div className="rounded-[24px] border border-dashed border-white/20 p-8 text-center">
+        <div className="mc-card border-dashed text-center">
           <FaWallet className="mx-auto mb-3 h-6 w-6 text-slate-500" />
-          <p className="text-sm text-slate-400">No receiving wallets configured</p>
+          <p className="text-sm text-slate-500">No receiving wallets configured</p>
           <p className="mt-1 text-xs text-slate-500">Add a receiving wallet to start accepting deposits on each chain.</p>
         </div>
       )}

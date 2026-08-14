@@ -50,10 +50,33 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">User Management</h1>
-        <p className="mt-1 text-sm text-slate-400">Manage platform users</p>
+    <div className="mc-page">
+      <div className="mc-page-header">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Bubble Team</p>
+          <h1 className="mc-title">User Management</h1>
+          <p className="mc-subtitle">Manage platform users, balances, and account status.</p>
+        </div>
+        <div className="rounded-2xl bg-cmblue-50 px-4 py-2 text-sm font-extrabold text-cmblue-700 ring-1 ring-cmblue-100">
+          {filtered.length} users
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ['Team Members', users.length, FaUsers, 'bg-cmblue-50 text-cmblue-600'],
+          ['Active Accounts', users.filter((u) => u.status === 'active').length, FaBolt, 'bg-emerald-50 text-emerald-600'],
+          ['Wallets Linked', users.filter((u) => u.walletAddress).length, FaWallet, 'bg-sky-50 text-cmblue-700'],
+          ['Team Balance', `$${users.reduce((sum, u) => sum + Number(u.platformBalance || 0), 0).toFixed(2)}`, FaWallet, 'bg-amber-50 text-amber-600'],
+        ].map(([label, value, Icon, color]: any) => (
+          <div key={label} className="mc-card">
+            <span className={`mc-stat-icon ${color}`}>
+              <Icon className="h-4 w-4" />
+            </span>
+            <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">{label}</p>
+            <p className="mt-1 text-xl font-extrabold text-slate-950">{value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Search */}
@@ -65,56 +88,56 @@ export default function AdminUsers() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by wallet or username..."
-            className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-10 pr-3 text-sm text-white outline-none transition focus:border-cmblue-500/50"
+            className="mc-input pl-10"
           />
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-white/5 backdrop-blur-xl">
-        <table className="w-full min-w-[800px] text-left">
+      <div className="mc-table-wrap">
+        <table className="mc-table">
           <thead>
-            <tr className="border-b border-white/10">
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">User</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Wallet</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Balance</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Status</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Actions</th>
+            <tr className="mc-table-head">
+              <th className="mc-th">User</th>
+              <th className="mc-th">Wallet</th>
+              <th className="mc-th">Balance</th>
+              <th className="mc-th">Status</th>
+              <th className="mc-th">Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((user) => (
-              <tr key={user.id} className="border-b border-white/5 last:border-0">
-                <td className="px-4 py-3">
+              <tr key={user.id} className="mc-row">
+                <td className="mc-td">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cmblue-500/20 text-cmblue-400">
+                    <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
                       <FaUsers className="h-3.5 w-3.5" />
                     </span>
                     <div>
-                      <p className="text-xs font-semibold">{user.username}</p>
+                      <p className="text-xs font-bold text-slate-950">{user.username}</p>
                       <p className="text-[10px] text-slate-500">{new Date(user.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="mc-td">
                   <p className="text-xs">{shortenAddress(user.walletAddress, 6)}</p>
                   <p className="text-[10px] capitalize text-slate-500">{user.chain}</p>
                 </td>
-                <td className="px-4 py-3 text-sm font-semibold">${Number(user.platformBalance || 0).toFixed(2)}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-[10px] font-medium ${
-                    user.status === 'active' ? 'text-emerald-400' :
-                    user.status === 'suspended' ? 'text-amber-400' : 'text-rose-400'
+                <td className="mc-td text-sm font-bold">${Number(user.platformBalance || 0).toFixed(2)}</td>
+                <td className="mc-td">
+                  <span className={`mc-status ${
+                    user.status === 'active' ? 'bg-emerald-50 text-emerald-600' :
+                    user.status === 'suspended' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
                   }`}>
                     {user.status}
                   </span>
                 </td>
-                <td className="px-4 py-3">
+                <td className="mc-td">
                   <div className="flex gap-1.5">
                     {user.status !== 'active' && (
                       <button
                         onClick={() => updateStatus(user.id, 'active')}
-                        className="rounded-lg bg-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-400 hover:bg-emerald-500/30"
+                        className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100"
                       >
                         Activate
                       </button>
@@ -122,7 +145,7 @@ export default function AdminUsers() {
                     {user.status !== 'suspended' && (
                       <button
                         onClick={() => updateStatus(user.id, 'suspended')}
-                        className="rounded-lg bg-amber-500/20 px-2 py-1 text-[10px] font-semibold text-amber-400 hover:bg-amber-500/30"
+                        className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-600 hover:bg-amber-100"
                       >
                         Suspend
                       </button>
@@ -130,7 +153,7 @@ export default function AdminUsers() {
                     {user.status !== 'banned' && (
                       <button
                         onClick={() => updateStatus(user.id, 'banned')}
-                        className="rounded-lg bg-rose-500/20 px-2 py-1 text-[10px] font-semibold text-rose-400 hover:bg-rose-500/30"
+                        className="rounded-lg bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-100"
                       >
                         Ban
                       </button>

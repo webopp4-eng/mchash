@@ -33,43 +33,64 @@ export default function AdminDeposits() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Deposit Management</h1>
-        <p className="mt-1 text-sm text-slate-400">View all platform deposits</p>
+    <div className="mc-page">
+      <div className="mc-page-header">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-cmblue-600">Transactions</p>
+          <h1 className="mc-title">Deposit Management</h1>
+          <p className="mc-subtitle">View incoming platform deposits and confirmation status.</p>
+        </div>
+        <div className="rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-extrabold text-emerald-600 ring-1 ring-emerald-100">
+          {deposits.length} deposits
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-[24px] border border-white/10 bg-white/5 backdrop-blur-xl">
-        <table className="w-full min-w-[800px] text-left">
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {['All', 'Deposit', 'Withdrawal', 'Transfer', 'Mining Reward', 'Team Reward', 'Service Charge'].map((tab) => (
+          <button
+            key={tab}
+            className={`shrink-0 rounded-xl px-4 py-2 text-xs font-bold ${
+              tab === 'Deposit'
+                ? 'bg-cmblue-500 text-white shadow-[0_10px_24px_rgba(0,130,255,0.22)]'
+                : 'border border-sky-100 bg-white/80 text-slate-500 hover:bg-cmblue-50 hover:text-cmblue-700'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      <div className="mc-table-wrap">
+        <table className="mc-table">
           <thead>
-            <tr className="border-b border-white/10">
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">User</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Amount</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Token</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">From</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Status</th>
-              <th className="px-4 py-3 text-[10px] uppercase tracking-[0.16em] text-slate-500">Date</th>
+            <tr className="mc-table-head">
+              <th className="mc-th">User</th>
+              <th className="mc-th">Amount</th>
+              <th className="mc-th">Token</th>
+              <th className="mc-th">From</th>
+              <th className="mc-th">Status</th>
+              <th className="mc-th">Date</th>
             </tr>
           </thead>
           <tbody>
             {deposits.map((deposit) => (
-              <tr key={deposit.id} className="border-b border-white/5 last:border-0">
-                <td className="px-4 py-3">
-                  <p className="text-xs font-semibold">{deposit.user?.username || 'Unknown'}</p>
+              <tr key={deposit.id} className="mc-row">
+                <td className="mc-td">
+                  <p className="text-xs font-bold text-slate-950">{deposit.user?.username || 'Unknown'}</p>
                   <p className="text-[10px] text-slate-500">{shortenAddress(deposit.user?.walletAddress || '', 6)}</p>
                 </td>
-                <td className="px-4 py-3 text-sm font-semibold text-emerald-400">+${Number(deposit.amount).toFixed(2)}</td>
-                <td className="px-4 py-3 text-xs">{deposit.token}</td>
-                <td className="px-4 py-3 text-[10px] text-slate-400">{shortenAddress(deposit.walletAddress, 8)}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-[10px] font-medium ${
-                    deposit.status === 'confirmed' ? 'text-emerald-400' :
-                    deposit.status === 'failed' ? 'text-rose-400' : 'text-amber-400'
+                <td className="mc-td text-sm font-bold text-emerald-600">+${Number(deposit.amount).toFixed(2)}</td>
+                <td className="mc-td text-xs font-semibold">{deposit.token}</td>
+                <td className="mc-td text-[10px] text-slate-500">{shortenAddress(deposit.walletAddress, 8)}</td>
+                <td className="mc-td">
+                  <span className={`mc-status ${
+                    deposit.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' :
+                    deposit.status === 'failed' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
                   }`}>
                     {deposit.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-[10px] text-slate-500">{new Date(deposit.createdAt).toLocaleDateString()}</td>
+                <td className="mc-td text-[10px] text-slate-500">{new Date(deposit.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
           </tbody>
