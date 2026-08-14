@@ -105,8 +105,8 @@ export default function MinePage() {
 
       <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="mc-card flex flex-col items-center justify-center text-center">
-          <div className="grid h-48 w-48 place-items-center rounded-full" style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
-            <div className="grid h-36 w-36 place-items-center rounded-full bg-white shadow-inner">
+          <div className={`grid h-48 w-48 place-items-center rounded-full transition-all ${activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''}`} style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
+            <div className={`grid h-36 w-36 place-items-center rounded-full bg-white shadow-inner ${activePlan && !activePlan.isExpired ? 'animate-mining-pulse' : ''}`}>
               <div>
                 <p className="text-4xl font-extrabold text-slate-950">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
                 <p className="text-[10px] font-bold uppercase text-slate-400">TH/s</p>
@@ -133,8 +133,12 @@ export default function MinePage() {
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {stats.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
-                <span className={`mc-stat-icon ${item.color}`}>
+              <div key={item.label} className={`rounded-2xl border border-sky-100 bg-sky-50/50 p-3 transition-all ${
+                item.label === 'Current Hashrate' && activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''
+              }`}>
+                <span className={`mc-stat-icon ${item.color} ${
+                  item.label === 'Current Hashrate' && activePlan && !activePlan.isExpired ? 'animate-pulse-glow' : ''
+                }`}>
                   <item.icon className="h-4 w-4" />
                 </span>
                 <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
@@ -142,10 +146,25 @@ export default function MinePage() {
               </div>
             ))}
           </div>
-          <div className="mt-5 h-36 rounded-2xl border border-sky-100 bg-white/80 p-4">
+          <div className={`mt-5 h-36 rounded-2xl border border-sky-100 bg-white/80 p-4 transition-all ${
+            activePlan && !activePlan.isExpired ? 'animate-progress-shimmer' : ''
+          }`} style={{
+            background: activePlan && !activePlan.isExpired 
+              ? 'linear-gradient(90deg, transparent, rgba(0, 130, 255, 0.1), transparent)'
+              : 'white'
+          }}>
             <div className="flex h-full items-end gap-2">
               {[36, 52, 44, 66, 58, 82, 74, 92, 76, 88].map((height, index) => (
-                <div key={index} className="flex-1 rounded-t-xl bg-gradient-to-t from-cmblue-500 to-sky-300" style={{ height: `${activePlan ? height : 12}%` }} />
+                <div 
+                  key={index} 
+                  className={`flex-1 rounded-t-xl bg-gradient-to-t from-cmblue-500 to-sky-300 transition-all ${
+                    activePlan && !activePlan.isExpired ? 'animate-pulse' : ''
+                  }`}
+                  style={{ 
+                    height: `${activePlan ? height : 12}%`,
+                    animationDelay: activePlan && !activePlan.isExpired ? `${index * 0.1}s` : '0s'
+                  }} 
+                />
               ))}
             </div>
           </div>

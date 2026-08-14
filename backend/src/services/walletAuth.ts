@@ -6,6 +6,12 @@ import nacl from 'tweetnacl';
 import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
 
+export type TokenPayload = {
+  userId: string;
+  iat?: number;
+  exp?: number;
+};
+
 type NonceRecord = {
   address: string;
   chain: string;
@@ -407,6 +413,19 @@ export function verifyJWT(token: string): string | null {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-me') as { sub: string };
     return decoded.sub;
   } catch {
+    return null;
+  }
+}
+
+// Verify token and return decoded payload
+export function verifyTokenPayload(token: string): { sub: string } | null {
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-me') as { sub: string };
+    return decoded;
+  } catch (error) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:TOKEN] Token verification failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
     return null;
   }
 }

@@ -126,9 +126,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main className="relative z-10 min-h-screen lg:pl-64">
-        <div className="mx-auto max-w-[1600px] px-4 pb-28 pt-24 sm:px-6 lg:px-8 lg:pb-10 lg:pt-6">
-          {children}
+      <main className="relative z-10 flex min-h-[100dvh] flex-col lg:pl-64">
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+            {children}
+          </div>
+          {/* Mobile bottom spacer for navbar */}
+          <div className="h-24 lg:h-0" />
         </div>
       </main>
 

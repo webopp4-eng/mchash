@@ -6,7 +6,7 @@ import { FaHome, FaWallet, FaBolt, FaUsers, FaUser } from 'react-icons/fa';
 
 const nav = [
   { href: '/dashboard', label: 'Home', icon: FaHome },
-  { href: '/dashboard/mining', label: 'Mining', icon: FaBolt },
+  { href: '/dashboard/mining', label: 'Mining', icon: FaBolt, featured: true },
   { href: '/dashboard/referrals', label: 'Team', icon: FaUsers },
   { href: '/dashboard/wallet', label: 'Wallet', icon: FaWallet },
   { href: '/dashboard/profile', label: 'Profile', icon: FaUser },
@@ -24,13 +24,15 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-[18px] text-[10px] font-bold transition-all ${
+              className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-[18px] text-[10px] font-bold transition-all duration-200 ${
                 isActive
-                  ? 'bg-cmblue-500 text-white shadow-[0_10px_24px_rgba(0,130,255,0.28)]'
-                  : 'text-slate-500 hover:bg-white hover:text-cmblue-700'
+                  ? item.featured
+                    ? 'scale-105 bg-gradient-to-br from-cmblue-500 to-cmblue-600 text-white shadow-[0_10px_24px_rgba(0,130,255,0.35)]'
+                    : 'bg-cmblue-500 text-white shadow-[0_10px_24px_rgba(0,130,255,0.28)]'
+                  : 'text-slate-500 hover:bg-white hover:text-cmblue-600'
               }`}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className={`h-4 w-4 ${isActive && item.featured ? 'animate-pulse-glow' : ''}`} />
               {item.label}
             </Link>
           );

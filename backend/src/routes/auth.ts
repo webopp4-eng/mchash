@@ -15,6 +15,7 @@ import {
   createAuthMessage,
   checkRateLimit,
   generateDeviceFingerprint,
+  verifyTokenPayload,
 } from '../services/walletAuth';
 import {
   hashPassword,
@@ -617,6 +618,104 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
   } catch (error) {
     console.error('[connectWallet] Error:', error);
     res.status(500).json({ error: 'Failed to connect wallet' });
+  }
+});
+
+// Check if session is valid (returns user data from httpOnly cookie)
+router.get('/session-check', async (req, res) => {
+  try {
+    // Get token from httpOnly cookie
+    const token = req.cookies?.cmhash_token;
+    if (!token) {
+      return res.json({ authenticated: false });
+    }
+
+    // Verify token is valid
+    const decoded = verifyTokenPayload(token);
+    if (!decoded) {
+      res.clearCookie('cmhash_token');
+      return res.json({ authenticated: false });
+    }
+
+    // Load user from database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+      include: { Wallet: true },
+    });
+
+    if (!user) {
+      res.clearCookie('cmhash_token');
+      return res.json({ authenticated: false });
+    }
+
+    res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        walletAddress: user.walletAddress,
+        chain: user.chain,
+        walletType: user.walletType,
+        username: user.username,
+        referralCode: user.referralCode,
+        platformBalance: user.platformBalance,
+        role: user.role,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.error('[AUTH-DEBUG:SESSION] session-check error:', error);
+    }
+    res.json({ authenticated: false });
+  }
+});
+
+// Check if session is valid (returns user data from httpOnly cookie, no auth middleware needed)
+router.get('/session-check', async (req, res) => {
+  try {
+    // Get token from httpOnly cookie
+    const token = req.cookies?.cmhash_token;
+    if (!token) {
+      return res.json({ authenticated: false });
+    }
+
+    // Verify token is valid
+    const decoded = verifyTokenPayload(token);
+    if (!decoded) {
+      res.clearCookie('cmhash_token');
+      return res.json({ authenticated: false });
+    }
+
+    // Load user from database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+      include: { Wallet: true },
+    });
+
+    if (!user) {
+      res.clearCookie('cmhash_token');
+      return res.json({ authenticated: false });
+    }
+
+    res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        walletAddress: user.walletAddress,
+        chain: user.chain,
+        walletType: user.walletType,
+        username: user.username,
+        referralCode: user.referralCode,
+        platformBalance: user.platformBalance,
+        role: user.role,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.error('[AUTH-DEBUG:SESSION] session-check error:', error);
+    }
+    res.json({ authenticated: false });
   }
 });
 

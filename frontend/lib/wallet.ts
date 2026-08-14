@@ -358,7 +358,12 @@ function isValidWalletRedirectRoute(pathname: string, basePath: string): boolean
 export function getSafeWalletRedirectUrl(routeOrUrl?: string): string {
   if (typeof window === 'undefined') return '/login';
   
-  const origin = window.location.origin;
+  // Get callback URL from environment or construct from window origin
+  const callbackBase = process.env.NEXT_PUBLIC_WALLET_CALLBACK_URL || 
+                       process.env.NEXT_PUBLIC_APP_URL ||
+                       window.location.origin;
+  
+  const origin = new URL(callbackBase).origin;
   const basePath = extractBasePath();
   const fallback = `${origin}${basePath}/login?autoconnect=1`;
 

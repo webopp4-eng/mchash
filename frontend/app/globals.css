@@ -15,11 +15,17 @@
     box-sizing: border-box;
   }
 
+  html, body {
+    height: 100%;
+    overflow-x: hidden;
+  }
+
   body {
-    @apply overflow-x-hidden text-slate-900 antialiased;
+    @apply text-slate-900 antialiased;
     background:
       linear-gradient(180deg, #f9fdff 0%, #eef8ff 46%, #ffffff 100%);
     color: var(--mc-text);
+    overflow-y: auto;
   }
 
   button,
@@ -126,4 +132,73 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: #7bb9ff;
+}
+
+/* Mining animations */
+@keyframes mining-pulse {
+  0%, 100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes mining-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 130, 255, 0.3), inset 0 0 8px rgba(0, 130, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 130, 255, 0.6), inset 0 0 12px rgba(0, 130, 255, 0.2);
+  }
+}
+
+@keyframes progress-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes circular-orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-mining-pulse {
+  animation: mining-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-mining-glow {
+  animation: mining-glow 2s ease-in-out infinite;
+}
+
+.animate-progress-shimmer {
+  background-size: 200% 100%;
+  animation: progress-shimmer 3s ease-in-out infinite;
+}
+
+.animate-circular-orbit {
+  animation: circular-orbit 3s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

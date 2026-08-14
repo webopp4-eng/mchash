@@ -86,7 +86,32 @@ export default function WalletSignIn() {
   useEffect(() => {
     setIsMounted(true);
     setPhantomAvailable(isPhantomProviderAvailable());
+    
+    // Check if session is already valid via httpOnly cookie
+    checkSessionValidity();
   }, []);
+
+  const checkSessionValidity = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/session-check`, {
+        credentials: 'include',
+      });
+      const data = await res.json();
+      
+      if (data.authenticated && data.user) {
+        // Session is valid, redirect to dashboard
+        setUser(data.user);
+        const redirectUrl = data.user.role === 'admin' ? '/admin' : '/dashboard';
+        setTimeout(() => {
+          router.push(redirectUrl);
+        }, 200);
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AUTH] Session check failed, user needs to login:', err);
+      }
+    }
+  };
 
   useEffect(() => {
     window.localStorage.setItem('cmhash_agreed', JSON.stringify(agreed));
