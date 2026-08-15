@@ -763,7 +763,7 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
         id: uuid(),
         userId,
         payoutMethodId,
-        amount,
+        amount: Number(amount),
         currency: currency || 'USDT',
         asset: asset || 'USDT',
         status: 'pending',
