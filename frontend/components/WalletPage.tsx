@@ -93,39 +93,40 @@ export default function WalletPage() {
   return (
     <div className="mc-page">
       <section className="mc-page-header">
-        <div>
+        <div className="flex-1 min-w-0">
           <p className="text-[10px] font-bold uppercase text-cmblue-600">Wallet</p>
-          <h1 className="mc-title">MC HASH Wallet</h1>
-          <p className="mc-subtitle">Balances, connected wallet, assets, and transaction activity.</p>
+          <h1 className="mc-title truncate">MC HASH Wallet</h1>
+          <p className="mc-subtitle truncate">Balances, connected wallet, assets, and transaction activity.</p>
         </div>
-        <div className="flex gap-2">
-          <button onClick={copyAddress} className="mc-button-secondary">
+        <div className="flex flex-col w-full sm:w-auto gap-2 sm:flex-row mt-3 sm:mt-0">
+          <button onClick={copyAddress} className="mc-button-secondary order-2 sm:order-1">
             <FaCopy className="h-3.5 w-3.5" />
-            {copied ? 'Copied' : 'Copy address'}
+            <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+            <span className="sm:hidden">{copied ? 'Copied' : 'Address'}</span>
           </button>
-          <Link href="/dashboard/deposits" className="mc-button">
+          <Link href="/dashboard/deposits" className="mc-button order-1 sm:order-2">
             <FaArrowDown className="h-3.5 w-3.5" />
             Deposit
           </Link>
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
         <section className="mc-glass-blue">
-          <div className="flex flex-col gap-8">
-            <div className="flex items-start justify-between">
-              <div>
+          <div className="flex flex-col gap-4 sm:gap-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold uppercase text-white/75">Total Balance</p>
-                <p className="mt-3 text-4xl font-extrabold sm:text-5xl">${balance.toFixed(2)}</p>
-                <p className="mt-2 text-sm text-white/80 capitalize">{walletType} on {chain}</p>
+                <p className="mt-2 text-2xl font-extrabold sm:mt-3 sm:text-3xl lg:text-4xl truncate">${balance.toFixed(2)}</p>
+                <p className="mt-1 text-xs sm:text-sm text-white/80 capitalize truncate">{walletType} on {chain}</p>
               </div>
-              <FaWallet className="h-10 w-10 text-white/70" />
+              <FaWallet className="h-8 w-8 sm:h-10 sm:w-10 text-white/70 shrink-0" />
             </div>
-            <div className="rounded-2xl bg-white/14 p-3 ring-1 ring-white/25">
-              <p className="text-[10px] font-bold uppercase text-white/65">Connected Wallet</p>
-              <p className="mt-1 truncate text-sm font-bold">{shortenAddress(walletAddress, 10) || 'No wallet connected'}</p>
+            <div className="rounded-xl sm:rounded-2xl bg-white/14 p-2.5 sm:p-3 ring-1 ring-white/25">
+              <p className="text-[9px] sm:text-[10px] font-bold uppercase text-white/65">Connected Wallet</p>
+              <p className="mt-1 truncate text-xs sm:text-sm font-bold break-all">{shortenAddress(walletAddress, 10) || 'No wallet connected'}</p>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid w-full grid-cols-3 gap-1.5 sm:gap-2">
               {[
                 { label: 'Deposit', href: '/dashboard/deposits', icon: FaArrowDown, className: 'bg-emerald-500 hover:bg-emerald-600' },
                 { label: 'Withdraw', href: '/dashboard/withdrawals', icon: FaArrowUp, className: 'bg-rose-500 hover:bg-rose-600' },
@@ -134,10 +135,10 @@ export default function WalletPage() {
                 <Link
                   key={item.label}
                   href={item.href}
-                  className={`flex flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-center text-xs font-bold text-white shadow-sm transition ${item.className}`}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-lg sm:rounded-xl px-2 sm:px-3 py-2 text-center text-[9px] sm:text-xs font-bold text-white shadow-sm transition-colors ${item.className}`}
                 >
-                  <item.icon className="h-3.5 w-3.5" />
-                  {item.label}
+                  <item.icon className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  <span className="line-clamp-1">{item.label}</span>
                 </Link>
               ))}
             </div>
@@ -145,23 +146,23 @@ export default function WalletPage() {
         </section>
 
         <section className="mc-card">
-          <div className="mb-4">
+          <div className="mb-3 sm:mb-4">
             <h2 className="text-base font-bold text-slate-950">Assets</h2>
-            <p className="text-xs text-slate-500">Asset balances and values</p>
+            <p className="text-[10px] sm:text-xs text-slate-500">Asset balances and values</p>
           </div>
           <div className="space-y-2">
             {assets.map((asset) => (
-              <div key={asset.symbol} className="flex items-center justify-between rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
-                <div className="flex items-center gap-3">
-                  <span className={`mc-stat-icon ${asset.color}`}>
-                    <asset.icon className="h-4 w-4" />
+              <div key={asset.symbol} className="flex items-center justify-between rounded-xl sm:rounded-2xl border border-sky-100 bg-sky-50/50 p-2.5 sm:p-3">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                  <span className={`mc-stat-icon shrink-0 ${asset.color}`}>
+                    <asset.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </span>
-                  <div>
-                    <p className="text-sm font-bold text-slate-950">{asset.symbol}</p>
-                    <p className="text-[10px] text-slate-500">{asset.units} units</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm font-bold text-slate-950">{asset.symbol}</p>
+                    <p className="text-[9px] sm:text-[10px] text-slate-500 truncate">{asset.units} units</p>
                   </div>
                 </div>
-                <p className="text-sm font-extrabold text-slate-950">${asset.value.toFixed(2)}</p>
+                <p className="text-xs sm:text-sm font-extrabold text-slate-950 shrink-0 ml-2">${asset.value.toFixed(2)}</p>
               </div>
             ))}
           </div>

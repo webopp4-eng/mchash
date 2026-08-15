@@ -43,23 +43,23 @@
 
 @layer components {
   .mc-page {
-    @apply space-y-5 text-slate-900;
+    @apply text-slate-900;
   }
 
   .mc-page-header {
-    @apply flex flex-col gap-3 rounded-[22px] border border-sky-100/80 bg-white/75 p-4 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:p-5;
+    @apply flex flex-col gap-3 rounded-[20px] sm:rounded-[22px] border border-sky-100/80 bg-white/75 p-3 sm:p-5 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between;
   }
 
   .mc-title {
-    @apply text-xl font-bold tracking-normal text-slate-950 sm:text-2xl;
+    @apply text-lg sm:text-xl font-bold tracking-normal text-slate-950 sm:text-2xl;
   }
 
   .mc-subtitle {
-    @apply mt-1 text-xs font-medium text-slate-500 sm:text-sm;
+    @apply mt-0.5 sm:mt-1 text-xs font-medium text-slate-500 sm:text-sm;
   }
 
   .mc-card {
-    @apply rounded-[22px] border border-sky-100/90 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl sm:p-5;
+    @apply rounded-[20px] sm:rounded-[22px] border border-sky-100/90 bg-white/80 p-3 sm:p-5 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl;
   }
 
   .mc-glass-blue {
@@ -67,19 +67,19 @@
   }
 
   .mc-button {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-cmblue-500 px-4 py-2 text-xs font-bold text-white shadow-[0_10px_24px_rgba(0,130,255,0.22)] hover:bg-cmblue-600 focus:outline-none focus:ring-2 focus:ring-cmblue-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg sm:rounded-xl bg-cmblue-500 px-3 sm:px-4 py-2 text-xs font-bold text-white shadow-[0_10px_24px_rgba(0,130,255,0.22)] hover:bg-cmblue-600 focus:outline-none focus:ring-2 focus:ring-cmblue-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors;
   }
 
   .mc-button-secondary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-sky-100 bg-white/80 px-4 py-2 text-xs font-bold text-slate-600 shadow-sm hover:border-cmblue-200 hover:bg-cmblue-50 hover:text-cmblue-700 focus:outline-none focus:ring-2 focus:ring-cmblue-200 focus:ring-offset-2;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-lg sm:rounded-xl border border-sky-100 bg-white/80 px-3 sm:px-4 py-2 text-xs font-bold text-slate-600 shadow-sm hover:border-cmblue-200 hover:bg-cmblue-50 hover:text-cmblue-700 focus:outline-none focus:ring-2 focus:ring-cmblue-200 focus:ring-offset-2 transition-colors;
   }
 
   .mc-icon-button {
-    @apply flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-white text-slate-500 shadow-sm hover:border-cmblue-200 hover:text-cmblue-600 focus:outline-none focus:ring-2 focus:ring-cmblue-200;
+    @apply flex h-9 w-9 items-center justify-center rounded-lg sm:rounded-xl border border-sky-100 bg-white text-slate-500 shadow-sm hover:border-cmblue-200 hover:text-cmblue-600 focus:outline-none focus:ring-2 focus:ring-cmblue-200 transition-colors;
   }
 
   .mc-input {
-    @apply w-full rounded-xl border border-sky-100 bg-white/85 px-3 py-2.5 text-sm text-slate-900 outline-none shadow-inner shadow-sky-50 placeholder:text-slate-400 focus:border-cmblue-300 focus:ring-4 focus:ring-cmblue-100;
+    @apply w-full rounded-lg sm:rounded-xl border border-sky-100 bg-white/85 px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-900 outline-none shadow-inner shadow-sky-50 placeholder:text-slate-400 focus:border-cmblue-300 focus:ring-4 focus:ring-cmblue-100 transition-colors;
   }
 
   .mc-table-wrap {
@@ -107,11 +107,11 @@
   }
 
   .mc-stat-icon {
-    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-xl;
+    @apply flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl;
   }
 
   .mc-status {
-    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold capitalize;
+    @apply inline-flex items-center rounded-full px-2 sm:px-2.5 py-1 text-[9px] sm:text-[10px] font-bold capitalize;
   }
 }
 

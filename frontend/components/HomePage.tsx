@@ -78,74 +78,74 @@ export default function HomePage() {
   });
 
   return (
-    <div className="mc-page">
+    <div className="mc-page space-y-3 sm:space-y-5">
       <section className="mc-page-header">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
           <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
             <FaUserCircle className="h-5 w-5" />
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase text-cmblue-600">Dashboard</p>
-            <h1 className="mc-title">Welcome back, {displayName}</h1>
-            <p className="mc-subtitle">{displayEmail}</p>
+            <h1 className="mc-title truncate">Welcome back, {displayName}</h1>
+            <p className="mc-subtitle truncate">{displayEmail}</p>
           </div>
         </div>
-        <Link href="/dashboard/settings" className="mc-button-secondary">
+        <Link href="/dashboard/settings" className="mc-button-secondary w-full sm:w-auto">
           Profile & settings
         </Link>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+      <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
         <section className="mc-glass-blue">
-          <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase text-white/75">Total Balance</p>
-              <p className="mt-3 text-4xl font-extrabold sm:text-5xl">${balance.toFixed(2)}</p>
-              <p className="mt-2 text-sm text-white/80">
+          <div className="flex flex-col gap-4 sm:gap-6 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex-1">
+              <p className="text-[10px] font-semibold uppercase text-white/75">Total Balance</p>
+              <p className="mt-2 text-3xl font-extrabold sm:mt-3 sm:text-4xl lg:text-5xl">${balance.toFixed(2)}</p>
+              <p className="mt-1 text-xs sm:mt-2 sm:text-sm text-white/80">
                 {activePlan ? `${progress}% active plan progress` : 'No active mining plan yet'}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:min-w-64">
-              <Link href="/dashboard/transactions" className="rounded-2xl bg-white/18 p-3 text-center text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25">
+            <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-56">
+              <Link href="/dashboard/transactions" className="rounded-xl sm:rounded-2xl bg-white/18 px-3 py-2.5 sm:p-3 text-center text-xs sm:text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25 transition-colors">
                 Deposit
               </Link>
-              <Link href="/dashboard/withdrawals" className="rounded-2xl bg-white/18 p-3 text-center text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25">
+              <Link href="/dashboard/withdrawals" className="rounded-xl sm:rounded-2xl bg-white/18 px-3 py-2.5 sm:p-3 text-center text-xs sm:text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25 transition-colors">
                 Withdraw
               </Link>
             </div>
           </div>
         </section>
 
-        <section className="mc-card flex items-center justify-between gap-4">
-          <div>
+        <section className="mc-card flex flex-col items-center justify-between gap-4 sm:flex-row">
+          <div className="w-full sm:flex-1">
             <p className="text-[10px] font-bold uppercase text-slate-400">Mining Progress</p>
-            <p className="mt-2 text-3xl font-extrabold text-slate-950">
+            <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-950">
               {activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}
             </p>
-            <p className="text-sm font-semibold text-cmblue-600">TH/s active hashrate</p>
-            <span className={`mt-3 mc-status ${activePlan ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+            <p className="text-xs sm:text-sm font-semibold text-cmblue-600">TH/s active hashrate</p>
+            <span className={`mt-2 mc-status ${activePlan ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
               {activePlan ? 'Status: Active' : 'Status: Idle'}
             </span>
           </div>
-          <div className="grid h-32 w-32 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
-            <div className="grid h-24 w-24 place-items-center rounded-full bg-white shadow-inner">
+          <div className="grid h-24 w-24 shrink-0 place-items-center rounded-full sm:h-32 sm:w-32" style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
+            <div className="grid h-16 w-16 place-items-center rounded-full bg-white shadow-inner sm:h-24 sm:w-24">
               <div className="text-center">
-                <p className="text-2xl font-extrabold text-slate-950">{progress}%</p>
-                <p className="text-[10px] font-bold text-slate-400">TVS</p>
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-950">{progress}%</p>
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-400">TVS</p>
               </div>
             </div>
           </div>
         </section>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {quickStats.map((item) => (
           <section key={item.label} className="mc-card">
             <span className={`mc-stat-icon ${item.color}`}>
               <item.icon className="h-4 w-4" />
             </span>
-            <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
-            <p className="mt-1 text-xl font-extrabold text-slate-950">{item.value}</p>
+            <p className="mt-2 text-[9px] sm:text-[10px] font-bold uppercase text-slate-500 line-clamp-2">{item.label}</p>
+            <p className="mt-1 text-lg sm:text-xl font-extrabold text-slate-950 line-clamp-2">{item.value}</p>
           </section>
         ))}
       </div>
