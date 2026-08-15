@@ -17,9 +17,14 @@
  * - refetch(): Manually refresh all data
  * - loading: Whether data is loading
  * - error: Error message if failed
+ * - totalEarned: Total accumulated earnings
+ * - referralEarnings: Referral commission earnings
+ * - activePlan: Currently active mining plan
+ * - availableBalance: Balance available for withdrawal
+ * - pendingBalance: Balance pending processing
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { apiFetch } from './auth';
 
 export interface FinancialData {
@@ -34,8 +39,11 @@ export interface FinancialData {
   miningEarnings: number;
   totalDeposits: number;
   totalWithdrawals: number;
+  totalEarned: number;
+  referralEarnings: number;
   availableBalance: number;
   pendingBalance: number;
+  activePlan: any | null;
   lastUpdated: number;
 }
 
@@ -58,34 +66,49 @@ const DEFAULT_DATA: FinancialData = {
   miningEarnings: 0,
   totalDeposits: 0,
   totalWithdrawals: 0,
+  totalEarned: 0,
+  referralEarnings: 0,
   availableBalance: 0,
   pendingBalance: 0,
+  activePlan: null,
   lastUpdated: 0,
 };
+
+// Global singleton for managing financial data updates across all components
+let globalFinancialData = { ...DEFAULT_DATA };
+const listeners = new Set<() => void>();
+
+export function subscribeToFinancialData(callback: () => void) {
+  listeners.add(callback);
+  return () => listeners.delete(callback);
+}
+
+function notifyListeners() {
+  listeners.forEach(listener => listener());
+}
 
 export function useFinancialData(): UseFinancialDataReturn {
   const [data, setData] = useState<FinancialData>(DEFAULT_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const refetchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refetch = async () => {
     try {
       setError(null);
       
-      // Fetch wallet data (includes balance and assets)
-      const walletRes = await apiFetch('/api/wallet');
-      
-      // Fetch admin/dashboard data (includes deposit/withdrawal stats)
-      let adminData: any = { totalDeposits: 0, totalWithdrawals: 0 };
-      try {
-        adminData = await apiFetch('/api/admin/dashboard');
-      } catch {
-        // Fallback if admin endpoint not available
-      }
+      // Fetch all financial data in parallel
+      const [dashboardRes, walletRes, earningsRes, depositsRes, withdrawalsRes] = await Promise.all([
+        apiFetch('/api/dashboard').catch(() => ({})),
+        apiFetch('/api/wallet').catch(() => ({})),
+        apiFetch('/api/earnings').catch(() => ({})),
+        apiFetch('/api/deposits').catch(() => ({})),
+        apiFetch('/api/withdrawals').catch(() => ({})),
+      ]);
 
-      // Parse wallet data
+      // Extract wallet data
       const walletBalance = Number(walletRes?.walletBalance || 0);
-      const platformBalance = Number(walletRes?.platformBalance || 0);
+      const platformBalance = Number(walletRes?.platformBalance || dashboardRes?.user?.platformBalance || 0);
       
       const assets = {
         USDT: Number(walletRes?.balances?.USDT ?? walletRes?.balances?.usdt ?? 0),
@@ -94,31 +117,47 @@ export function useFinancialData(): UseFinancialDataReturn {
         MCCoin: Number(walletRes?.balances?.['MC Coin'] ?? walletRes?.balances?.mcCoin ?? 0),
       };
 
-      // Calculate totals
-      const totalAssets = Object.values(assets).reduce((sum, val) => sum + val, 0);
+      // Extract mining and referral earnings
+      const miningEarnings = Number(earningsRes?.totalMiningEarnings || 0);
+      const referralEarnings = Number(earningsRes?.totalReferralEarnings || 0);
+      const totalEarned = Number(earningsRes?.totalEarned || dashboardRes?.user?.totalEarned || miningEarnings + referralEarnings);
 
-      // Parse mining earnings from wallet data
-      const miningEarnings = Number(walletRes?.miningEarnings || 0);
+      // Extract deposit/withdrawal data
+      const deposits = Array.isArray(depositsRes?.deposits) ? depositsRes.deposits : [];
+      const withdrawals = Array.isArray(withdrawalsRes?.withdrawals) ? withdrawalsRes.withdrawals : [];
+      
+      const totalDeposits = deposits.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+      const totalWithdrawals = withdrawals.reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
 
-      // Use admin dashboard data for deposits/withdrawals if available
-      const totalDeposits = Number(adminData?.totalDeposits || 0);
-      const totalWithdrawals = Number(adminData?.totalWithdrawals || 0);
+      // Extract active plan data
+      const activePlan = dashboardRes?.activePlan || null;
 
       // Calculate available vs pending
-      const availableBalance = Math.max(0, platformBalance - (Number(walletRes?.pendingAmount || 0)));
-      const pendingBalance = Number(walletRes?.pendingAmount || 0);
+      const pendingAmount = withdrawals
+        .filter((w: any) => w.status === 'pending')
+        .reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
+      
+      const availableBalance = Math.max(0, platformBalance - pendingAmount);
+      const pendingBalance = pendingAmount;
 
-      setData({
-        platformBalance: Math.max(platformBalance, totalAssets),
+      const newData = {
+        platformBalance: Math.max(platformBalance, Object.values(assets).reduce((a, b) => a + b, 0)),
         walletBalance,
         assets,
         miningEarnings,
-        totalDeposits,
+        totalDeposits: totalDeposits,
         totalWithdrawals,
+        totalEarned,
+        referralEarnings,
         availableBalance,
         pendingBalance,
+        activePlan,
         lastUpdated: Date.now(),
-      });
+      };
+
+      globalFinancialData = newData;
+      setData(newData);
+      notifyListeners();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch financial data';
       setError(errorMsg);
@@ -133,7 +172,17 @@ export function useFinancialData(): UseFinancialDataReturn {
 
     // Auto-refresh every 30 seconds
     const interval = setInterval(refetch, 30000);
-    return () => clearInterval(interval);
+    
+    // Subscribe to global updates
+    const unsubscribe = subscribeToFinancialData(() => {
+      setData(globalFinancialData);
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+      if (refetchTimeoutRef.current) clearTimeout(refetchTimeoutRef.current);
+    };
   }, []);
 
   const isStale = Date.now() - data.lastUpdated > 30000;
@@ -145,6 +194,66 @@ export function useFinancialData(): UseFinancialDataReturn {
     refetch,
     isStale,
   };
+}
+
+/**
+ * Trigger a refetch of financial data across all components
+ * Call this after mutations like deposits, withdrawals, plan purchases
+ */
+export async function refreshFinancialData() {
+  const [dashboardRes, walletRes, earningsRes, depositsRes, withdrawalsRes] = await Promise.all([
+    apiFetch('/api/dashboard').catch(() => ({})),
+    apiFetch('/api/wallet').catch(() => ({})),
+    apiFetch('/api/earnings').catch(() => ({})),
+    apiFetch('/api/deposits').catch(() => ({})),
+    apiFetch('/api/withdrawals').catch(() => ({})),
+  ]);
+
+  const walletBalance = Number(walletRes?.walletBalance || 0);
+  const platformBalance = Number(walletRes?.platformBalance || dashboardRes?.user?.platformBalance || 0);
+  
+  const assets = {
+    USDT: Number(walletRes?.balances?.USDT ?? walletRes?.balances?.usdt ?? 0),
+    ETH: Number(walletRes?.balances?.ETH ?? walletRes?.balances?.eth ?? 0),
+    BTC: Number(walletRes?.balances?.BTC ?? walletRes?.balances?.btc ?? 0),
+    MCCoin: Number(walletRes?.balances?.['MC Coin'] ?? walletRes?.balances?.mcCoin ?? 0),
+  };
+
+  const miningEarnings = Number(earningsRes?.totalMiningEarnings || 0);
+  const referralEarnings = Number(earningsRes?.totalReferralEarnings || 0);
+  const totalEarned = Number(earningsRes?.totalEarned || dashboardRes?.user?.totalEarned || miningEarnings + referralEarnings);
+
+  const deposits = Array.isArray(depositsRes?.deposits) ? depositsRes.deposits : [];
+  const withdrawals = Array.isArray(withdrawalsRes?.withdrawals) ? withdrawalsRes.withdrawals : [];
+  
+  const totalDeposits = deposits.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+  const totalWithdrawals = withdrawals.reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
+
+  const activePlan = dashboardRes?.activePlan || null;
+
+  const pendingAmount = withdrawals
+    .filter((w: any) => w.status === 'pending')
+    .reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
+  
+  const availableBalance = Math.max(0, platformBalance - pendingAmount);
+  const pendingBalance = pendingAmount;
+
+  globalFinancialData = {
+    platformBalance: Math.max(platformBalance, Object.values(assets).reduce((a, b) => a + b, 0)),
+    walletBalance,
+    assets,
+    miningEarnings,
+    totalDeposits: totalDeposits,
+    totalWithdrawals,
+    totalEarned,
+    referralEarnings,
+    availableBalance,
+    pendingBalance,
+    activePlan,
+    lastUpdated: Date.now(),
+  };
+
+  notifyListeners();
 }
 
 /**

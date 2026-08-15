@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FaArrowDown, FaArrowLeft, FaCheck, FaTimes, FaEye, FaUpload } from 'react-icons/fa';
 import { apiFetch, getUser, User } from '@/lib/auth';
+import { refreshFinancialData } from '@/lib/financialData';
 import { toastEmitter } from '@/components/NotificationToast';
 
 const PAYMENT_METHODS = [
@@ -159,6 +160,9 @@ export default function DepositsPage() {
         'Deposit Submitted',
         `Your $${Number(form.amount).toFixed(2)} deposit is pending verification`
       );
+
+      // Refresh financial data across the app
+      await refreshFinancialData();
 
       // Reset form
       setForm({

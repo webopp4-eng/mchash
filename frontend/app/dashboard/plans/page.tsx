@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { FaBolt, FaCheck, FaWallet, FaClock, FaGift, FaUsers, FaCube, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import { apiFetch } from '@/lib/auth';
-import { getUser } from '@/lib/auth';
+import { apiFetch, getUser } from '@/lib/auth';
+import { refreshFinancialData } from '@/lib/financialData';
 import { toastEmitter } from '@/components/NotificationToast';
 
 const getVisiblePlanCount = () => {
@@ -99,6 +99,9 @@ export default function PlansPage() {
       setSuccess(message);
       toastEmitter.success('Mining Started', `${plan.name} plan purchased for $${cost.toFixed(2)}`);
       
+      // Refresh financial data across the app
+      await refreshFinancialData();
+      
       setTimeout(() => router.push('/dashboard/mining'), 1000);
     } catch (err: any) {
       const errorMsg = err.message || 'Failed to purchase plan';
@@ -143,6 +146,10 @@ export default function PlansPage() {
       const message = `${plan.name} hash renting activated. Mining has started.`;
       setSuccess(message);
       toastEmitter.success('Hash Renting Started', `${plan.name} rented for $${cost.toFixed(2)}`);
+      
+      // Refresh financial data across the app
+      await refreshFinancialData();
+      
       
       setTimeout(() => router.push('/dashboard/mining'), 1000);
     } catch (err: any) {

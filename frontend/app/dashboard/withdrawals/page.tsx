@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FaArrowUp, FaWallet, FaCheckCircle, FaClock, FaExclamationTriangle } from 'react-icons/fa';
 import { apiFetch, getUser } from '@/lib/auth';
+import { refreshFinancialData } from '@/lib/financialData';
 import { toastEmitter } from '@/components/NotificationToast';
 
 interface PayoutMethod {
@@ -106,6 +107,10 @@ export default function WithdrawalsPage() {
       const message = `Withdrawal of $${numAmount.toFixed(2)} requested successfully!`;
       setSuccess(message);
       toastEmitter.success('Withdrawal Requested', `$${numAmount.toFixed(2)} will be sent to your payout method`);
+      
+      // Refresh financial data across the app
+      await refreshFinancialData();
+      
       setAmount('');
       loadData();
       setTimeout(() => setSuccess(null), 5000);
