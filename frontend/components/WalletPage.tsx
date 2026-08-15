@@ -7,6 +7,7 @@ import { SiTether } from 'react-icons/si';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { useFinancialData } from '@/lib/financialData';
 import { shortenAddress } from '@/lib/wallet';
+import { getBalanceFontSize } from '@/lib/typography';
 
 export default function WalletPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -117,7 +118,7 @@ export default function WalletPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold uppercase text-white/75">Total Balance</p>
-                <p className="mt-2 text-2xl font-extrabold sm:mt-3 sm:text-3xl lg:text-4xl truncate">${balance.toFixed(2)}</p>
+                <p className={`mt-2 font-extrabold sm:mt-3 truncate ${getBalanceFontSize(balance, 'text-2xl sm:text-3xl lg:text-4xl')}`}>${balance.toFixed(2)}</p>
                 <p className="mt-1 text-xs sm:text-sm text-white/80 capitalize truncate">{walletType} on {chain}</p>
               </div>
               <FaWallet className="h-8 w-8 sm:h-10 sm:w-10 text-white/70 shrink-0" />

@@ -6,6 +6,7 @@ import { FaArrowDown, FaArrowUp, FaBolt, FaCoins, FaGift, FaHistory, FaShieldAlt
 import WalletConnectionPanel from './WalletConnectionPanel';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { useFinancialData } from '@/lib/financialData';
+import { getBalanceFontSize } from '@/lib/typography';
 
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -100,7 +101,7 @@ export default function HomePage() {
           <div className="flex flex-col gap-4 sm:gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex-1">
               <p className="text-[10px] font-semibold uppercase text-white/75">Total Balance</p>
-              <p className="mt-2 text-3xl font-extrabold sm:mt-3 sm:text-4xl lg:text-5xl">${balance.toFixed(2)}</p>
+              <p className={`mt-2 font-extrabold sm:mt-3 ${getBalanceFontSize(balance, 'text-3xl sm:text-4xl lg:text-5xl')}`}>${balance.toFixed(2)}</p>
               <p className="mt-1 text-xs sm:mt-2 sm:text-sm text-white/80">
                 {activePlan ? `${progress}% active plan progress` : 'No active mining plan yet'}
               </p>

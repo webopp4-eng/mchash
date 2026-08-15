@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { FaCoins, FaChartLine, FaBolt, FaUsers, FaArrowUp } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
+import { getBalanceFontSize } from '@/lib/typography';
 
 export default function EarningsPage() {
   const [data, setData] = useState<any>(null);
@@ -51,14 +52,14 @@ export default function EarningsPage() {
             <FaCoins className="h-4 w-4" />
           </span>
           <p className="mt-3 text-[8px] sm:text-[10px] font-bold uppercase text-slate-500">Total Earned</p>
-          <p className="mt-1 text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-950">${Number(data?.totalEarned || 0).toFixed(2)}</p>
+          <p className={`mt-1 font-extrabold ${getBalanceFontSize(Number(data?.totalEarned || 0), 'text-lg sm:text-xl lg:text-2xl')}`}>${Number(data?.totalEarned || 0).toFixed(2)}</p>
         </section>
         <section className="mc-card">
           <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
             <FaChartLine className="h-4 w-4" />
           </span>
           <p className="mt-3 text-[8px] sm:text-[10px] font-bold uppercase text-slate-500">Platform Balance</p>
-          <p className="mt-1 text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-950">${Number(data?.platformBalance || 0).toFixed(2)}</p>
+          <p className={`mt-1 font-extrabold ${getBalanceFontSize(Number(data?.platformBalance || 0), 'text-lg sm:text-xl lg:text-2xl')}`}>${Number(data?.platformBalance || 0).toFixed(2)}</p>
         </section>
         <section className="mc-card">
           <span className="mc-stat-icon bg-purple-50 text-purple-600">

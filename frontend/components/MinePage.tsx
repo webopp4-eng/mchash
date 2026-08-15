@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FaBolt, FaClock, FaChartLine, FaCalendarAlt, FaCheckCircle, FaWallet } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
+import { getBalanceFontSize } from '@/lib/typography';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
