@@ -6,35 +6,17 @@ import { FaArrowDown, FaArrowUp, FaBitcoin, FaCopy, FaEthereum, FaExchangeAlt, F
 import { SiTether } from 'react-icons/si';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
-import { toastEmitter } from './NotificationToast';
-
-const paymentMethods = [
-  { value: 'bank', label: 'Bank Transfer' },
-  { value: 'crypto', label: 'Crypto Wallet' },
-  { value: 'momo', label: 'Mobile Money' },
-  { value: 'opay', label: 'OPay' },
-  { value: 'other', label: 'Other' },
-];
 
 export default function WalletPage() {
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [paymentAccounts, setPaymentAccounts] = useState<any[]>([]);
-  const [selectedMethod, setSelectedMethod] = useState('bank');
-  const [selectedAccountId, setSelectedAccountId] = useState('');
-  const [depositForm, setDepositForm] = useState({ amount: '', currency: 'USDT', txHash: '', note: '', proofUrl: '' });
-  const [depositMessage, setDepositMessage] = useState<string | null>(null);
-  const [depositError, setDepositError] = useState<string | null>(null);
-  const [submittingDeposit, setSubmittingDeposit] = useState(false);
   const [marketPrices, setMarketPrices] = useState<any>(null);
 
   useEffect(() => {
     setUser(getUser());
     loadWallet();
-    loadPaymentAccounts();
     loadMarketPrices();
   }, []);
 
@@ -59,15 +41,7 @@ export default function WalletPage() {
   };
 
   const loadPaymentAccounts = async () => {
-    try {
-      const res = await apiFetch('/api/payment-accounts');
-      const accounts = res.paymentAccounts || [];
-      setPaymentAccounts(accounts);
-      const defaultAccount = accounts.find((account: any) => account.active && account.isDefault && account.type === selectedMethod) || accounts.find((account: any) => account.active && account.type === selectedMethod);
-      if (defaultAccount) setSelectedAccountId(defaultAccount.id);
-    } catch (err) {
-      console.error('Failed to load payment accounts:', err);
-    }
+    // Removed - moved to dedicated deposits page
   };
 
   const copyAddress = () => {
@@ -76,112 +50,6 @@ export default function WalletPage() {
     navigator.clipboard.writeText(address);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const filteredAccounts = paymentAccounts.filter((account: any) => account.active && account.type === selectedMethod);
-
-  useEffect(() => {
-    if (!filteredAccounts.length) {
-      setSelectedAccountId('');
-      return;
-    }
-    const nextDefault = filteredAccounts.find((account: any) => account.isDefault) || filteredAccounts[0];
-    setSelectedAccountId((current) => current && filteredAccounts.some((account: any) => account.id === current) ? current : nextDefault.id);
-  }, [selectedMethod, paymentAccounts]);
-
-  const handleDepositFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const fileReader = new FileReader();
-    fileReader.onload = () => {
-      setDepositForm((current) => ({ ...current, proofUrl: String(fileReader.result || '') }));
-    };
-    fileReader.readAsDataURL(file);
-  };
-
-  const submitDeposit = async () => {
-    const walletAddress = data?.walletAddress || user?.walletAddress || '';
-    
-    // Comprehensive validation
-    if (!walletAddress) {
-      setDepositError('Connect your wallet to continue with a crypto deposit.');
-      toastEmitter.error('Wallet Not Connected', 'Please connect your wallet first');
-      return;
-    }
-    
-    const amount = Number(depositForm.amount);
-    if (!depositForm.amount || amount <= 0) {
-      setDepositError('Enter a valid deposit amount greater than 0.');
-      toastEmitter.error('Invalid Amount', 'Please enter a valid deposit amount');
-      return;
-    }
-    
-    if (amount < 10) {
-      setDepositError('Minimum deposit amount is $10.');
-      toastEmitter.error('Amount Too Low', 'Minimum deposit is $10');
-      return;
-    }
-    
-    if (amount > 1000000) {
-      setDepositError('Maximum deposit amount is $1,000,000.');
-      toastEmitter.error('Amount Too High', 'Maximum deposit is $1,000,000');
-      return;
-    }
-    
-    if (!selectedAccountId) {
-      setDepositError('Select an active receiving account for this payment method.');
-      toastEmitter.error('No Account Selected', 'Please select a payment account');
-      return;
-    }
-    
-    if (!depositForm.txHash || !depositForm.txHash.trim()) {
-      setDepositError('Transaction reference or TXID is required.');
-      toastEmitter.error('Missing Reference', 'Please provide a transaction reference');
-      return;
-    }
-    
-    if (selectedMethod === 'crypto' && (!depositForm.proofUrl || depositForm.proofUrl === '')) {
-      setDepositError('Crypto deposits require proof upload.');
-      toastEmitter.error('Missing Proof', 'Please upload payment proof');
-      return;
-    }
-
-    setSubmittingDeposit(true);
-    setDepositError(null);
-    setDepositMessage(null);
-
-    try {
-      await apiFetch('/api/deposits', {
-        method: 'POST',
-        body: JSON.stringify({
-          amount,
-          currency: depositForm.currency,
-          paymentAccountId: selectedAccountId,
-          method: selectedMethod,
-          walletAddress,
-          txHash: depositForm.txHash || null,
-          proofUrl: depositForm.proofUrl || null,
-          note: depositForm.note || null,
-        }),
-      });
-
-      const message = `Deposit of $${amount.toFixed(2)} submitted and awaiting verification.`;
-      setDepositMessage(message);
-      toastEmitter.success('Deposit Submitted', `Your $${amount.toFixed(2)} deposit is pending verification`);
-      
-      // Reset form
-      setDepositForm({ amount: '', currency: 'USDT', txHash: '', note: '', proofUrl: '' });
-      setSelectedMethod('bank');
-      
-      setTimeout(() => setDepositOpen(false), 1500);
-    } catch (error: any) {
-      const errorMsg = error.message || 'Unable to submit deposit.';
-      setDepositError(errorMsg);
-      toastEmitter.error('Deposit Failed', errorMsg);
-    } finally {
-      setSubmittingDeposit(false);
-    }
   };
 
   if (loading) {
@@ -233,110 +101,12 @@ export default function WalletPage() {
             <FaCopy className="h-3.5 w-3.5" />
             {copied ? 'Copied' : 'Copy address'}
           </button>
-          <button onClick={() => setDepositOpen(true)} className="mc-button">
+          <Link href="/dashboard/deposits" className="mc-button">
             <FaArrowDown className="h-3.5 w-3.5" />
             Deposit
-          </button>
+          </Link>
         </div>
       </section>
-
-      {depositOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase text-cmblue-600">Manual Deposit</p>
-                <h2 className="text-xl font-extrabold text-slate-950">Submit deposit</h2>
-              </div>
-              <button onClick={() => setDepositOpen(false)} className="rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">Close</button>
-            </div>
-
-            {!walletAddress && (
-              <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-700">
-                Connect your wallet to continue with a crypto deposit.
-              </div>
-            )}
-
-            {depositError && <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{depositError}</div>}
-            {depositMessage && <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700">{depositMessage}</div>}
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Payment method</label>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {paymentMethods.map((method) => (
-                    <button
-                      key={method.value}
-                      onClick={() => setSelectedMethod(method.value)}
-                      className={`rounded-xl border px-3 py-2 text-left text-sm font-semibold ${selectedMethod === method.value ? 'border-cmblue-500 bg-cmblue-50 text-cmblue-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                    >
-                      {method.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Receiving account</label>
-                <div className="space-y-2">
-                  {(filteredAccounts.length ? filteredAccounts : [{ id: 'none', name: 'No active accounts', label: 'Unavailable', accountNumber: '', walletAddress: '', isDefault: false, active: false }]).map((account: any) => (
-                    <button
-                      key={account.id}
-                      disabled={!account.active}
-                      onClick={() => setSelectedAccountId(account.id)}
-                      className={`flex w-full items-center justify-between rounded-2xl border p-3 text-left ${selectedAccountId === account.id ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-white'} ${!account.active ? 'opacity-50' : ''}`}
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-slate-950">{account.name || account.label || 'Account'}</p>
-                        <p className="text-[11px] text-slate-500">{account.accountNumber || account.walletAddress || account.bankName || 'No details available'}</p>
-                      </div>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${account.isDefault ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {account.isDefault ? 'Default' : account.active ? 'Active' : 'Disabled'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Amount</label>
-                <input value={depositForm.amount} onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })} type="number" min="1" step="0.01" placeholder="500.00" className="mc-input" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Currency</label>
-                <select value={depositForm.currency} onChange={(e) => setDepositForm({ ...depositForm, currency: e.target.value })} className="mc-input">
-                  <option value="USDT">USDT</option>
-                  <option value="USD">USD</option>
-                  <option value="NGN">NGN</option>
-                </select>
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">{selectedMethod === 'crypto' ? 'TXID / Hash' : 'Reference / Transaction ID'}</label>
-                <input value={depositForm.txHash} onChange={(e) => setDepositForm({ ...depositForm, txHash: e.target.value })} type="text" placeholder={selectedMethod === 'crypto' ? '0xabc...' : 'Transfer reference'} className="mc-input" />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Proof upload</label>
-                <input type="file" accept="image/png,image/jpeg,application/pdf" onChange={handleDepositFile} className="mc-input" />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">Note</label>
-                <textarea value={depositForm.note} onChange={(e) => setDepositForm({ ...depositForm, note: e.target.value })} rows={3} placeholder="Optional deposit note" className="mc-input resize-none" />
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setDepositOpen(false)} className="mc-button-secondary">Cancel</button>
-              <button onClick={submitDeposit} disabled={submittingDeposit} className="mc-button">
-                {submittingDeposit ? 'Submitting...' : 'Submit deposit'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <section className="mc-glass-blue">
@@ -354,11 +124,19 @@ export default function WalletPage() {
               <p className="mt-1 truncate text-sm font-bold">{shortenAddress(walletAddress, 10) || 'No wallet connected'}</p>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {[{ label: 'Deposit', href: '#', icon: FaArrowDown, className: 'bg-emerald-500 hover:bg-emerald-600' }, { label: 'Withdraw', href: '/dashboard/withdrawals', icon: FaArrowUp, className: 'bg-rose-500 hover:bg-rose-600' }, { label: 'Transfer', href: '/dashboard/transactions', icon: FaExchangeAlt, className: 'bg-cmblue-500 hover:bg-cmblue-600' }].map((item) => (
-                <button key={item.label} onClick={() => item.label === 'Deposit' ? setDepositOpen(true) : null} className={`rounded-xl px-3 py-2 text-center text-xs font-bold text-white shadow-sm ${item.className}`}>
-                  <item.icon className="mx-auto mb-1 h-3.5 w-3.5" />
+              {[
+                { label: 'Deposit', href: '/dashboard/deposits', icon: FaArrowDown, className: 'bg-emerald-500 hover:bg-emerald-600' },
+                { label: 'Withdraw', href: '/dashboard/withdrawals', icon: FaArrowUp, className: 'bg-rose-500 hover:bg-rose-600' },
+                { label: 'Transfer', href: '/dashboard/transactions', icon: FaExchangeAlt, className: 'bg-cmblue-500 hover:bg-cmblue-600' },
+              ].map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl px-3 py-2 text-center text-xs font-bold text-white shadow-sm transition ${item.className}`}
+                >
+                  <item.icon className="h-3.5 w-3.5" />
                   {item.label}
-                </button>
+                </Link>
               ))}
             </div>
           </div>
