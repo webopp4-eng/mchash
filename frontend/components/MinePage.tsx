@@ -103,37 +103,37 @@ export default function MinePage() {
         </span>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
+      <div className="grid gap-3 sm:gap-4 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="mc-card flex flex-col items-center justify-center text-center">
-          <div className={`grid h-48 w-48 place-items-center rounded-full transition-all ${activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''}`} style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
-            <div className={`grid h-36 w-36 place-items-center rounded-full bg-white shadow-inner ${activePlan && !activePlan.isExpired ? 'animate-mining-pulse' : ''}`}>
+          <div className={`grid h-32 w-32 sm:h-40 sm:w-40 lg:h-48 lg:w-48 place-items-center rounded-full transition-all ${activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''}`} style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
+            <div className={`grid h-24 w-24 sm:h-32 sm:w-32 lg:h-36 lg:w-36 place-items-center rounded-full bg-white shadow-inner ${activePlan && !activePlan.isExpired ? 'animate-mining-pulse' : ''}`}>
               <div>
-                <p className="text-4xl font-extrabold text-slate-950">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
-                <p className="text-[10px] font-bold uppercase text-slate-400">TH/s</p>
+                <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-950">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
+                <p className="text-[8px] sm:text-[10px] font-bold uppercase text-slate-400">TH/s</p>
               </div>
             </div>
           </div>
-          <p className="mt-4 text-sm font-bold text-cmblue-600">{progress}% mining progress</p>
+          <p className="mt-3 sm:mt-4 text-xs sm:text-sm font-bold text-cmblue-600">{progress}% mining progress</p>
           {!activePlan && (
-            <Link href="/dashboard/plans" className="mc-button mt-4 w-full max-w-xs">
+            <Link href="/dashboard/plans" className="mc-button mt-3 sm:mt-4 w-full max-w-xs">
               Upgrade Plan
             </Link>
           )}
         </section>
 
         <section className="mc-card">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <h2 className="text-base font-bold text-slate-950">Mining Performance</h2>
-              <p className="text-xs text-slate-500">Live contract and reward performance</p>
+              <h2 className="text-base sm:text-lg font-bold text-slate-950">Mining Performance</h2>
+              <p className="text-[10px] sm:text-xs text-slate-500">Live contract and reward performance</p>
             </div>
-            <Link href="/dashboard/plans" className="mc-button-secondary min-h-8 px-3 py-1">
+            <Link href="/dashboard/plans" className="mc-button-secondary min-h-8 px-2.5 sm:px-3 py-1 text-xs sm:text-sm">
               View plans
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
             {stats.map((item) => (
-              <div key={item.label} className={`rounded-2xl border border-sky-100 bg-sky-50/50 p-3 transition-all ${
+              <div key={item.label} className={`rounded-2xl border border-sky-100 bg-sky-50/50 p-2.5 sm:p-3 transition-all ${
                 item.label === 'Current Hashrate' && activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''
               }`}>
                 <span className={`mc-stat-icon ${item.color} ${
@@ -141,23 +141,23 @@ export default function MinePage() {
                 }`}>
                   <item.icon className="h-4 w-4" />
                 </span>
-                <p className="mt-3 text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
-                <p className="mt-1 text-sm font-extrabold text-slate-950">{item.value}</p>
+                <p className="mt-2 sm:mt-3 text-[8px] sm:text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
+                <p className="mt-1 text-xs sm:text-sm font-extrabold text-slate-950">{item.value}</p>
               </div>
             ))}
           </div>
-          <div className={`mt-5 h-36 rounded-2xl border border-sky-100 bg-white/80 p-4 transition-all ${
+          <div className={`mt-4 sm:mt-5 h-24 sm:h-32 lg:h-36 rounded-2xl border border-sky-100 bg-white/80 p-3 sm:p-4 transition-all ${
             activePlan && !activePlan.isExpired ? 'animate-progress-shimmer' : ''
           }`} style={{
             background: activePlan && !activePlan.isExpired 
               ? 'linear-gradient(90deg, transparent, rgba(0, 130, 255, 0.1), transparent)'
               : 'white'
           }}>
-            <div className="flex h-full items-end gap-2">
+            <div className="flex h-full items-end gap-1.5 sm:gap-2">
               {[36, 52, 44, 66, 58, 82, 74, 92, 76, 88].map((height, index) => (
                 <div 
                   key={index} 
-                  className={`flex-1 rounded-t-xl bg-gradient-to-t from-cmblue-500 to-sky-300 transition-all ${
+                  className={`flex-1 rounded-t-lg sm:rounded-t-xl bg-gradient-to-t from-cmblue-500 to-sky-300 transition-all ${
                     activePlan && !activePlan.isExpired ? 'animate-pulse' : ''
                   }`}
                   style={{ 
@@ -173,22 +173,22 @@ export default function MinePage() {
 
       <section className="mc-card">
         <div className="mb-4">
-          <h2 className="text-base font-bold text-slate-950">Mining Details</h2>
-          <p className="text-xs text-slate-500">Complete contract information</p>
+          <h2 className="text-base sm:text-lg font-bold text-slate-950">Mining Details</h2>
+          <p className="text-[10px] sm:text-xs text-slate-500">Complete contract information</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
           {miningDetails.map((item) => (
-            <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
-              <div className="flex items-center gap-3">
-                <span className="mc-stat-icon bg-white text-cmblue-600">
+            <div key={item.label} className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-1 rounded-2xl border border-sky-100 bg-sky-50/50 p-2.5 sm:p-3">
+              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                <span className="mc-stat-icon bg-white text-cmblue-600 shrink-0">
                   <item.icon className="h-4 w-4" />
                 </span>
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
-                  <p className="mt-1 text-xs font-bold text-slate-950">{item.value}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[8px] sm:text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
+                  <p className="mt-1 text-[10px] sm:text-xs font-bold text-slate-950 truncate">{item.value}</p>
                 </div>
               </div>
-              <span className={`mc-status ${item.badgeColor}`}>{item.badge}</span>
+              <span className={`mc-status text-[8px] sm:text-xs shrink-0 ${item.badgeColor}`}>{item.badge}</span>
             </div>
           ))}
         </div>
