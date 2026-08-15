@@ -609,7 +609,22 @@ router.patch('/deposits/:id', async (req, res) => {
 router.get('/withdrawals', async (_req, res) => {
   try {
     const withdrawals = await prisma.withdrawal.findMany({
-      include: { User: { select: { username: true, walletAddress: true } } },
+      include: { 
+        User: { select: { id: true, username: true, walletAddress: true, email: true } },
+        PayoutMethod: {
+          select: {
+            type: true,
+            name: true,
+            address: true,
+            solanaAddress: true,
+            momoNumber: true,
+            momoName: true,
+            bankName: true,
+            accountNumber: true,
+            accountHolder: true,
+          },
+        },
+      },
       orderBy: { requestedAt: 'desc' },
       take: 100,
     });

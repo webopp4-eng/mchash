@@ -195,6 +195,41 @@ model PaymentAccount {
   @@index([type])
 }
 
+model PayoutMethod {
+  id              String    @id @db.Uuid
+  userId          String    @db.Uuid
+  type            String    // 'crypto', 'solana', 'momo', 'bank'
+  name            String    // User-given name like "My Solana Wallet"
+  
+  // Crypto fields (Ethereum, BNB, etc.)
+  address         String?   
+  network         String?   // 'ethereum', 'bnb'
+  
+  // Solana fields
+  solanaAddress   String?
+  
+  // MoMo fields
+  momoNumber      String?
+  momoName        String?
+  
+  // Bank fields
+  bankName        String?
+  accountHolder   String?
+  accountNumber   String?
+  bankCode        String?
+  
+  isDefault       Boolean   @default(false)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime
+  
+  User            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Withdrawal      Withdrawal[]
+  
+  @@index([userId])
+  @@index([type])
+}
+
 model Referral {
   id              String            @id @db.Uuid
   userId          String            @unique @db.Uuid
@@ -331,6 +366,7 @@ model User {
   Transaction         Transaction[]
   Wallet              Wallet[]
   Withdrawal          Withdrawal[]
+  PayoutMethod        PayoutMethod[]
 
   @@index([authMethod])
   @@index([email])
@@ -357,19 +393,23 @@ model Wallet {
 }
 
 model Withdrawal {
-  id                 String    @id @db.Uuid
-  userId             String    @db.Uuid
-  amount             Decimal   @db.Decimal(18, 8)
-  currency           String
-  chain              String
-  destinationAddress String
-  status             String    @default("pending")
-  txHash             String?
-  adminNote          String?
-  requestedAt        DateTime  @default(now())
-  processedAt        DateTime?
-  createdAt          DateTime  @default(now())
-  User               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id              String    @id @db.Uuid
+  userId          String    @db.Uuid
+  payoutMethodId  String    @db.Uuid
+  amount          Decimal   @db.Decimal(18, 8)
+  currency        String
+  asset           String    // 'ETH', 'USDT', 'MCCoin', 'SOL', etc.
+  status          String    @default("pending")
+  txHash          String?
+  adminNote       String?
+  requestedAt     DateTime  @default(now())
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  
+  User            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  PayoutMethod    PayoutMethod @relation(fields: [payoutMethodId], references: [id], onDelete: Cascade)
+  
   @@index([userId])
+  @@index([payoutMethodId])
+  @@index([status])
 }

@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import dashboardRoutes from './routes/dashboard';
 import adminRoutes from './routes/admin';
+import payoutMethodsRoutes from './routes/payoutMethods';
 
 dotenv.config();
 
@@ -72,6 +73,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/payout-methods', payoutMethodsRoutes);
 
 // Health check
 app.get('/api/health', (_, res) => {

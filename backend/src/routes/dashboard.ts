@@ -697,6 +697,19 @@ router.get('/withdrawals', async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const withdrawals = await prisma.withdrawal.findMany({
       where: { userId },
+      include: {
+        PayoutMethod: {
+          select: {
+            id: true,
+            type: true,
+            name: true,
+            address: true,
+            solanaAddress: true,
+            momoNumber: true,
+            bankName: true,
+          },
+        },
+      },
       orderBy: { requestedAt: 'desc' },
     });
     res.json({ withdrawals });
@@ -710,10 +723,31 @@ router.get('/withdrawals', async (req: AuthRequest, res) => {
 router.post('/withdrawals', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
-    const { amount, currency, chain } = req.body;
+    const { amount, currency, asset, payoutMethodId } = req.body;
 
     if (!amount || amount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    if (!payoutMethodId) {
+      return res.status(400).json({ error: 'Payout method is required' });
+    }
+
+    // Verify payout method exists and belongs to user
+    const payoutMethod = await prisma.payoutMethod.findUnique({
+      where: { id: payoutMethodId },
+    });
+
+    if (!payoutMethod) {
+      return res.status(404).json({ error: 'Payout method not found' });
+    }
+
+    if (payoutMethod.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied to this payout method' });
+    }
+
+    if (!payoutMethod.active) {
+      return res.status(400).json({ error: 'This payout method is not active' });
     }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -723,7 +757,20 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
 
-    // Deduct balance
+    // Create withdrawal record with payout method reference
+    const withdrawal = await prisma.withdrawal.create({
+      data: {
+        id: uuid(),
+        userId,
+        payoutMethodId,
+        amount,
+        currency: currency || 'USDT',
+        asset: asset || 'USDT',
+        status: 'pending',
+      },
+    });
+
+    // Deduct balance after withdrawal is created
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -732,22 +779,7 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
       },
     });
 
-    if (!user.walletAddress) {
-      return res.status(400).json({ error: 'No wallet connected for withdrawal' });
-    }
-
-    const withdrawal = await prisma.withdrawal.create({
-      data: {
-        id: uuid(),
-        userId,
-        amount,
-        currency: currency || 'USDT',
-        chain: chain || user.chain,
-        destinationAddress: user.walletAddress,
-        status: 'pending',
-      },
-    });
-
+    // Record transaction
     await prisma.transaction.create({
       data: {
         id: uuid(),
@@ -755,23 +787,36 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
         type: 'withdrawal',
         amount: -amount,
         currency: currency || 'USDT',
-        chain: chain || user.chain,
+        chain: 'platform',
         status: 'pending',
-        metadata: { withdrawalId: withdrawal.id },
+        metadata: { 
+          withdrawalId: withdrawal.id,
+          payoutMethodType: payoutMethod.type,
+        },
       },
     });
 
+    // Notify user
     await prisma.notification.create({
       data: {
         id: uuid(),
         userId,
         type: 'withdrawal',
         title: 'Withdrawal Requested',
-        message: `Withdrawal of ${amount} ${currency || 'USDT'} is pending approval.`,
+        message: `Withdrawal of ${amount} ${asset || 'USDT'} is pending approval.`,
       },
     });
 
-    res.json({ success: true, withdrawal });
+    res.json({ 
+      success: true, 
+      withdrawal: {
+        ...withdrawal,
+        payoutMethod: {
+          type: payoutMethod.type,
+          name: payoutMethod.name,
+        },
+      },
+    });
   } catch (error) {
     console.error('Withdrawal error:', error);
     res.status(500).json({ error: 'Failed to process withdrawal' });
