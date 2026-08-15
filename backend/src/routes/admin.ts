@@ -841,37 +841,40 @@ router.get('/support/tickets', async (_req, res) => {
         User: {
           select: { id: true, username: true, walletAddress: true, email: true },
         },
-        SupportMessage: {
-          include: {
-            User: { select: { username: true } },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
 
-    const formattedTickets = tickets.map((ticket) => ({
-      id: ticket.id,
-      userId: ticket.userId,
-      user: ticket.User,
-      subject: ticket.subject,
-      category: ticket.category,
-      priority: ticket.priority,
-      message: ticket.message,
-      status: ticket.status,
-      createdAt: ticket.createdAt,
-      updatedAt: ticket.updatedAt,
-      responses: ticket.SupportMessage.map((msg: any) => ({
-        id: msg.id,
-        message: msg.message,
-        createdAt: msg.createdAt,
-        isAdmin: msg.isAdmin,
-      })),
-    }));
+    // Fetch messages separately for each ticket
+    const ticketsWithMessages = await Promise.all(
+      tickets.map(async (ticket) => {
+        const messages = await prisma.supportMessage.findMany({
+          where: { ticketId: ticket.id },
+          orderBy: { createdAt: 'asc' },
+        });
 
-    res.json({ tickets: formattedTickets });
+        return {
+          id: ticket.id,
+          userId: ticket.userId,
+          user: ticket.User,
+          subject: ticket.subject,
+          category: ticket.category,
+          priority: ticket.priority,
+          status: ticket.status,
+          createdAt: ticket.createdAt,
+          updatedAt: ticket.updatedAt,
+          responses: messages.map((msg) => ({
+            id: msg.id,
+            message: msg.message,
+            createdAt: msg.createdAt,
+            isAdmin: msg.senderRole === 'admin',
+          })),
+        };
+      })
+    );
+
+    res.json({ tickets: ticketsWithMessages });
   } catch (error) {
     console.error('Admin support tickets error:', error);
     res.status(500).json({ error: 'Failed to load support tickets' });
@@ -891,9 +894,6 @@ router.patch('/support/tickets/:ticketId', async (req, res) => {
     const ticket = await prisma.supportTicket.update({
       where: { id: ticketId },
       data: { status, updatedAt: new Date() },
-      include: {
-        User: { select: { username: true } },
-      },
     });
 
     // Audit log
@@ -937,9 +937,9 @@ router.post('/support/tickets/:ticketId/respond', async (req, res) => {
       data: {
         id: uuid(),
         ticketId,
-        userId: (req as AuthRequest).user?.id || '',
+        senderId: (req as AuthRequest).user?.id || '',
+        senderRole: 'admin',
         message: message.trim(),
-        isAdmin: true,
       },
     });
 
