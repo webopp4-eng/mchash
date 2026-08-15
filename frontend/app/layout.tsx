@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Poppins } from 'next/font/google';
 import NotificationContainer from '@/components/NotificationToast';
+import DeviceNoticeProvider from '@/components/DeviceNoticeProvider';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className={poppins.className}>
         {children}
         <NotificationContainer />
+        <DeviceNoticeProvider />
       </body>
     </html>
   );
