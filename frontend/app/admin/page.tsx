@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import { FaArrowDown, FaArrowUp, FaBolt, FaCoins, FaGift, FaLayerGroup, FaShieldAlt, FaUsers, FaWallet } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
+import { useFinancialData } from '@/lib/financialData';
 
 export default function AdminDashboard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const financial = useFinancialData();
 
   useEffect(() => {
     loadDashboard();
@@ -31,8 +33,8 @@ export default function AdminDashboard() {
     );
   }
 
-  const totalDeposits = Number(data?.totalDeposits || 0);
-  const totalWithdrawals = Number(data?.totalWithdrawals || 0);
+  const totalDeposits = Number(data?.totalDeposits || financial.totalDeposits || 0);
+  const totalWithdrawals = Number(data?.totalWithdrawals || financial.totalWithdrawals || 0);
   const totalRevenue = Number(data?.totalRevenue || 0);
   const activeMiners = Number(data?.activeMiners || 0);
   const totalUsers = Number(data?.totalUsers || 0);

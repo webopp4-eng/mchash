@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { FaArrowDown, FaArrowUp, FaBolt, FaCoins, FaGift, FaHistory, FaShieldAlt, FaUserCircle, FaWallet } from 'react-icons/fa';
 import WalletConnectionPanel from './WalletConnectionPanel';
 import { apiFetch, getUser, User } from '@/lib/auth';
+import { useFinancialData } from '@/lib/financialData';
 
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const financial = useFinancialData();
 
   useEffect(() => {
     setUser(getUser());
@@ -33,7 +35,7 @@ export default function HomePage() {
     }
   };
 
-  if (loading) {
+  if (loading && !financial.loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
@@ -43,7 +45,7 @@ export default function HomePage() {
 
   const displayName = data?.user?.username || user?.username || 'MC Hash Miner';
   const displayEmail = data?.user?.email || 'wallet connected';
-  const balance = Number(data?.user?.platformBalance || user?.platformBalance || 0);
+  const balance = financial.platformBalance || Number(data?.user?.platformBalance || user?.platformBalance || 0);
   const activePlan = data?.activePlan;
   const progress = Math.min(100, Math.max(0, Number(activePlan?.progressPercent || 0)));
   const recentTx = data?.recentTransactions || [];
@@ -52,7 +54,7 @@ export default function HomePage() {
     { label: 'Active Hashrate', value: activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s', icon: FaBolt, color: 'bg-cmblue-50 text-cmblue-600' },
     { label: 'TVS Metric', value: activePlan ? `${progress}%` : '0%', icon: FaCoins, color: 'bg-sky-50 text-cmblue-700' },
     { label: 'Mining Status', value: activePlan ? 'Active' : 'Idle', icon: FaShieldAlt, color: activePlan ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500' },
-    { label: 'Earnings', value: `$${Number(data?.user?.totalEarned || 0).toFixed(2)}`, icon: FaArrowUp, color: 'bg-amber-50 text-amber-600' },
+    { label: 'Earnings', value: `$${(financial.miningEarnings || Number(data?.user?.totalEarned || 0)).toFixed(2)}`, icon: FaArrowUp, color: 'bg-amber-50 text-amber-600' },
   ];
 
   const fallbackTransactions = [

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FaArrowDown, FaArrowUp, FaBitcoin, FaCopy, FaEthereum, FaExchangeAlt, FaHistory, FaWallet } from 'react-icons/fa';
 import { SiTether } from 'react-icons/si';
 import { apiFetch, getUser, User } from '@/lib/auth';
+import { useFinancialData } from '@/lib/financialData';
 import { shortenAddress } from '@/lib/wallet';
 
 export default function WalletPage() {
@@ -13,6 +14,7 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [marketPrices, setMarketPrices] = useState<any>(null);
+  const financial = useFinancialData();
 
   useEffect(() => {
     setUser(getUser());
@@ -60,7 +62,7 @@ export default function WalletPage() {
     );
   }
 
-  const balance = Number(data?.platformBalance || user?.platformBalance || 0);
+  const balance = financial.platformBalance || Number(data?.platformBalance || user?.platformBalance || 0);
   const walletAddress = data?.walletAddress || user?.walletAddress || '';
   const chain = data?.chain || user?.chain || 'ethereum';
   const walletType = data?.walletType || user?.walletType || 'Wallet';
@@ -70,10 +72,10 @@ export default function WalletPage() {
   const ethPrice = Number(marketPrices?.ETH?.price || 0);
   const usdtPrice = Number(marketPrices?.USDT?.price || 1);
 
-  const mcCoinBalance = Number(data?.balances?.['MC Coin'] ?? data?.balances?.mcCoin ?? balance ?? 0);
-  const usdtBalance = Number(data?.balances?.USDT ?? data?.balances?.usdt ?? balance ?? 0);
-  const ethBalance = Number(data?.balances?.ETH ?? data?.balances?.eth ?? 0);
-  const btcBalance = Number(data?.balances?.BTC ?? data?.balances?.btc ?? 0);
+  const mcCoinBalance = financial.assets.MCCoin || Number(data?.balances?.['MC Coin'] ?? data?.balances?.mcCoin ?? balance ?? 0);
+  const usdtBalance = financial.assets.USDT || Number(data?.balances?.USDT ?? data?.balances?.usdt ?? balance ?? 0);
+  const ethBalance = financial.assets.ETH || Number(data?.balances?.ETH ?? data?.balances?.eth ?? 0);
+  const btcBalance = financial.assets.BTC || Number(data?.balances?.BTC ?? data?.balances?.btc ?? 0);
 
   const assets = [
     { symbol: 'MC Coin', value: mcCoinBalance, units: mcCoinBalance.toFixed(2), icon: FaWallet, color: 'bg-cmblue-50 text-cmblue-600' },

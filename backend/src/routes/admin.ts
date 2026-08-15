@@ -243,8 +243,38 @@ router.patch('/plans/:id', async (req, res) => {
 router.delete('/plans/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const plan = await prisma.miningPlan.findUnique({ where: { id } });
+
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+
+    const activePurchases = await prisma.miningPurchase.count({
+      where: {
+        planId: id,
+        status: 'active',
+      },
+    });
+
+    if (activePurchases > 0) {
+      const updatedPlan = await prisma.miningPlan.update({
+        where: { id },
+        data: {
+          active: false,
+          updatedAt: new Date(),
+        },
+      });
+
+      return res.json({
+        success: true,
+        softDeleted: true,
+        plan: updatedPlan,
+        message: 'Plan is still active for users and was deactivated instead of being deleted.',
+      });
+    }
+
     await prisma.miningPlan.delete({ where: { id } });
-    res.json({ success: true });
+    res.json({ success: true, deleted: true });
   } catch (error) {
     console.error('Delete plan error:', error);
     res.status(500).json({ error: 'Failed to delete plan' });
