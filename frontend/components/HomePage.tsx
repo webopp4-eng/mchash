@@ -106,7 +106,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-56">
-              <Link href="/dashboard/transactions" className="rounded-xl sm:rounded-2xl bg-white/18 px-3 py-2.5 sm:p-3 text-center text-xs sm:text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25 transition-colors">
+              <Link href="/dashboard/deposits" className="rounded-xl sm:rounded-2xl bg-white/18 px-3 py-2.5 sm:p-3 text-center text-xs sm:text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25 transition-colors">
                 Deposit
               </Link>
               <Link href="/dashboard/withdrawals" className="rounded-xl sm:rounded-2xl bg-white/18 px-3 py-2.5 sm:p-3 text-center text-xs sm:text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25 transition-colors">
@@ -190,6 +190,13 @@ export default function HomePage() {
             </div>
           </div>
           <WalletConnectionPanel compact showTitle={false} darkMode={false} />
+          
+          <div className="mt-4 pt-4 border-t border-sky-100">
+            <Link href="/dashboard/profile/payout-methods" className="flex items-center justify-between gap-3 rounded-xl bg-cmblue-50/50 p-3 text-sm font-semibold text-cmblue-700 hover:bg-cmblue-100/50 transition">
+              <span>💰 Connect Payout Method</span>
+              <span>→</span>
+            </Link>
+          </div>
         </section>
       </div>
     </div>

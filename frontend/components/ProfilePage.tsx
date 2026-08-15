@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { FaBell, FaCogs, FaHeadset, FaLock, FaPencilAlt, FaSignOutAlt, FaUserCircle, FaCheck } from 'react-icons/fa';
+import { FaBell, FaCogs, FaHeadset, FaLock, FaPencilAlt, FaSignOutAlt, FaUserCircle, FaCheck, FaWallet, FaMoneyBill } from 'react-icons/fa';
 import { getUser, logout, User } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { shortenAddress } from '@/lib/wallet';
@@ -12,6 +12,8 @@ const items = [
   { icon: FaHeadset, label: 'Support', desc: 'Get help & contact us', href: '/dashboard/support' },
   { icon: FaBell, label: 'Notifications', desc: 'View all notifications', href: '/dashboard/withdrawals' },
   { icon: FaLock, label: 'Security', desc: 'Manage account security', href: '/dashboard/settings' },
+  { icon: FaMoneyBill, label: 'Connect Payout Method', desc: 'Set up withdrawal destination', href: '/dashboard/profile/payout-methods' },
+  { icon: FaWallet, label: 'Connect Wallet', desc: 'Coming Soon', href: '#', disabled: true },
 ];
 
 export default function ProfilePage() {
@@ -139,11 +141,16 @@ export default function ProfilePage() {
           </div>
 
           <div className="grid gap-2">
-            {items.map((item) => (
+            {items.map((item: any) => (
               <Link
                 key={item.label}
-                href={item.href || '#'}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-sky-100 bg-sky-50/50 p-3 transition hover:border-cmblue-200 hover:bg-cmblue-50/80"
+                href={item.disabled ? '#' : (item.href || '#')}
+                onClick={(e) => item.disabled && e.preventDefault()}
+                className={`flex items-center justify-between gap-3 rounded-2xl border border-sky-100 p-3 transition ${
+                  item.disabled 
+                    ? 'bg-slate-50/50 opacity-60 cursor-not-allowed' 
+                    : 'bg-sky-50/50 hover:border-cmblue-200 hover:bg-cmblue-50/80'
+                }`}
               >
                 <div className="flex items-center gap-2.5">
                   <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">

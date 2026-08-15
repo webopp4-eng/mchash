@@ -73,8 +73,20 @@ export default function AdminPlans() {
     if (!confirm('Delete this plan?')) return;
     try {
       const plan = plans.find(p => p.id === id);
-      await apiFetch(`/api/admin/plans/${id}`, { method: 'DELETE' });
-      toastEmitter.success('Plan Deleted', `Plan \"${plan?.name}\" has been deleted`);
+      const response = await apiFetch(`/api/admin/plans/${id}`, { method: 'DELETE' });
+      
+      if (response.softDeleted) {
+        toastEmitter.success(
+          'Plan Deactivated',
+          `Plan \"${plan?.name}\" has active users. It has been deactivated instead of deleted.`
+        );
+      } else if (response.deleted) {
+        toastEmitter.success(
+          'Plan Deleted',
+          `Plan \"${plan?.name}\" has been permanently deleted.`
+        );
+      }
+      
       loadPlans();
     } catch (err: any) {
       toastEmitter.error('Delete Failed', err.message || 'Failed to delete plan');
