@@ -833,4 +833,154 @@ router.get('/audit-logs', async (_req, res) => {
   }
 });
 
+// ============ SUPPORT SYSTEM ============
+router.get('/support/tickets', async (_req, res) => {
+  try {
+    const tickets = await prisma.supportTicket.findMany({
+      include: {
+        User: {
+          select: { id: true, username: true, walletAddress: true, email: true },
+        },
+        SupportMessage: {
+          include: {
+            User: { select: { username: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    const formattedTickets = tickets.map((ticket) => ({
+      id: ticket.id,
+      userId: ticket.userId,
+      user: ticket.User,
+      subject: ticket.subject,
+      category: ticket.category,
+      priority: ticket.priority,
+      message: ticket.message,
+      status: ticket.status,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      responses: ticket.SupportMessage.map((msg: any) => ({
+        id: msg.id,
+        message: msg.message,
+        createdAt: msg.createdAt,
+        isAdmin: msg.isAdmin,
+      })),
+    }));
+
+    res.json({ tickets: formattedTickets });
+  } catch (error) {
+    console.error('Admin support tickets error:', error);
+    res.status(500).json({ error: 'Failed to load support tickets' });
+  }
+});
+
+router.patch('/support/tickets/:ticketId', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { status } = req.body;
+
+    const validStatuses = ['open', 'pending', 'resolved', 'closed'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const ticket = await prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: { status, updatedAt: new Date() },
+      include: {
+        User: { select: { username: true } },
+      },
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: uuid(),
+        userId: ticket.userId,
+        action: 'SUPPORT_TICKET_STATUS',
+        details: { ticketId, newStatus: status, adminId: (req as AuthRequest).user?.id },
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    res.json({ success: true, ticket });
+  } catch (error) {
+    console.error('Update support ticket error:', error);
+    res.status(500).json({ error: 'Failed to update ticket status' });
+  }
+});
+
+router.post('/support/tickets/:ticketId/respond', async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { message } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+      include: { User: { select: { username: true, email: true } } },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    const adminMessage = await prisma.supportMessage.create({
+      data: {
+        id: uuid(),
+        ticketId,
+        userId: (req as AuthRequest).user?.id || '',
+        message: message.trim(),
+        isAdmin: true,
+      },
+    });
+
+    // Update ticket status to pending if it's open
+    if (ticket.status === 'open') {
+      await prisma.supportTicket.update({
+        where: { id: ticketId },
+        data: { status: 'pending', updatedAt: new Date() },
+      });
+    }
+
+    // Create notification for user
+    if (ticket.User?.email) {
+      await prisma.notification.create({
+        data: {
+          id: uuid(),
+          userId: ticket.userId,
+          type: 'support',
+          title: 'Support Response',
+          message: `Admin has responded to your support ticket: "${ticket.subject}"`,
+        },
+      });
+    }
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: uuid(),
+        userId: ticket.userId,
+        action: 'SUPPORT_ADMIN_RESPONSE',
+        details: { ticketId, messageId: adminMessage.id, adminId: (req as AuthRequest).user?.id },
+        ipAddress: req.ip || null,
+        userAgent: req.headers['user-agent'] || null,
+      },
+    });
+
+    res.json({ success: true, message: adminMessage });
+  } catch (error) {
+    console.error('Support admin response error:', error);
+    res.status(500).json({ error: 'Failed to send response' });
+  }
+});
+
 export default router;

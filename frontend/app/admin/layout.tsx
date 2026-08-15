@@ -32,7 +32,7 @@ const adminNav = [
   { href: '/admin/plans', label: 'Marketplace', icon: FaStore },
   { href: '/admin/deposits', label: 'Reports', icon: FaChartPie },
   { href: '/admin/settings', label: 'Settings', icon: FaCogs },
-  { label: 'Support', icon: FaHeadset },
+  { href: '/admin/support', label: 'Support', icon: FaHeadset },
   { href: '/admin/withdrawals', label: 'Notifications', icon: FaBell },
   { href: '/admin', label: 'Analytics', icon: FaChartLine },
 ];
