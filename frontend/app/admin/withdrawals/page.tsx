@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { FaArrowUp, FaCheck, FaCheckCircle, FaTimes, FaClock } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
+import { refreshFinancialData } from '@/lib/financialData';
 import { shortenAddress } from '@/lib/wallet';
 
 export default function AdminWithdrawals() {
@@ -30,6 +31,10 @@ export default function AdminWithdrawals() {
         method: 'PATCH',
         body: JSON.stringify({ status, txHash }),
       });
+      
+      // Refresh financial data across the app (user balances may have changed)
+      await refreshFinancialData();
+      
       loadWithdrawals();
     } catch (err) {
       console.error('Failed to update withdrawal:', err);
