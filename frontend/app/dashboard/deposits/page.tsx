@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FaArrowDown, FaArrowLeft, FaCheck, FaTimes, FaEye, FaUpload } from 'react-icons/fa';
+import { FaArrowDown, FaArrowLeft, FaCheck, FaTimes, FaEye, FaUpload, FaCopy } from 'react-icons/fa';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { refreshFinancialData } from '@/lib/financialData';
 import { toastEmitter } from '@/components/NotificationToast';
@@ -21,8 +21,11 @@ interface PaymentAccount {
   name: string;
   label?: string;
   bankName?: string;
+  accountHolder?: string;
   accountNumber?: string;
   walletAddress?: string;
+  network?: string;
+  currency?: string;
   active: boolean;
   isDefault?: boolean;
 }
@@ -56,6 +59,7 @@ export default function DepositsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = getUser();
@@ -73,9 +77,9 @@ export default function DepositsPage() {
       const res = await apiFetch('/api/payment-accounts');
       const accounts = res.paymentAccounts || [];
       setAccounts(accounts.filter((a: any) => a.active));
-      
+
       if (accounts.length > 0) {
-        const defaultAccount = accounts.find((a: any) => a.isDefault && a.type === 'bank') || 
+        const defaultAccount = accounts.find((a: any) => a.isDefault && a.type === 'bank') ||
                               accounts.find((a: any) => a.type === 'bank');
         if (defaultAccount) {
           setForm(prev => ({ ...prev, accountId: defaultAccount.id }));
@@ -87,6 +91,19 @@ export default function DepositsPage() {
   };
 
   const filteredAccounts = accounts.filter(a => a.type === form.paymentMethod);
+  const selectedAccount = filteredAccounts.find(a => a.id === form.accountId);
+
+  const copyToClipboard = async (text: string, field: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+      toastEmitter.success('Copied', 'Copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -128,7 +145,7 @@ export default function DepositsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
@@ -236,8 +253,8 @@ export default function DepositsPage() {
                     key={method.value}
                     type="button"
                     onClick={() => {
-                      setForm(prev => ({ 
-                        ...prev, 
+                      setForm(prev => ({
+                        ...prev,
                         paymentMethod: method.value,
                         accountId: '',
                       }));
@@ -273,7 +290,7 @@ export default function DepositsPage() {
                           : 'border-slate-200 bg-white hover:border-cmblue-300'
                       }`}
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="font-bold text-slate-900">{account.name || account.label}</p>
                         <p className="text-xs text-slate-500 mt-1">
                           {account.bankName && `${account.bankName} - `}
@@ -282,13 +299,148 @@ export default function DepositsPage() {
                         </p>
                       </div>
                       {account.isDefault && (
-                        <span className="text-xs font-bold text-cmblue-600 bg-cmblue-100 px-2 py-1 rounded-full">
+                        <span className="text-xs font-bold text-cmblue-600 bg-cmblue-100 px-2 py-1 rounded-full ml-2 shrink-0">
                           Default
                         </span>
                       )}
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Selected Account Full Details */}
+            {selectedAccount && (
+              <div className="rounded-2xl border-2 border-cmblue-200 bg-cmblue-50/50 p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <FaEye className="h-4 w-4 text-cmblue-600" />
+                    Account Details — Send to this account
+                  </h3>
+                  {selectedAccount.isDefault && (
+                    <span className="text-xs font-bold text-cmblue-600 bg-cmblue-100 px-2 py-1 rounded-full">
+                      Default
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {/* Bank / MoMo / OPay details */}
+                  {(selectedAccount.type === 'bank' || selectedAccount.type === 'momo' || selectedAccount.type === 'opay') && (
+                    <>
+                      {selectedAccount.bankName && (
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Bank / Provider</p>
+                            <p className="text-sm font-bold text-slate-900 break-all">{selectedAccount.bankName}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedAccount.bankName || '', 'bankName')}
+                            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cmblue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-cmblue-600 transition"
+                          >
+                            <FaCopy className="h-3 w-3" />
+                            {copiedField === 'bankName' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      )}
+
+                      {selectedAccount.accountHolder && (
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Account Holder</p>
+                            <p className="text-sm font-bold text-slate-900 break-all">{selectedAccount.accountHolder}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedAccount.accountHolder || '', 'accountHolder')}
+                            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cmblue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-cmblue-600 transition"
+                          >
+                            <FaCopy className="h-3 w-3" />
+                            {copiedField === 'accountHolder' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      )}
+
+                      {selectedAccount.accountNumber && (
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Account Number</p>
+                            <p className="text-sm font-bold text-slate-900 break-all tracking-wide">{selectedAccount.accountNumber}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedAccount.accountNumber || '', 'accountNumber')}
+                            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cmblue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-cmblue-600 transition"
+                          >
+                            <FaCopy className="h-3 w-3" />
+                            {copiedField === 'accountNumber' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Crypto details */}
+                  {selectedAccount.type === 'crypto' && (
+                    <>
+                      {selectedAccount.network && (
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Network</p>
+                            <p className="text-sm font-bold text-slate-900 capitalize break-all">{selectedAccount.network}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedAccount.network || '', 'network')}
+                            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cmblue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-cmblue-600 transition"
+                          >
+                            <FaCopy className="h-3 w-3" />
+                            {copiedField === 'network' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      )}
+
+                      {selectedAccount.walletAddress && (
+                        <div className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase text-slate-400">Wallet Address</p>
+                            <p className="text-sm font-bold text-slate-900 break-all font-mono">{selectedAccount.walletAddress}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(selectedAccount.walletAddress || '', 'walletAddress')}
+                            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cmblue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-cmblue-600 transition"
+                          >
+                            <FaCopy className="h-3 w-3" />
+                            {copiedField === 'walletAddress' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {selectedAccount.currency && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase text-slate-400">Currency</p>
+                        <p className="text-sm font-bold text-slate-900 break-all">{selectedAccount.currency}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(selectedAccount.currency || '', 'currency')}
+                        className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-cmblue-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-cmblue-600 transition"
+                      >
+                        <FaCopy className="h-3 w-3" />
+                        {copiedField === 'currency' ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <p className="mt-3 text-xs text-slate-500">
+                  Send your payment to the details above, then enter the transaction reference below.
+                </p>
               </div>
             )}
 
@@ -348,7 +500,7 @@ export default function DepositsPage() {
                 className="mc-input"
               />
               <p className="text-xs text-slate-500 mt-1">
-                {form.paymentMethod === 'crypto' 
+                {form.paymentMethod === 'crypto'
                   ? 'Paste the transaction hash from your blockchain transfer'
                   : 'Provide the reference number from your transfer'}
               </p>
@@ -457,19 +609,26 @@ export default function DepositsPage() {
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cmblue-500 text-white text-xs font-bold">2</span>
                 <div className="text-sm">
+                  <p className="font-bold text-slate-900">Copy Account Details</p>
+                  <p className="text-xs text-slate-500">Copy the full account or wallet details</p>
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cmblue-500 text-white text-xs font-bold">3</span>
+                <div className="text-sm">
                   <p className="font-bold text-slate-900">Enter Amount</p>
                   <p className="text-xs text-slate-500">Specify deposit amount</p>
                 </div>
               </li>
               <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cmblue-500 text-white text-xs font-bold">3</span>
+                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cmblue-500 text-white text-xs font-bold">4</span>
                 <div className="text-sm">
                   <p className="font-bold text-slate-900">Provide Reference</p>
                   <p className="text-xs text-slate-500">Add transaction details</p>
                 </div>
               </li>
               <li className="flex gap-3">
-                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cmblue-500 text-white text-xs font-bold">4</span>
+                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cmblue-500 text-white text-xs font-bold">5</span>
                 <div className="text-sm">
                   <p className="font-bold text-slate-900">Submit & Wait</p>
                   <p className="text-xs text-slate-500">Verification in 1-2 hours</p>
