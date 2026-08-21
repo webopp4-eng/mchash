@@ -22,6 +22,17 @@ type NonceRecord = {
   ipAddress?: string;
 };
 
+// Resolve the JWT secret once at module load. Fail fast if missing.
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'JWT_SECRET environment variable is required and must be at least 32 characters long.'
+    );
+  }
+  return secret;
+}
+
 type RateLimitRecord = {
   count: number;
   resetTime: number;
@@ -86,23 +97,18 @@ export function generateDeviceFingerprint(userAgent: string, ipAddress: string):
     .substring(0, 16);
 }
 
-// Generate a nonce for wallet signing
+// Generate a nonce for wallet signing.
+// The nonce is a cryptographically random opaque string; the binding
+// metadata (address, chain, device, IP) is stored server-side only.
 export function generateNonce(address: string, chain: string, deviceFingerprint?: string, ipAddress?: string): string {
   cleanupNonces();
   
   const csrfToken = crypto.randomBytes(32).toString('hex');
-  const payload = {
-    address,
-    chain,
-    timestamp: Date.now(),
-    random: crypto.randomBytes(16).toString('hex'),
-    csrfToken,
-  };
-  const nonce = Buffer.from(JSON.stringify(payload)).toString('base64');
+  const nonce = crypto.randomBytes(32).toString('base64url');
   issuedNonces.set(nonce, {
     address,
     chain,
-    timestamp: payload.timestamp,
+    timestamp: Date.now(),
     used: false,
     csrfToken,
     deviceFingerprint,
@@ -118,18 +124,27 @@ export function generateNonce(address: string, chain: string, deviceFingerprint?
   return nonce;
 }
 
+// Verify a nonce's structure and age. Returns the stored record if valid.
 export function verifyNonce(nonce: string, maxAgeMs = 5 * 60 * 1000): { address: string; chain: string; timestamp: number; csrfToken: string } | null {
-  try {
-    const payload = JSON.parse(Buffer.from(nonce, 'base64').toString());
-    if (Date.now() - payload.timestamp > maxAgeMs) return null;
-    if (typeof payload.address !== 'string' || typeof payload.chain !== 'string' || typeof payload.csrfToken !== 'string') return null;
-    return payload;
-  } catch {
-    return null;
-  }
+  const record = issuedNonces.get(nonce);
+  if (!record) return null;
+  if (Date.now() - record.timestamp > maxAgeMs) return null;
+  return {
+    address: record.address,
+    chain: record.chain,
+    timestamp: record.timestamp,
+    csrfToken: record.csrfToken,
+  };
 }
 
-export function verifyAndConsumeNonce(nonce: string, address: string, chain: string, maxAgeMs = 5 * 60 * 1000): boolean {
+export function verifyAndConsumeNonce(
+  nonce: string,
+  address: string,
+  chain: string,
+  maxAgeMs = 5 * 60 * 1000,
+  deviceFingerprint?: string,
+  ipAddress?: string
+): boolean {
   cleanupNonces(maxAgeMs);
   const record = issuedNonces.get(nonce);
   const payload = verifyNonce(nonce, maxAgeMs);
@@ -162,10 +177,16 @@ export function verifyAndConsumeNonce(nonce: string, address: string, chain: str
     return false;
   }
   
-  if (payload.address.toLowerCase() !== address.toLowerCase() ||
-      payload.chain.toLowerCase() !== chain.toLowerCase()) {
+  // Enforce device/IP binding when the nonce was issued with that context.
+  if (record.deviceFingerprint && deviceFingerprint && record.deviceFingerprint !== deviceFingerprint) {
     if (process.env.ENABLE_DEBUG_LOGGING) {
-      console.log(`[AUTH-DEBUG:NONCE] Payload address/chain mismatch`);
+      console.log(`[AUTH-DEBUG:NONCE] Device fingerprint mismatch`);
+    }
+    return false;
+  }
+  if (record.ipAddress && ipAddress && record.ipAddress !== ipAddress) {
+    if (process.env.ENABLE_DEBUG_LOGGING) {
+      console.log(`[AUTH-DEBUG:NONCE] IP address mismatch`);
     }
     return false;
   }
@@ -186,17 +207,6 @@ export function createAuthMessage(address: string, chain: string, nonce: string,
   const issuedAt = new Date().toISOString();
   const expiration = new Date(Date.now() + 5 * 60 * 1000).toISOString();
   
-  // Extract CSRF token from nonce if available
-  let csrfNote = '';
-  try {
-    const noncePayload = JSON.parse(Buffer.from(nonce, 'base64').toString());
-    if (noncePayload.csrfToken) {
-      csrfNote = `\nCSRF Token: ${noncePayload.csrfToken.substring(0, 8)}...`;
-    }
-  } catch {
-    // Ignore if nonce format unexpected
-  }
-  
   return [
     'Sign in to CM HASH',
     '',
@@ -209,8 +219,7 @@ export function createAuthMessage(address: string, chain: string, nonce: string,
     '',
     'This signature is used only to authenticate your wallet.',
     'It does not authorize a blockchain transaction.',
-    csrfNote,
-  ].filter(line => line !== '').join('\n');
+  ].join('\n');
 }
 
 // Solana address validation (58-char base58, starts with specific patterns)
@@ -480,7 +489,7 @@ export async function findOrCreateUser(walletAddress: string, chain: string, wal
 export function generateJWT(userId: string): string {
   return jwt.sign(
     { sub: userId },
-    process.env.JWT_SECRET || 'super-secret-key-change-me',
+    getJwtSecret(),
     { expiresIn: '7d' }
   );
 }
@@ -488,7 +497,7 @@ export function generateJWT(userId: string): string {
 // Verify JWT
 export function verifyJWT(token: string): string | null {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-me') as { sub: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { sub: string };
     return decoded.sub;
   } catch {
     return null;
@@ -498,7 +507,7 @@ export function verifyJWT(token: string): string | null {
 // Verify token and return decoded payload
 export function verifyTokenPayload(token: string): { sub: string } | null {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-me') as { sub: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { sub: string };
     return decoded;
   } catch (error) {
     if (process.env.ENABLE_DEBUG_LOGGING) {

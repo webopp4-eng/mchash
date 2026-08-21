@@ -2,6 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma';
 
+// Resolve the JWT secret once at module load. Fail fast if missing.
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'JWT_SECRET environment variable is required and must be at least 32 characters long.'
+    );
+  }
+  return secret;
+}
+
 export interface AuthRequest extends Request {
   user?: {
     id: string;
@@ -29,7 +40,7 @@ export function authenticateToken(req: AuthRequest, res: Response, next: NextFun
   if (!token) return res.status(401).json({ error: 'Missing token' });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key-change-me') as { sub: string };
+    const decoded = jwt.verify(token, getJwtSecret()) as { sub: string };
     req.user = { id: decoded.sub, walletAddress: '' };
     next();
   } catch {

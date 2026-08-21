@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import crypto from 'crypto';
@@ -27,6 +27,21 @@ import {
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+// Helper to resolve the client IP consistently (handles proxies)
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.length > 0) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || 'unknown';
+}
+
+// Helper to compute the device fingerprint for the current request
+function getDeviceFingerprint(req: Request): string {
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  return generateDeviceFingerprint(userAgent, getClientIp(req));
+}
 
 // Store for QR code sessions
 const qrSessions = new Map<string, {
@@ -186,7 +201,7 @@ router.post('/qr/session/:sessionId/complete', async (req, res) => {
     }
 
     const nonceMatch = typeof message === 'string' ? message.match(/Nonce:\s*([A-Za-z0-9+/=]+)/) : null;
-    if (!nonceMatch || !verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
+    if (!nonceMatch || !verifyAndConsumeNonce(nonceMatch[1], address, chain, 5 * 60 * 1000, getDeviceFingerprint(req), getClientIp(req))) {
       return res.status(400).json({ error: 'Invalid or expired nonce' });
     }
 
@@ -307,7 +322,7 @@ router.post('/wallet', async (req, res) => {
       console.log(`[AUTH-DEBUG:NONCE] Nonce extracted from message: ${nonceMatch[1].substring(0, 20)}...`);
     }
 
-    if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
+    if (!verifyAndConsumeNonce(nonceMatch[1], address, chain, 5 * 60 * 1000, getDeviceFingerprint(req), getClientIp(req))) {
       if (process.env.ENABLE_DEBUG_LOGGING) {
         console.log(`[AUTH-DEBUG:NONCE] Nonce verification failed`);
       }
@@ -491,7 +506,7 @@ router.post('/wallet/connect', authenticateToken, loadUser, async (req: AuthRequ
       console.log(`[AUTH-DEBUG:NONCE] Verifying nonce for wallet connect`);
     }
 
-    if (!verifyAndConsumeNonce(nonceMatch[1], address, chain)) {
+    if (!verifyAndConsumeNonce(nonceMatch[1], address, chain, 5 * 60 * 1000, getDeviceFingerprint(req), getClientIp(req))) {
       if (process.env.ENABLE_DEBUG_LOGGING) {
         console.log(`[AUTH-DEBUG:NONCE] Nonce verification failed`);
       }
