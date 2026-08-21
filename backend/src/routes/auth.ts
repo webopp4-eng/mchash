@@ -660,6 +660,7 @@ router.get('/session-check', async (req, res) => {
         platformBalance: user.platformBalance,
         role: user.role,
         status: user.status,
+        employeeStatus: user.employeeStatus,
       },
     });
   } catch (error) {
@@ -695,6 +696,7 @@ router.get('/me', authenticateToken, loadUser, async (req: AuthRequest, res) => 
         totalWithdrawn: user.totalWithdrawn,
         role: user.role,
         status: user.status,
+        employeeStatus: user.employeeStatus,
         createdAt: user.createdAt,
         wallets: user.Wallet,
       },

@@ -64,7 +64,8 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
       }
 
       // Success - redirect based on role
-      if (data.user?.role === 'admin') {
+      const role = data.user?.role;
+      if (role === 'SUPER_ADMIN' || role === 'EMPLOYEE') {
         router.push('/admin');
       } else {
         router.push('/dashboard');

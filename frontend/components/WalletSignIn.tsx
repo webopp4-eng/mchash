@@ -101,7 +101,7 @@ export default function WalletSignIn() {
       if (data.authenticated && data.user) {
         // Session is valid, redirect to dashboard
         setUser(data.user);
-        const redirectUrl = data.user.role === 'admin' ? '/admin' : '/dashboard';
+        const redirectUrl = (data.user.role === 'SUPER_ADMIN' || data.user.role === 'EMPLOYEE') ? '/admin' : '/dashboard';
         setTimeout(() => {
           router.push(redirectUrl);
         }, 200);
@@ -168,7 +168,7 @@ export default function WalletSignIn() {
       setConnectionStatus('Connected');
       
       // Determine redirect URL
-      const redirectUrl = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      const redirectUrl = (data.user.role === 'SUPER_ADMIN' || data.user.role === 'EMPLOYEE') ? '/admin' : '/dashboard';
       if (debugMode) {
         console.log(`[AUTH-DEBUG:REDIRECT] Redirect target: ${redirectUrl}`);
         console.log(`[AUTH-DEBUG:REDIRECT] Waiting 200ms for state settlement`);

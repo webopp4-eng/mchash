@@ -1,356 +1,238 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  FaHeadset, FaTicketAlt, FaQuestionCircle, FaBook, FaPaperPlane,
-  FaWallet, FaChartLine, FaGift, FaClock, FaShieldAlt, FaMobileAlt, FaDesktop, FaQrcode, FaCube, FaServer, FaCoins
+  FaHeadset, FaPaperPlane, FaArrowLeft, FaCheckCircle, FaClock,
+  FaExclamationTriangle, FaSearch, FaPlus, FaUserCircle, FaShieldAlt
 } from 'react-icons/fa';
 import { apiFetch, getUser } from '@/lib/auth';
 
-const faqs = [
-  {
-    q: 'How do I start mining?',
-    a: 'Connect your wallet, navigate to the Plans page from the dashboard, select a mining package, and purchase it using your platform balance or wallet.',
-  },
-  {
-    q: 'When can I withdraw earnings?',
-    a: 'You can request withdrawals anytime from the Withdrawals page. Funds are sent to your connected wallet within 24 hours after admin approval.',
-  },
-  {
-    q: 'How are mining rewards calculated?',
-    a: 'Daily earnings are calculated based on your plan hash rate and daily rate percentage. Rewards accrue in real-time and can be seen in your mining dashboard.',
-  },
-  {
-    q: 'What wallets are supported?',
-    a: 'We support Solana, Ethereum, and BNB Smart Chain wallets including Phantom, MetaMask, Trust Wallet, and WalletConnect.',
-  },
-  {
-    q: 'What is the minimum withdrawal amount?',
-    a: 'The minimum withdrawal is 10 USDT. There are no fees for internal mining withdrawals.',
-  },
-  {
-    q: 'How does the referral program work?',
-    a: 'Share your unique referral link from the Referrals page. You earn 3-8% commission on each referred user purchase, depending on your package.',
-  },
-  {
-    q: 'What happens when my mining plan expires?',
-    a: 'Your plan automatically completes and mining stops. You receive a bonus reward at completion. You can purchase a new plan from the Plans page.',
-  },
-  {
-    q: 'Can I mine multiple plans at once?',
-    a: 'No, you can only have one active mining package at a time. When it completes, you may start another.',
-  },
-];
+interface ChatMessage {
+  id: string;
+  ticketId: string;
+  senderId: string | null;
+  senderRole: string;
+  message: string;
+  readByUser: boolean;
+  readByStaff: boolean;
+  createdAt: string;
+}
 
-const tutorials = [
-  {
-    title: 'Connect Your Wallet',
-    icon: FaWallet,
-    steps: [
-      'Go to the homepage and click "Connect Wallet"',
-      'Select your preferred wallet (MetaMask, Phantom, Trust Wallet, etc.)',
-      'On mobile, click the wallet app icon to open your wallet app',
-      'Sign the message to verify ownership',
-      'Your wallet is now connected and you can access the dashboard',
-    ],
-  },
-  {
-    title: 'Buy a Mining Plan',
-    icon: FaChartLine,
-    steps: [
-      'Ensure you have sufficient platform balance (USDT)',
-      'Navigate to Dashboard → Plans',
-      'Select the plan that fits your budget and duration',
-      'Click "Buy Plan" — your balance is deducted and mining starts instantly',
-      'Track progress on the Mining page in real-time',
-    ],
-  },
-  {
-    title: 'Withdraw Earnings',
-    icon: FaGift,
-    steps: [
-      'Go to Dashboard → Withdrawals',
-      'Enter the amount and select your chain',
-      'Submit the withdrawal request',
-      'Wait for admin approval (usually within 24 hours)',
-      'Funds are sent to your connected wallet address',
-    ],
-  },
-  {
-    title: 'Use Hash Renting',
-    icon: FaChartLine,
-    steps: [
-      'Navigate to Dashboard → Plans and scroll to Hash Renting',
-      'Choose a hash renting package with your desired hash power',
-      'Rent the hash power — mining starts immediately',
-      'Earn yields directly to your platform balance',
-    ],
-  },
-];
+interface Conversation {
+  id: string;
+  userId: string;
+  subject: string;
+  category: string;
+  priority: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  unreadMessages?: number;
+  SupportMessage?: ChatMessage[];
+}
 
 export default function SupportPage() {
-  const [tickets, setTickets] = useState<any[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [subject, setSubject] = useState('');
-  const [category, setCategory] = useState('general');
-  const [priority, setPriority] = useState('normal');
-  const [message, setMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'faq' | 'knowledge' | 'tutorial' | 'tickets'>('faq');
-  const [submitting, setSubmitting] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [newSubject, setNewSubject] = useState('');
+  const [newCategory, setNewCategory] = useState('general');
+  const [newMessage, setNewMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    loadTickets();
+    setUser(getUser());
+    loadConversations();
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, []);
 
-  const loadTickets = async () => {
+  // Poll for new messages every 5 seconds when a conversation is open
+  useEffect(() => {
+    if (selectedConversation) {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(() => {
+        loadMessages(selectedConversation.id, true);
+      }, 5000);
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [selectedConversation?.id]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const loadConversations = async () => {
     try {
       const res = await apiFetch('/api/support/tickets');
-      setTickets(res.tickets || []);
+      setConversations(res.tickets || []);
     } catch (err) {
-      console.error('Failed to load tickets:', err);
+      console.error('Failed to load conversations:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const submitTicket = async () => {
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
-
+  const loadMessages = async (ticketId: string, silent = false) => {
     try {
-      await apiFetch('/api/support/tickets', {
-        method: 'POST',
-        body: JSON.stringify({ subject, category, priority, message }),
-      });
-      setSuccess('Support ticket created successfully! Our team will respond shortly.');
-      setSubject('');
-      setMessage('');
-      setCategory('general');
-      setPriority('normal');
-      loadTickets();
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
+      const res = await apiFetch(`/api/support/tickets/${ticketId}`);
+      if (res.ticket) {
+        setMessages(res.ticket.SupportMessage || []);
+        setSelectedConversation(prev => prev ? { ...prev, status: res.ticket.status } : prev);
+        // Update unread count in conversation list
+        setConversations(prev => prev.map(c => 
+          c.id === ticketId ? { ...c, unreadMessages: 0 } : c
+        ));
+      }
+    } catch (err) {
+      if (!silent) console.error('Failed to load messages:', err);
     }
   };
+
+  const openConversation = async (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+    await loadMessages(conversation.id);
+  };
+
+  const createConversation = async () => {
+    if (!newSubject.trim() || !newMessage.trim()) {
+      setError('Subject and message are required');
+      return;
+    }
+    setError(null);
+    try {
+      const res = await apiFetch('/api/support/tickets', {
+        method: 'POST',
+        body: JSON.stringify({
+          subject: newSubject.trim(),
+          category: newCategory,
+          message: newMessage.trim(),
+        }),
+      });
+      setShowNewChat(false);
+      setNewSubject('');
+      setNewMessage('');
+      setNewCategory('general');
+      await loadConversations();
+      if (res.ticket) {
+        await openConversation(res.ticket);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create conversation');
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!messageText.trim() || !selectedConversation) return;
+    setSending(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/support/tickets/${selectedConversation.id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ message: messageText.trim() }),
+      });
+      setMessageText('');
+      await loadMessages(selectedConversation.id);
+      await loadConversations();
+    } catch (err: any) {
+      setError(err.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open': return 'bg-emerald-50 text-emerald-600';
+      case 'pending': return 'bg-amber-50 text-amber-600';
+      case 'resolved': return 'bg-cmblue-50 text-cmblue-600';
+      case 'closed': return 'bg-slate-100 text-slate-500';
+      default: return 'bg-slate-100 text-slate-500';
+    }
+  };
+
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="mc-page">
       <section className="mc-page-header">
         <div>
           <p className="text-[10px] font-bold uppercase text-cmblue-600">Support</p>
-          <h1 className="mc-title">Help & Support</h1>
-          <p className="mc-subtitle">FAQs, guides, tutorials, and support tickets</p>
+          <h1 className="mc-title">Support & Chats</h1>
+          <p className="mc-subtitle">Chat with our support team</p>
         </div>
       </section>
 
-      {/* Tab Navigation */}
-      <div className="flex flex-wrap gap-1.5 rounded-2xl bg-sky-50/50 p-1.5 ring-1 ring-sky-100">
-        {[
-          { id: 'faq', label: 'FAQ', icon: FaQuestionCircle },
-          { id: 'knowledge', label: 'Knowledge Base', icon: FaBook },
-          { id: 'tutorial', label: 'Tutorials', icon: FaMobileAlt },
-          { id: 'tickets', label: 'Support Tickets', icon: FaTicketAlt },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all ${
-              activeTab === tab.id
-                ? 'bg-cmblue-500 text-white shadow-[0_10px_24px_rgba(0,130,255,0.22)]'
-                : 'text-slate-600 hover:bg-white hover:text-cmblue-700'
-            }}`}
-          >
-            <tab.icon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{tab.label}</span>
-          </button>
-        ))}
-      </div>
-
       {error && (
-        <div className="flex items-start gap-2 rounded-[22px] border border-rose-200/80 bg-rose-50/80 p-4 backdrop-blur-xl">
+        <div className="mb-4 flex items-start gap-2 rounded-[22px] border border-rose-200/80 bg-rose-50/80 p-4 backdrop-blur-xl">
           <div className="text-sm font-semibold text-rose-600">{error}</div>
         </div>
       )}
-      {success && (
-        <div className="flex items-start gap-2 rounded-[22px] border border-emerald-200/80 bg-emerald-50/80 p-4 backdrop-blur-xl">
-          <div className="text-sm font-semibold text-emerald-600">{success}</div>
-        </div>
-      )}
 
-      {/* FAQ Tab */}
-      {activeTab === 'faq' && (
-        <section className="mc-card">
-          <div className="mb-4">
-            <h2 className="text-base font-bold text-slate-950">Frequently Asked Questions</h2>
-            <p className="text-xs text-slate-500">Quick answers to common questions</p>
-          </div>
-          <div className="space-y-3">
-            {faqs.map((faq) => (
-              <details key={faq.q} className="group rounded-xl border border-sky-100 bg-sky-50/50 transition-all">
-                <summary className="flex cursor-pointer items-center justify-between px-4 py-3 font-semibold text-slate-950 hover:text-cmblue-700">
-                  <span className="text-sm">{faq.q}</span>
-                  <span className="text-cmblue-500 transition-transform group-open:rotate-180">↓</span>
-                </summary>
-                <div className="border-t border-sky-100 px-4 py-3">
-                  <p className="text-xs leading-relaxed text-slate-600">{faq.a}</p>
-                </div>
-              </details>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Knowledge Base Tab */}
-      {activeTab === 'knowledge' && (
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <section className="mc-card">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
-                  <FaShieldAlt className="h-4 w-4" />
-                </span>
-                <h3 className="font-bold text-slate-950">Security Best Practices</h3>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-600">
-                <li>• Never share your private key or seed phrase</li>
-                <li>• Always verify official website URLs</li>
-                <li>• Enable 2FA when available</li>
-                <li>• Use strong, unique passwords</li>
-                <li>• Never click suspicious links</li>
-              </ul>
-            </section>
-
-            <section className="mc-card">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="mc-stat-icon bg-purple-50 text-purple-600">
-                  <FaWallet className="h-4 w-4" />
-                </span>
-                <h3 className="font-bold text-slate-950">Supported Wallets</h3>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-600">
-                <li><span className="font-semibold text-slate-800">Ethereum:</span> MetaMask, Rainbow</li>
-                <li><span className="font-semibold text-slate-800">Solana:</span> Phantom, Solflare</li>
-                <li><span className="font-semibold text-slate-800">BNB Chain:</span> MetaMask, Trust</li>
-                <li><span className="font-semibold text-slate-800">Mobile:</span> WalletConnect</li>
-              </ul>
-            </section>
-
-            <section className="mc-card">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="mc-stat-icon bg-emerald-50 text-emerald-600">
-                  <FaClock className="h-4 w-4" />
-                </span>
-                <h3 className="font-bold text-slate-950">Rewards Schedule</h3>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-600">
-                <li>• Rewards accrue real-time</li>
-                <li>• Daily automatic payouts</li>
-                <li>• Minimum: 0.001 USDT</li>
-                <li>• Bonus on completion</li>
-                <li>• Referrals credited instantly</li>
-              </ul>
-            </section>
-
-            <section className="mc-card">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="mc-stat-icon bg-amber-50 text-amber-600">
-                  <FaCube className="h-4 w-4" />
-                </span>
-                <h3 className="font-bold text-slate-950">Supported Chains</h3>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-600">
-                <li>• <span className="font-semibold">Ethereum:</span> ERC-20 USDT</li>
-                <li>• <span className="font-semibold">Solana:</span> SPL USDT</li>
-                <li>• <span className="font-semibold">BNB:</span> BEP-20 USDT</li>
-              </ul>
-            </section>
-
-            <section className="mc-card">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
-                  <FaCoins className="h-4 w-4" />
-                </span>
-                <h3 className="font-bold text-slate-950">Earning Methods</h3>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-600">
-                <li>• <span className="font-semibold">Mining:</span> Your plan rewards</li>
-                <li>• <span className="font-semibold">Referrals:</span> 3-8% commissions</li>
-                <li>• <span className="font-semibold">Hash Renting:</span> Direct yields</li>
-                <li>• <span className="font-semibold">Bonus:</span> Plan completion</li>
-              </ul>
-            </section>
-
-            <section className="mc-card">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="mc-stat-icon bg-sky-50 text-cmblue-600">
-                  <FaServer className="h-4 w-4" />
-                </span>
-                <h3 className="font-bold text-slate-950">Platform Fees</h3>
-              </div>
-              <ul className="space-y-2 text-xs text-slate-600">
-                <li>• No mining purchase fees</li>
-                <li>• Withdrawal: 0.5% (min 1 USDT)</li>
-                <li>• Hash renting: Free</li>
-                <li>• Support: 24/7 free access</li>
-              </ul>
-            </section>
-          </div>
-        </div>
-      )}
-
-      {/* Tutorial Tab */}
-      {activeTab === 'tutorial' && (
-        <div className="space-y-4">
-          {tutorials.map((tutorial) => (
-            <section key={tutorial.title} className="mc-card">
-              <div className="mb-4 flex items-center gap-3">
-                <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
-                  <tutorial.icon className="h-4 w-4" />
-                </span>
-                <h3 className="font-bold text-slate-950">{tutorial.title}</h3>
-              </div>
-              <ol className="space-y-3">
-                {tutorial.steps.map((step, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cmblue-50 text-xs font-bold text-cmblue-600">
-                      {i + 1}
-                    </span>
-                    <span className="text-xs leading-relaxed text-slate-600">{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ))}
-        </div>
-      )}
-
-      {/* Tickets Tab */}
-      {activeTab === 'tickets' && (
-        <div className="space-y-4">
-          {/* Create Ticket */}
-          <section className="mc-card">
-            <div className="mb-4">
-              <h2 className="text-base font-bold text-slate-950">Create Support Ticket</h2>
-              <p className="text-xs text-slate-500">Describe your issue and our team will help you</p>
+      <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+        {/* Conversation List */}
+        <section className="mc-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-sky-100 p-4">
+            <div className="flex items-center gap-2">
+              <FaHeadset className="h-4 w-4 text-cmblue-500" />
+              <h2 className="text-sm font-bold text-slate-950">Conversations</h2>
             </div>
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="What's your issue?"
-                className="mc-input"
-              />
-              <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setShowNewChat(!showNewChat)}
+              className="mc-icon-button bg-cmblue-500 text-white hover:bg-cmblue-600"
+              title="New Conversation"
+            >
+              <FaPlus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* New Conversation Form */}
+          {showNewChat && (
+            <div className="border-b border-sky-100 bg-sky-50/50 p-4">
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={newSubject}
+                  onChange={(e) => setNewSubject(e.target.value)}
+                  placeholder="What's your issue?"
+                  className="mc-input"
+                />
                 <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
                   className="mc-input"
                 >
                   <option value="general">General</option>
@@ -361,80 +243,181 @@ export default function SupportPage() {
                   <option value="technical">Technical</option>
                   <option value="billing">Billing</option>
                 </select>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="mc-input"
+                <textarea
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Describe your issue..."
+                  rows={3}
+                  className="mc-input resize-none"
+                />
+                <button
+                  onClick={createConversation}
+                  disabled={!newSubject.trim() || !newMessage.trim()}
+                  className="mc-button w-full"
                 >
-                  <option value="low">Low Priority</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
+                  <FaPlus className="h-3 w-3" />
+                  Start Conversation
+                </button>
               </div>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Describe your issue in detail..."
-                rows={4}
-                className="mc-input"
-              />
-              <button
-                onClick={submitTicket}
-                disabled={submitting || !subject || !message}
-                className="mc-button w-full"
-              >
-                {submitting ? (
-                  <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    <FaPaperPlane className="h-3.5 w-3.5" />
-                    Submit Ticket
-                  </>
-                )}
-              </button>
             </div>
-          </section>
+          )}
 
-          {/* Existing Tickets */}
-          <section className="mc-card">
-            <div className="mb-4">
-              <h2 className="text-base font-bold text-slate-950">Your Support Tickets</h2>
-              <p className="text-xs text-slate-500">Track your support requests</p>
-            </div>
-            {tickets.length > 0 ? (
-              <div className="space-y-2">
-                {tickets.map((ticket: any) => (
-                  <div key={ticket.id} className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-slate-950">{ticket.subject}</p>
-                      <span className={`mc-status ${
-                        ticket.status === 'open' ? 'bg-emerald-50 text-emerald-600' :
-                        ticket.status === 'pending' ? 'bg-amber-50 text-amber-600' :
-                        ticket.status === 'resolved' || ticket.status === 'closed' ? 'bg-slate-100 text-slate-500' : 'bg-cmblue-50 text-cmblue-600'
-                      }`}>
-                        {ticket.status}
-                      </span>
+          <div className="max-h-[500px] overflow-y-auto">
+            {conversations.length > 0 ? (
+              conversations.map((conv) => (
+                <button
+                  key={conv.id}
+                  onClick={() => openConversation(conv)}
+                  className={`w-full border-b border-sky-50 p-4 text-left transition-all ${
+                    selectedConversation?.id === conv.id
+                      ? 'bg-cmblue-50'
+                      : 'hover:bg-sky-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <FaUserCircle className="h-5 w-5 shrink-0 text-cmblue-400" />
+                        <p className="truncate text-sm font-bold text-slate-950">{conv.subject}</p>
+                      </div>
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {conv.SupportMessage?.[conv.SupportMessage.length - 1]?.message || 'No messages'}
+                      </p>
                     </div>
-                    <p className="mt-1 text-[10px] text-slate-500">
-                      {ticket.category} • Priority: {ticket.priority || 'Normal'}
-                    </p>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-[10px] text-slate-400">{formatDate(conv.updatedAt)}</span>
+                      <span className={`mc-status ${getStatusColor(conv.status)}`}>{conv.status}</span>
+                      {conv.unreadMessages ? (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cmblue-500 text-[10px] font-bold text-white">
+                          {conv.unreadMessages}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                ))}
-              </div>
+                </button>
+              ))
             ) : (
-              <div className="py-8 text-center">
+              <div className="py-12 text-center">
                 <FaHeadset className="mx-auto h-10 w-10 text-cmblue-200" />
-                <p className="mt-3 text-sm font-semibold text-slate-500">No tickets yet</p>
-                <p className="text-xs text-slate-400">Create one above if you need help</p>
+                <p className="mt-3 text-sm font-semibold text-slate-500">No conversations yet</p>
+                <p className="text-xs text-slate-400">Click + to start a new conversation</p>
               </div>
             )}
-          </section>
-        </div>
-      )}
+          </div>
+        </section>
+
+        {/* Chat Window */}
+        <section className="mc-card flex flex-col overflow-hidden">
+          {selectedConversation ? (
+            <>
+              {/* Chat Header */}
+              <div className="flex items-center justify-between border-b border-sky-100 bg-sky-50/50 p-4">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedConversation(null)}
+                    className="mc-icon-button lg:hidden"
+                  >
+                    <FaArrowLeft className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cmblue-500 text-white">
+                    <FaHeadset className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-950">Support Team</p>
+                    <p className="text-[10px] text-slate-500">{selectedConversation.subject}</p>
+                  </div>
+                </div>
+                <span className={`mc-status ${getStatusColor(selectedConversation.status)}`}>
+                  {selectedConversation.status}
+                </span>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50/50 p-4" style={{ minHeight: '400px', maxHeight: '500px' }}>
+                {messages.length > 0 ? (
+                  messages.map((msg) => {
+                    const isUser = msg.senderRole === 'user';
+                    return (
+                      <div key={msg.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                          isUser
+                            ? 'bg-cmblue-500 text-white rounded-br-sm'
+                            : 'bg-white text-slate-900 border border-sky-100 rounded-bl-sm shadow-sm'
+                        }`}>
+                          <p className="text-sm leading-relaxed">{msg.message}</p>
+                          <div className={`mt-1 flex items-center gap-1 text-[10px] ${isUser ? 'text-white/70' : 'text-slate-400'}`}>
+                            <span>{formatTime(msg.createdAt)}</span>
+                            {isUser && (
+                              <span>
+                                {msg.readByStaff ? (
+                                  <FaCheckCircle className="h-3 w-3 text-emerald-300" />
+                                ) : (
+                                  <FaClock className="h-3 w-3" />
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <div className="text-center">
+                      <FaHeadset className="mx-auto h-10 w-10 text-cmblue-200" />
+                      <p className="mt-2 text-sm font-semibold text-slate-500">No messages yet</p>
+                      <p className="text-xs text-slate-400">Send a message to start the conversation</p>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Message Input */}
+              {selectedConversation.status !== 'closed' && (
+                <div className="border-t border-sky-100 p-3">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={messageText}
+                      onChange={(e) => setMessageText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendMessage();
+                        }
+                      }}
+                      placeholder="Type a message..."
+                      rows={1}
+                      className="mc-input flex-1 resize-none"
+                      style={{ minHeight: '44px', maxHeight: '120px' }}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={sending || !messageText.trim()}
+                      className="mc-button h-11 w-11 shrink-0 rounded-full p-0"
+                      title="Send"
+                    >
+                      {sending ? (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      ) : (
+                        <FaPaperPlane className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex min-h-[400px] items-center justify-center">
+              <div className="text-center">
+                <FaHeadset className="mx-auto h-12 w-12 text-cmblue-200" />
+                <p className="mt-3 text-sm font-semibold text-slate-500">Select a conversation to start chatting</p>
+                <p className="text-xs text-slate-400">Or click + to create a new one</p>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

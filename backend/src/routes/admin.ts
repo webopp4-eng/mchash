@@ -1,15 +1,265 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
+import crypto from 'crypto';
 import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
-import { requireAdmin } from '../middleware/admin';
+import { requireSuperAdmin, requireAdminOrEmployee } from '../middleware/admin';
+import { hashPassword } from '../services/emailAuth';
+import { createAuditLog, getActorName } from '../services/auditLog';
 
 const router = Router();
 
-router.use(authenticateToken, loadUser, requireAdmin);
+// All admin routes require authentication
+router.use(authenticateToken, loadUser);
 
-// ============ ADMIN DASHBOARD ============
-router.get('/dashboard', async (_req, res) => {
+// ============ EMPLOYEE MANAGEMENT (SUPER_ADMIN ONLY) ============
+
+// List all employees
+router.get('/employees', requireSuperAdmin, async (_req, res) => {
+  try {
+    const employees = await prisma.user.findMany({
+      where: { role: 'EMPLOYEE' },
+      select: {
+        id: true, email: true, fullName: true, username: true,
+        role: true, employeeStatus: true, status: true,
+        createdAt: true, updatedAt: true, lastLoginAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ employees });
+  } catch (error) {
+    console.error('List employees error:', error);
+    res.status(500).json({ error: 'Failed to load employees' });
+  }
+});
+
+// Create employee (SUPER_ADMIN only)
+router.post('/employees', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { name, email, password, status } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Only allow creating EMPLOYEE accounts - never SUPER_ADMIN
+    const passwordHash = await hashPassword(password);
+
+    // Generate unique username
+    let username = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 20);
+    let usernameAttempt = username;
+    let counter = 1;
+    while (await prisma.user.findUnique({ where: { username: usernameAttempt } })) {
+      usernameAttempt = `${username}${counter}`;
+      counter++;
+    }
+
+    // Generate unique referral code
+    let referralCode = '';
+    do {
+      referralCode = 'CMH' + crypto.randomBytes(4).toString('hex').toUpperCase();
+    } while (await prisma.referral.findUnique({ where: { code: referralCode } }));
+
+    const employee = await prisma.user.create({
+      data: {
+        id: uuid(),
+        email: normalizedEmail,
+        passwordHash,
+        fullName: name,
+        username: usernameAttempt,
+        authMethod: 'EMAIL',
+        referralCode,
+        status: 'active',
+        employeeStatus: status === 'disabled' ? 'disabled' : 'active',
+        role: 'EMPLOYEE',
+        platformBalance: 0,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true, email: true, fullName: true, username: true,
+        role: true, employeeStatus: true, status: true, createdAt: true,
+      },
+    });
+
+    await createAuditLog(req, {
+      action: 'EMPLOYEE_CREATE',
+      targetId: employee.id,
+      details: { email: employee.email, name: employee.fullName, createdBy: getActorName(req) },
+    });
+
+    res.status(201).json({ success: true, employee });
+  } catch (error) {
+    console.error('Create employee error:', error);
+    res.status(500).json({ error: 'Failed to create employee' });
+  }
+});
+
+// Update employee (SUPER_ADMIN only)
+router.patch('/employees/:id', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, password, status, role } = req.body;
+
+    const employee = await prisma.user.findUnique({ where: { id } });
+    if (!employee || employee.role !== 'EMPLOYEE') {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // Prevent changing role to SUPER_ADMIN
+    if (role && role !== 'EMPLOYEE') {
+      return res.status(400).json({ error: 'Employees can only have the EMPLOYEE role' });
+    }
+
+    const data: Record<string, unknown> = { updatedAt: new Date() };
+
+    if (name) data.fullName = name;
+    if (email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      const existing = await prisma.user.findFirst({
+        where: { email: normalizedEmail, id: { not: id } },
+      });
+      if (existing) return res.status(400).json({ error: 'Email already in use' });
+      data.email = normalizedEmail;
+    }
+    if (password) {
+      if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+      data.passwordHash = await hashPassword(password);
+    }
+    if (status) {
+      if (!['active', 'disabled'].includes(status)) return res.status(400).json({ error: 'Invalid employee status' });
+      data.employeeStatus = status;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data,
+      select: {
+        id: true, email: true, fullName: true, username: true,
+        role: true, employeeStatus: true, status: true, updatedAt: true,
+      },
+    });
+
+    await createAuditLog(req, {
+      action: 'EMPLOYEE_UPDATE',
+      targetId: id,
+      details: { updatedFields: Object.keys(data).filter(k => k !== 'updatedAt'), updatedBy: getActorName(req) },
+    });
+
+    res.json({ success: true, employee: updated });
+  } catch (error) {
+    console.error('Update employee error:', error);
+    res.status(500).json({ error: 'Failed to update employee' });
+  }
+});
+
+// Disable/enable employee (SUPER_ADMIN only)
+router.patch('/employees/:id/status', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['active', 'disabled'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be active or disabled' });
+    }
+
+    const employee = await prisma.user.findUnique({ where: { id } });
+    if (!employee || employee.role !== 'EMPLOYEE') {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { employeeStatus: status, updatedAt: new Date() },
+      select: { id: true, email: true, fullName: true, role: true, employeeStatus: true },
+    });
+
+    await createAuditLog(req, {
+      action: 'EMPLOYEE_STATUS_CHANGE',
+      targetId: id,
+      details: { newStatus: status, changedBy: getActorName(req) },
+    });
+
+    res.json({ success: true, employee: updated });
+  } catch (error) {
+    console.error('Employee status error:', error);
+    res.status(500).json({ error: 'Failed to update employee status' });
+  }
+});
+
+// Delete/revoke employee (SUPER_ADMIN only) - soft delete to preserve audit logs
+router.delete('/employees/:id', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const employee = await prisma.user.findUnique({ where: { id } });
+    if (!employee || employee.role !== 'EMPLOYEE') {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    await prisma.user.update({
+      where: { id },
+      data: { employeeStatus: 'disabled', status: 'suspended', updatedAt: new Date() },
+    });
+
+    await createAuditLog(req, {
+      action: 'EMPLOYEE_REVOKE',
+      targetId: id,
+      details: { revokedBy: getActorName(req), email: employee.email },
+    });
+
+    res.json({ success: true, message: 'Employee account revoked' });
+  } catch (error) {
+    console.error('Delete employee error:', error);
+    res.status(500).json({ error: 'Failed to revoke employee' });
+  }
+});
+
+// Reset employee password (SUPER_ADMIN only)
+router.post('/employees/:id/reset-password', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const employee = await prisma.user.findUnique({ where: { id } });
+    if (!employee || employee.role !== 'EMPLOYEE') {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({ where: { id }, data: { passwordHash, updatedAt: new Date() } });
+
+    await createAuditLog(req, {
+      action: 'EMPLOYEE_PASSWORD_RESET',
+      targetId: id,
+      details: { resetBy: getActorName(req) },
+    });
+
+    res.json({ success: true, message: 'Employee password reset successfully' });
+  } catch (error) {
+    console.error('Reset employee password error:', error);
+    res.status(500).json({ error: 'Failed to reset employee password' });
+  }
+});
+
+// ============ ADMIN DASHBOARD (SUPER_ADMIN or EMPLOYEE) ============
+router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
   try {
     const [totalUsers, activeMiners, totalDeposits, totalWithdrawals, totalRevenue, miningPlans, referrals, treasuryWallets] = await Promise.all([
       prisma.user.count(),
@@ -23,8 +273,7 @@ router.get('/dashboard', async (_req, res) => {
     ]);
 
     res.json({
-      totalUsers,
-      activeMiners,
+      totalUsers, activeMiners,
       totalDeposits: totalDeposits._sum.amount || 0,
       totalWithdrawals: totalWithdrawals._sum.amount || 0,
       totalRevenue: totalRevenue._sum.amount || 0,
@@ -38,8 +287,8 @@ router.get('/dashboard', async (_req, res) => {
   }
 });
 
-// ============ USER MANAGEMENT ============
-router.get('/users', async (req, res) => {
+// ============ USER MANAGEMENT (SUPER_ADMIN or EMPLOYEE) ============
+router.get('/users', requireAdminOrEmployee, async (req, res) => {
   try {
     const { search, status } = req.query;
     const where: Record<string, unknown> = {};
@@ -67,7 +316,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
-router.patch('/users/:id/status', async (req, res) => {
+router.patch('/users/:id/status', requireAdminOrEmployee, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -76,16 +325,10 @@ router.patch('/users/:id/status', async (req, res) => {
     }
     const user = await prisma.user.update({ where: { id }, data: { status } });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        id: uuid(),
-        userId: id,
-        action: 'USER_STATUS_CHANGE',
-        details: { status, adminId: (req as AuthRequest).user?.id },
-        ipAddress: req.ip || null,
-        userAgent: req.headers['user-agent'] || null,
-      },
+    await createAuditLog(req, {
+      action: 'USER_STATUS_CHANGE',
+      targetId: id,
+      details: { status, adminName: getActorName(req) },
     });
 
     res.json({ success: true, user });
@@ -95,8 +338,8 @@ router.patch('/users/:id/status', async (req, res) => {
   }
 });
 
-// ============ ADMIN CREDIT SYSTEM ============
-router.post('/users/:id/credit', async (req, res) => {
+// ============ ADMIN CREDIT SYSTEM (SUPER_ADMIN ONLY - wallet sensitive) ============
+router.post('/users/:id/credit', requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { amount, balanceType, reason } = req.body;
@@ -106,14 +349,10 @@ router.post('/users/:id/credit', async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     const creditAmount = Number(amount);
     const type = balanceType || 'platformBalance';
-
-    // Validate balance type
     const validTypes = ['platformBalance', 'totalEarned', 'totalDeposited'];
     if (!validTypes.includes(type)) {
       return res.status(400).json({ error: 'Invalid balance type' });
@@ -124,41 +363,25 @@ router.post('/users/:id/credit', async (req, res) => {
       data: { [type]: { increment: creditAmount } },
     });
 
-    // Create transaction record
     await prisma.transaction.create({
       data: {
-        id: uuid(),
-        userId: id,
-        type: 'admin_credit',
-        amount: creditAmount,
-        currency: 'USDT',
-        chain: user.chain || 'ethereum',
-        status: 'completed',
-        metadata: { balanceType: type, reason: reason || 'Admin credit', adminId: (req as AuthRequest).user?.id },
+        id: uuid(), userId: id, type: 'admin_credit', amount: creditAmount,
+        currency: 'USDT', chain: user.chain || 'ethereum', status: 'completed',
+        metadata: { balanceType: type, reason: reason || 'Admin credit', adminId: req.user?.id },
       },
     });
 
-    // Create notification
     await prisma.notification.create({
       data: {
-        id: uuid(),
-        userId: id,
-        type: 'credit',
-        title: 'Account Credited',
+        id: uuid(), userId: id, type: 'credit', title: 'Account Credited',
         message: `Your account has been credited with ${creditAmount.toFixed(2)} USDT.${reason ? ` Reason: ${reason}` : ''}`,
       },
     });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        id: uuid(),
-        userId: id,
-        action: 'ADMIN_CREDIT',
-        details: { amount: creditAmount, balanceType: type, reason: reason || null, adminId: (req as AuthRequest).user?.id },
-        ipAddress: req.ip || null,
-        userAgent: req.headers['user-agent'] || null,
-      },
+    await createAuditLog(req, {
+      action: 'ADMIN_CREDIT',
+      targetId: id,
+      details: { amount: creditAmount, balanceType: type, reason: reason || null, adminName: getActorName(req) },
     });
 
     res.json({ success: true, user: updatedUser });
@@ -168,7 +391,7 @@ router.post('/users/:id/credit', async (req, res) => {
   }
 });
 
-router.get('/users/:id/mining', async (req, res) => {
+router.get('/users/:id/mining', requireAdminOrEmployee, async (req, res) => {
   try {
     const { id } = req.params;
     const [purchases, sessions] = await Promise.all([
@@ -183,7 +406,7 @@ router.get('/users/:id/mining', async (req, res) => {
 });
 
 // ============ MINING PLAN MANAGEMENT ============
-router.get('/plans', async (_req, res) => {
+router.get('/plans', requireAdminOrEmployee, async (_req, res) => {
   try {
     const plans = await prisma.miningPlan.findMany({ orderBy: { price: 'asc' } });
     res.json({ plans });
@@ -193,24 +416,16 @@ router.get('/plans', async (_req, res) => {
   }
 });
 
-router.post('/plans', async (req, res) => {
+router.post('/plans', requireSuperAdmin, async (req, res) => {
   try {
     const { name, description, price, currency, chain, hashRate, dailyRate, durationDays, bonusReward, referralBonus, expectedReturn } = req.body;
     const plan = await prisma.miningPlan.create({
       data: {
-        id: uuid(),
-        name,
-        description,
-        price: Number(price),
-        currency: currency || 'USDT',
-        chain: chain || 'ethereum',
-        hashRate: Number(hashRate),
-        dailyRate: Number(dailyRate),
-        durationDays: Number(durationDays),
-        bonusReward: Number(bonusReward || 0),
-        referralBonus: Number(referralBonus || 0),
-        expectedReturn: Number(expectedReturn || 0),
-        updatedAt: new Date(),
+        id: uuid(), name, description,
+        price: Number(price), currency: currency || 'USDT', chain: chain || 'ethereum',
+        hashRate: Number(hashRate), dailyRate: Number(dailyRate), durationDays: Number(durationDays),
+        bonusReward: Number(bonusReward || 0), referralBonus: Number(referralBonus || 0),
+        expectedReturn: Number(expectedReturn || 0), updatedAt: new Date(),
       },
     });
     res.json({ success: true, plan });
@@ -220,7 +435,7 @@ router.post('/plans', async (req, res) => {
   }
 });
 
-router.patch('/plans/:id', async (req, res) => {
+router.patch('/plans/:id', requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const data = { ...req.body };
@@ -240,37 +455,19 @@ router.patch('/plans/:id', async (req, res) => {
   }
 });
 
-router.delete('/plans/:id', async (req, res) => {
+router.delete('/plans/:id', requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const plan = await prisma.miningPlan.findUnique({ where: { id } });
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
 
-    if (!plan) {
-      return res.status(404).json({ error: 'Plan not found' });
-    }
-
-    const activePurchases = await prisma.miningPurchase.count({
-      where: {
-        planId: id,
-        status: 'active',
-      },
-    });
+    const activePurchases = await prisma.miningPurchase.count({ where: { planId: id, status: 'active' } });
 
     if (activePurchases > 0) {
       const updatedPlan = await prisma.miningPlan.update({
-        where: { id },
-        data: {
-          active: false,
-          updatedAt: new Date(),
-        },
+        where: { id }, data: { active: false, updatedAt: new Date() },
       });
-
-      return res.json({
-        success: true,
-        softDeleted: true,
-        plan: updatedPlan,
-        message: 'Plan is still active for users and was deactivated instead of being deleted.',
-      });
+      return res.json({ success: true, softDeleted: true, plan: updatedPlan, message: 'Plan is still active for users and was deactivated instead of being deleted.' });
     }
 
     await prisma.miningPlan.delete({ where: { id } });
@@ -281,12 +478,10 @@ router.delete('/plans/:id', async (req, res) => {
   }
 });
 
-// ============ RECEIVING WALLET MANAGEMENT ============
-router.get('/treasury', async (_req, res) => {
+// ============ RECEIVING WALLET MANAGEMENT (SUPER_ADMIN ONLY - wallet sensitive) ============
+router.get('/treasury', requireSuperAdmin, async (_req, res) => {
   try {
-    const wallets = await prisma.treasuryWallet.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    const wallets = await prisma.treasuryWallet.findMany({ orderBy: { createdAt: 'desc' } });
     res.json({ wallets });
   } catch (error) {
     console.error('Treasury wallets error:', error);
@@ -294,11 +489,9 @@ router.get('/treasury', async (_req, res) => {
   }
 });
 
-router.get('/receiving-wallets', async (_req, res) => {
+router.get('/receiving-wallets', requireSuperAdmin, async (_req, res) => {
   try {
-    const wallets = await prisma.treasuryWallet.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    const wallets = await prisma.treasuryWallet.findMany({ orderBy: { createdAt: 'desc' } });
     res.json({ wallets });
   } catch (error) {
     console.error('Receiving wallets error:', error);
@@ -306,7 +499,7 @@ router.get('/receiving-wallets', async (_req, res) => {
   }
 });
 
-router.post('/receiving-wallets', async (req, res) => {
+router.post('/receiving-wallets', requireSuperAdmin, async (req, res) => {
   try {
     const { network, address, label, supportedCurrency, active } = req.body;
     if (!['solana', 'ethereum', 'bnb'].includes(network)) {
@@ -315,16 +508,11 @@ router.post('/receiving-wallets', async (req, res) => {
     if (!address) return res.status(400).json({ error: 'Address is required' });
 
     const existing = await prisma.treasuryWallet.findUnique({ where: { network } });
-    if (existing) {
-      return res.status(400).json({ error: `A receiving wallet for ${network} already exists` });
-    }
+    if (existing) return res.status(400).json({ error: `A receiving wallet for ${network} already exists` });
 
     const wallet = await prisma.treasuryWallet.create({
       data: {
-        id: uuid(),
-        network,
-        address,
-        label,
+        id: uuid(), network, address, label,
         supportedCurrency: supportedCurrency || 'USDT',
         active: active !== undefined ? Boolean(active) : true,
         updatedAt: new Date(),
@@ -337,15 +525,14 @@ router.post('/receiving-wallets', async (req, res) => {
   }
 });
 
-router.patch('/receiving-wallets/:id', async (req, res) => {
+router.patch('/receiving-wallets/:id', requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { address, label, supportedCurrency, active } = req.body;
     const wallet = await prisma.treasuryWallet.update({
       where: { id },
       data: {
-        address: address || undefined,
-        label: label || undefined,
+        address: address || undefined, label: label || undefined,
         supportedCurrency: supportedCurrency || undefined,
         active: active !== undefined ? Boolean(active) : undefined,
       },
@@ -357,7 +544,7 @@ router.patch('/receiving-wallets/:id', async (req, res) => {
   }
 });
 
-router.delete('/receiving-wallets/:id', async (req, res) => {
+router.delete('/receiving-wallets/:id', requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     await prisma.treasuryWallet.delete({ where: { id } });
@@ -368,12 +555,10 @@ router.delete('/receiving-wallets/:id', async (req, res) => {
   }
 });
 
-// ============ PAYMENT ACCOUNT MANAGEMENT ============
-router.get('/payment-accounts', async (_req, res) => {
+// ============ PAYMENT ACCOUNT MANAGEMENT (SUPER_ADMIN ONLY - wallet sensitive) ============
+router.get('/payment-accounts', requireSuperAdmin, async (_req, res) => {
   try {
-    const accounts = await prisma.paymentAccount.findMany({
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
-    });
+    const accounts = await prisma.paymentAccount.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }] });
     res.json({ paymentAccounts: accounts });
   } catch (error) {
     console.error('Payment accounts error:', error);
@@ -381,7 +566,7 @@ router.get('/payment-accounts', async (_req, res) => {
   }
 });
 
-router.post('/payment-accounts', async (req, res) => {
+router.post('/payment-accounts', requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { type, name, label, bankName, accountHolder, accountNumber, walletAddress, network, currency, isDefault, active, sortOrder } = req.body;
     const validTypes = ['bank', 'crypto', 'momo', 'opay', 'other'];
@@ -392,40 +577,24 @@ router.post('/payment-accounts', async (req, res) => {
     }
 
     const payload = {
-      id: uuid(),
-      type: normalizedType,
-      name,
-      label: label || name,
-      bankName: bankName || null,
-      accountHolder: accountHolder || null,
-      accountNumber: accountNumber || null,
-      walletAddress: walletAddress || null,
-      network: network || null,
-      currency: currency || 'USDT',
-      isDefault: Boolean(isDefault),
-      active: active !== undefined ? Boolean(active) : true,
-      sortOrder: Number(sortOrder || 0),
-      updatedAt: new Date(),
+      id: uuid(), type: normalizedType, name, label: label || name,
+      bankName: bankName || null, accountHolder: accountHolder || null,
+      accountNumber: accountNumber || null, walletAddress: walletAddress || null,
+      network: network || null, currency: currency || 'USDT',
+      isDefault: Boolean(isDefault), active: active !== undefined ? Boolean(active) : true,
+      sortOrder: Number(sortOrder || 0), updatedAt: new Date(),
     };
 
     if (payload.isDefault) {
-      await prisma.paymentAccount.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false },
-      });
+      await prisma.paymentAccount.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
     }
 
     const account = await prisma.paymentAccount.create({ data: payload });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        id: uuid(),
-        action: 'PAYMENT_ACCOUNT_CREATE',
-        details: { accountId: account.id, name: account.name, type: account.type, adminId: (req as AuthRequest).user?.id },
-        ipAddress: req.ip || null,
-        userAgent: req.headers['user-agent'] || null,
-      },
+    await createAuditLog(req, {
+      action: 'PAYMENT_ACCOUNT_CREATE',
+      targetId: account.id,
+      details: { name: account.name, type: account.type, adminName: getActorName(req) },
     });
 
     res.status(201).json({ success: true, paymentAccount: account });
@@ -435,7 +604,7 @@ router.post('/payment-accounts', async (req, res) => {
   }
 });
 
-router.patch('/payment-accounts/:id', async (req, res) => {
+router.patch('/payment-accounts/:id', requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { type, name, label, bankName, accountHolder, accountNumber, walletAddress, network, currency, isDefault, active, sortOrder } = req.body;
@@ -443,15 +612,10 @@ router.patch('/payment-accounts/:id', async (req, res) => {
     const normalizedType = type && validTypes.includes(type) ? type : type === 'card' ? 'other' : undefined;
 
     const data: Record<string, unknown> = {
-      type: normalizedType || undefined,
-      name: name || undefined,
-      label: label || undefined,
-      bankName: bankName || undefined,
-      accountHolder: accountHolder || undefined,
-      accountNumber: accountNumber || undefined,
-      walletAddress: walletAddress || undefined,
-      network: network || undefined,
-      currency: currency || undefined,
+      type: normalizedType || undefined, name: name || undefined, label: label || undefined,
+      bankName: bankName || undefined, accountHolder: accountHolder || undefined,
+      accountNumber: accountNumber || undefined, walletAddress: walletAddress || undefined,
+      network: network || undefined, currency: currency || undefined,
       isDefault: isDefault !== undefined ? Boolean(isDefault) : undefined,
       active: active !== undefined ? Boolean(active) : undefined,
       sortOrder: sortOrder !== undefined ? Number(sortOrder) : undefined,
@@ -459,30 +623,15 @@ router.patch('/payment-accounts/:id', async (req, res) => {
     };
 
     if (data.isDefault === true) {
-      await prisma.paymentAccount.updateMany({
-        where: { isDefault: true },
-        data: { isDefault: false },
-      });
+      await prisma.paymentAccount.updateMany({ where: { isDefault: true }, data: { isDefault: false } });
     }
 
-    const account = await prisma.paymentAccount.update({
-      where: { id },
-      data,
-    });
+    const account = await prisma.paymentAccount.update({ where: { id }, data });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        id: uuid(),
-        action: 'PAYMENT_ACCOUNT_UPDATE',
-        details: {
-          accountId: id,
-          updatedFields: Object.keys(data).filter((key) => data[key] !== undefined),
-          adminId: (req as AuthRequest).user?.id,
-        },
-        ipAddress: req.ip || null,
-        userAgent: req.headers['user-agent'] || null,
-      },
+    await createAuditLog(req, {
+      action: 'PAYMENT_ACCOUNT_UPDATE',
+      targetId: id,
+      details: { updatedFields: Object.keys(data).filter((key) => data[key] !== undefined), adminName: getActorName(req) },
     });
 
     res.json({ success: true, paymentAccount: account });
@@ -492,20 +641,15 @@ router.patch('/payment-accounts/:id', async (req, res) => {
   }
 });
 
-router.delete('/payment-accounts/:id', async (req, res) => {
+router.delete('/payment-accounts/:id', requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     await prisma.paymentAccount.delete({ where: { id } });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        id: uuid(),
-        action: 'PAYMENT_ACCOUNT_DELETE',
-        details: { accountId: id, adminId: (req as AuthRequest).user?.id },
-        ipAddress: req.ip || null,
-        userAgent: req.headers['user-agent'] || null,
-      },
+    await createAuditLog(req, {
+      action: 'PAYMENT_ACCOUNT_DELETE',
+      targetId: id,
+      details: { adminName: getActorName(req) },
     });
 
     res.json({ success: true });
@@ -516,7 +660,9 @@ router.delete('/payment-accounts/:id', async (req, res) => {
 });
 
 // ============ FINANCIAL MANAGEMENT ============
-router.get('/deposits', async (_req, res) => {
+
+// Deposits - employees can view and process deposits
+router.get('/deposits', requireAdminOrEmployee, async (_req, res) => {
   try {
     const deposits = await prisma.deposit.findMany({
       include: {
@@ -533,7 +679,8 @@ router.get('/deposits', async (_req, res) => {
   }
 });
 
-router.patch('/deposits/:id', async (req, res) => {
+// Approve/reject deposits - employees can do this
+router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status, adminNote } = req.body;
@@ -544,27 +691,34 @@ router.patch('/deposits/:id', async (req, res) => {
     }
 
     const deposit = await prisma.deposit.findUnique({ where: { id } });
-    if (!deposit) {
-      return res.status(404).json({ error: 'Deposit not found' });
-    }
+    if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
+
+    const actorName = getActorName(req);
+    const previousStatus = deposit.status;
 
     if (status === 'rejected') {
       const updated = await prisma.deposit.update({
         where: { id },
         data: {
-          status: 'rejected',
-          note: adminNote || deposit.note,
-          approvedAt: null,
+          status: 'rejected', note: adminNote || deposit.note, approvedAt: null,
+          processedById: req.user?.id, processedByName: actorName,
         },
       });
 
       await prisma.notification.create({
         data: {
-          id: uuid(),
-          userId: deposit.userId,
-          type: 'deposit',
-          title: 'Deposit Rejected',
+          id: uuid(), userId: deposit.userId, type: 'deposit', title: 'Deposit Rejected',
           message: `Your deposit request for ${Number(deposit.amount).toFixed(2)} ${deposit.currency} was rejected.${adminNote ? ` Reason: ${adminNote}` : ''}`,
+        },
+      });
+
+      await createAuditLog(req, {
+        action: 'DEPOSIT_REJECT',
+        targetId: id,
+        details: {
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          previousStatus, newStatus: 'rejected',
+          amount: Number(deposit.amount), currency: deposit.currency,
         },
       });
 
@@ -580,10 +734,7 @@ router.patch('/deposits/:id', async (req, res) => {
       const processed = await prisma.$transaction([
         prisma.user.update({
           where: { id: deposit.userId },
-          data: {
-            platformBalance: { increment: amount },
-            totalDeposited: { increment: amount },
-          },
+          data: { platformBalance: { increment: amount }, totalDeposited: { increment: amount } },
         }),
         prisma.deposit.update({
           where: { id },
@@ -592,41 +743,41 @@ router.patch('/deposits/:id', async (req, res) => {
             approvedAt: new Date(),
             confirmedAt: status === 'completed' ? new Date() : deposit.confirmedAt,
             note: adminNote || deposit.note,
+            processedById: req.user?.id, processedByName: actorName,
           },
         }),
         prisma.transaction.create({
           data: {
-            id: uuid(),
-            userId: deposit.userId,
-            type: 'deposit',
-            amount,
-            currency: deposit.currency,
-            chain: deposit.chain || 'ethereum',
-            txHash: deposit.txHash || null,
-            status: 'completed',
+            id: uuid(), userId: deposit.userId, type: 'deposit', amount,
+            currency: deposit.currency, chain: deposit.chain || 'ethereum',
+            txHash: deposit.txHash || null, status: 'completed',
             metadata: { depositId: deposit.id, source: deposit.method || 'manual', paymentAccountId: deposit.paymentAccountId },
           },
         }),
         prisma.notification.create({
           data: {
-            id: uuid(),
-            userId: deposit.userId,
-            type: 'deposit',
-            title: 'Deposit Approved',
+            id: uuid(), userId: deposit.userId, type: 'deposit', title: 'Deposit Approved',
             message: `Your ${deposit.currency} deposit of ${amount.toFixed(2)} has been approved and credited to your balance.`,
           },
         }),
       ]);
+
+      await createAuditLog(req, {
+        action: 'DEPOSIT_APPROVE',
+        targetId: id,
+        details: {
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          previousStatus, newStatus: status === 'completed' ? 'completed' : 'approved',
+          amount, currency: deposit.currency,
+        },
+      });
 
       return res.json({ success: true, deposit: processed[1] });
     }
 
     const updated = await prisma.deposit.update({
       where: { id },
-      data: {
-        status,
-        note: adminNote || deposit.note,
-      },
+      data: { status, note: adminNote || deposit.note },
     });
 
     res.json({ success: true, deposit: updated });
@@ -636,22 +787,17 @@ router.patch('/deposits/:id', async (req, res) => {
   }
 });
 
-router.get('/withdrawals', async (_req, res) => {
+// Withdrawals - employees can view, only SUPER_ADMIN can process
+router.get('/withdrawals', requireAdminOrEmployee, async (_req, res) => {
   try {
     const withdrawals = await prisma.withdrawal.findMany({
-      include: { 
+      include: {
         User: { select: { id: true, username: true, walletAddress: true, email: true } },
         PayoutMethod: {
           select: {
-            type: true,
-            name: true,
-            address: true,
-            solanaAddress: true,
-            momoNumber: true,
-            momoName: true,
-            bankName: true,
-            accountNumber: true,
-            accountHolder: true,
+            type: true, name: true, address: true, solanaAddress: true,
+            momoNumber: true, momoName: true, bankName: true,
+            accountNumber: true, accountHolder: true,
           },
         },
       },
@@ -665,7 +811,7 @@ router.get('/withdrawals', async (_req, res) => {
   }
 });
 
-router.patch('/withdrawals/:id', async (req, res) => {
+router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status, adminNote, txHash } = req.body;
@@ -675,14 +821,13 @@ router.patch('/withdrawals/:id', async (req, res) => {
     }
 
     const withdrawal = await prisma.withdrawal.findUnique({ where: { id } });
-    if (!withdrawal) {
-      return res.status(404).json({ error: 'Withdrawal not found' });
-    }
+    if (!withdrawal) return res.status(404).json({ error: 'Withdrawal not found' });
 
     const user = await prisma.user.findUnique({ where: { id: withdrawal.userId } });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const actorName = getActorName(req);
+    const previousStatus = withdrawal.status;
 
     const transactionWhere = {
       userId: withdrawal.userId,
@@ -694,24 +839,28 @@ router.patch('/withdrawals/:id', async (req, res) => {
       const updatedWithdrawal = await prisma.withdrawal.update({
         where: { id },
         data: {
-          status: 'approved',
-          adminNote: adminNote || undefined,
+          status: 'approved', adminNote: adminNote || undefined,
+          processedById: req.user?.id, processedByName: actorName,
         },
       });
 
       await prisma.notification.create({
         data: {
-          id: uuid(),
-          userId: withdrawal.userId,
-          type: 'withdrawal',
-          title: 'Withdrawal Approved',
+          id: uuid(), userId: withdrawal.userId, type: 'withdrawal', title: 'Withdrawal Approved',
           message: `Your withdrawal request for ${withdrawal.amount} ${withdrawal.currency} is approved and awaiting completion.`,
         },
       });
 
-      await prisma.transaction.updateMany({
-        where: transactionWhere,
-        data: { status: 'pending' },
+      await prisma.transaction.updateMany({ where: transactionWhere, data: { status: 'pending' } });
+
+      await createAuditLog(req, {
+        action: 'WITHDRAWAL_APPROVE',
+        targetId: id,
+        details: {
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          previousStatus, newStatus: 'approved',
+          amount: Number(withdrawal.amount), currency: withdrawal.currency,
+        },
       });
 
       return res.json({ success: true, withdrawal: updatedWithdrawal });
@@ -721,33 +870,33 @@ router.patch('/withdrawals/:id', async (req, res) => {
       await prisma.$transaction([
         prisma.user.update({
           where: { id: user.id },
-          data: {
-            platformBalance: { increment: withdrawal.amount },
-            totalWithdrawn: { decrement: withdrawal.amount },
-          },
+          data: { platformBalance: { increment: withdrawal.amount }, totalWithdrawn: { decrement: withdrawal.amount } },
         }),
         prisma.withdrawal.update({
           where: { id },
           data: {
-            status: 'rejected',
-            adminNote: adminNote || undefined,
-            processedAt: new Date(),
+            status: 'rejected', adminNote: adminNote || undefined, processedAt: new Date(),
+            processedById: req.user?.id, processedByName: actorName,
           },
         }),
-        prisma.transaction.updateMany({
-          where: transactionWhere,
-          data: { status: 'failed' },
-        }),
+        prisma.transaction.updateMany({ where: transactionWhere, data: { status: 'failed' } }),
         prisma.notification.create({
           data: {
-            id: uuid(),
-            userId: withdrawal.userId,
-            type: 'withdrawal',
-            title: 'Withdrawal Rejected',
+            id: uuid(), userId: withdrawal.userId, type: 'withdrawal', title: 'Withdrawal Rejected',
             message: `Your withdrawal request for ${withdrawal.amount} ${withdrawal.currency} was rejected. Funds have been returned to your account.`,
           },
         }),
       ]);
+
+      await createAuditLog(req, {
+        action: 'WITHDRAWAL_REJECT',
+        targetId: id,
+        details: {
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          previousStatus, newStatus: 'rejected',
+          amount: Number(withdrawal.amount), currency: withdrawal.currency,
+        },
+      });
 
       return res.json({ success: true, withdrawal: { ...withdrawal, status: 'rejected' } });
     }
@@ -760,25 +909,27 @@ router.patch('/withdrawals/:id', async (req, res) => {
       const updatedWithdrawal = await prisma.withdrawal.update({
         where: { id },
         data: {
-          status: 'completed',
-          txHash,
-          adminNote: adminNote || undefined,
-          processedAt: new Date(),
+          status: 'completed', txHash, adminNote: adminNote || undefined,
+          processedAt: new Date(), processedById: req.user?.id, processedByName: actorName,
         },
       });
 
-      await prisma.transaction.updateMany({
-        where: transactionWhere,
-        data: { status: 'completed', txHash },
-      });
+      await prisma.transaction.updateMany({ where: transactionWhere, data: { status: 'completed', txHash } });
 
       await prisma.notification.create({
         data: {
-          id: uuid(),
-          userId: withdrawal.userId,
-          type: 'withdrawal',
-          title: 'Withdrawal Completed',
+          id: uuid(), userId: withdrawal.userId, type: 'withdrawal', title: 'Withdrawal Completed',
           message: `Your withdrawal of ${withdrawal.amount} ${withdrawal.currency} is complete.`,
+        },
+      });
+
+      await createAuditLog(req, {
+        action: 'WITHDRAWAL_COMPLETE',
+        targetId: id,
+        details: {
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          previousStatus, newStatus: 'completed',
+          amount: Number(withdrawal.amount), currency: withdrawal.currency, txHash,
         },
       });
 
@@ -792,8 +943,8 @@ router.patch('/withdrawals/:id', async (req, res) => {
   }
 });
 
-// ============ SETTINGS ============
-router.get('/settings', async (_req, res) => {
+// ============ SETTINGS (SUPER_ADMIN ONLY) ============
+router.get('/settings', requireSuperAdmin, async (_req, res) => {
   try {
     const settings = await prisma.adminSetting.findMany();
     res.json({ settings });
@@ -803,7 +954,7 @@ router.get('/settings', async (_req, res) => {
   }
 });
 
-router.put('/settings', async (req, res) => {
+router.put('/settings', requireSuperAdmin, async (req, res) => {
   try {
     const { key, value } = req.body;
     const setting = await prisma.adminSetting.upsert({
@@ -818,8 +969,8 @@ router.put('/settings', async (req, res) => {
   }
 });
 
-// ============ AUDIT LOGS ============
-router.get('/audit-logs', async (_req, res) => {
+// ============ AUDIT LOGS (SUPER_ADMIN ONLY) ============
+router.get('/audit-logs', requireSuperAdmin, async (_req, res) => {
   try {
     const logs = await prisma.auditLog.findMany({
       include: { User: true },
@@ -833,26 +984,27 @@ router.get('/audit-logs', async (_req, res) => {
   }
 });
 
-// ============ SUPPORT SYSTEM ============
-router.get('/support/tickets', async (_req, res) => {
+// ============ SUPPORT SYSTEM (SUPER_ADMIN or EMPLOYEE) ============
+
+// Get all support conversations - shared across staff
+router.get('/support/tickets', requireAdminOrEmployee, async (_req, res) => {
   try {
     const tickets = await prisma.supportTicket.findMany({
       include: {
-        User: {
-          select: { id: true, username: true, walletAddress: true, email: true },
-        },
+        User: { select: { id: true, username: true, walletAddress: true, email: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
       take: 100,
     });
 
-    // Fetch messages separately for each ticket
     const ticketsWithMessages = await Promise.all(
       tickets.map(async (ticket) => {
         const messages = await prisma.supportMessage.findMany({
           where: { ticketId: ticket.id },
           orderBy: { createdAt: 'asc' },
         });
+
+        const unreadStaffMessages = messages.filter(m => m.senderRole === 'user' && !m.readByStaff).length;
 
         return {
           id: ticket.id,
@@ -862,13 +1014,19 @@ router.get('/support/tickets', async (_req, res) => {
           category: ticket.category,
           priority: ticket.priority,
           status: ticket.status,
+          assignedStaffId: ticket.assignedStaffId,
           createdAt: ticket.createdAt,
           updatedAt: ticket.updatedAt,
+          unreadStaffMessages,
           responses: messages.map((msg) => ({
             id: msg.id,
             message: msg.message,
             createdAt: msg.createdAt,
-            isAdmin: msg.senderRole === 'admin',
+            senderId: msg.senderId,
+            senderRole: msg.senderRole,
+            isAdmin: msg.senderRole !== 'user',
+            readByUser: msg.readByUser,
+            readByStaff: msg.readByStaff,
           })),
         };
       })
@@ -881,7 +1039,37 @@ router.get('/support/tickets', async (_req, res) => {
   }
 });
 
-router.patch('/support/tickets/:ticketId', async (req, res) => {
+// Get single conversation with full message history
+router.get('/support/tickets/:ticketId', requireAdminOrEmployee, async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const ticket = await prisma.supportTicket.findUnique({
+      where: { id: ticketId },
+      include: {
+        User: { select: { id: true, username: true, walletAddress: true, email: true } },
+        SupportMessage: { orderBy: { createdAt: 'asc' } },
+      },
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Mark staff messages as read
+    await prisma.supportMessage.updateMany({
+      where: { ticketId, senderRole: 'user', readByStaff: false },
+      data: { readByStaff: true },
+    });
+
+    res.json({ ticket });
+  } catch (error) {
+    console.error('Admin support ticket detail error:', error);
+    res.status(500).json({ error: 'Failed to load conversation' });
+  }
+});
+
+// Update conversation status
+router.patch('/support/tickets/:ticketId', requireAdminOrEmployee, async (req: AuthRequest, res) => {
   try {
     const { ticketId } = req.params;
     const { status } = req.body;
@@ -891,31 +1079,36 @@ router.patch('/support/tickets/:ticketId', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    const ticket = await prisma.supportTicket.update({
+    const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId } });
+    if (!ticket) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    const previousStatus = ticket.status;
+
+    const updated = await prisma.supportTicket.update({
       where: { id: ticketId },
       data: { status, updatedAt: new Date() },
     });
 
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        id: uuid(),
-        userId: ticket.userId,
-        action: 'SUPPORT_TICKET_STATUS',
-        details: { ticketId, newStatus: status, adminId: (req as AuthRequest).user?.id },
-        ipAddress: req.ip || null,
-        userAgent: req.headers['user-agent'] || null,
+    await createAuditLog(req, {
+      action: 'SUPPORT_TICKET_STATUS',
+      targetId: ticketId,
+      details: {
+        conversationId: ticketId, previousStatus, newStatus: status,
+        employeeName: getActorName(req),
       },
     });
 
-    res.json({ success: true, ticket });
+    res.json({ success: true, ticket: updated });
   } catch (error) {
     console.error('Update support ticket error:', error);
     res.status(500).json({ error: 'Failed to update ticket status' });
   }
 });
 
-router.post('/support/tickets/:ticketId/respond', async (req, res) => {
+// Reply to a conversation - shared across staff
+router.post('/support/tickets/:ticketId/respond', requireAdminOrEmployee, async (req: AuthRequest, res) => {
   try {
     const { ticketId } = req.params;
     const { message } = req.body;
@@ -930,16 +1123,18 @@ router.post('/support/tickets/:ticketId/respond', async (req, res) => {
     });
 
     if (!ticket) {
-      return res.status(404).json({ error: 'Ticket not found' });
+      return res.status(404).json({ error: 'Conversation not found' });
     }
 
-    const adminMessage = await prisma.supportMessage.create({
+    const staffMessage = await prisma.supportMessage.create({
       data: {
         id: uuid(),
         ticketId,
-        senderId: (req as AuthRequest).user?.id || '',
-        senderRole: 'admin',
+        senderId: req.user?.id || '',
+        senderRole: req.user?.role === 'SUPER_ADMIN' ? 'admin' : 'employee',
         message: message.trim(),
+        readByUser: false,
+        readByStaff: true,
       },
     });
 
@@ -952,31 +1147,27 @@ router.post('/support/tickets/:ticketId/respond', async (req, res) => {
     }
 
     // Create notification for user
-    if (ticket.User?.email) {
-      await prisma.notification.create({
-        data: {
-          id: uuid(),
-          userId: ticket.userId,
-          type: 'support',
-          title: 'Support Response',
-          message: `Admin has responded to your support ticket: "${ticket.subject}"`,
-        },
-      });
-    }
-
-    // Audit log
-    await prisma.auditLog.create({
+    await prisma.notification.create({
       data: {
         id: uuid(),
         userId: ticket.userId,
-        action: 'SUPPORT_ADMIN_RESPONSE',
-        details: { ticketId, messageId: adminMessage.id, adminId: (req as AuthRequest).user?.id },
-        ipAddress: req.ip || null,
-        userAgent: req.headers['user-agent'] || null,
+        type: 'support',
+        title: 'Support Team replied to your support conversation',
+        message: `Support Team replied to your support conversation: "${ticket.subject}"`,
+        conversationId: ticketId,
       },
     });
 
-    res.json({ success: true, message: adminMessage });
+    await createAuditLog(req, {
+      action: 'SUPPORT_ADMIN_RESPONSE',
+      targetId: ticketId,
+      details: {
+        conversationId: ticketId, messageId: staffMessage.id,
+        employeeName: getActorName(req), employeeRole: req.user?.role,
+      },
+    });
+
+    res.json({ success: true, message: staffMessage });
   } catch (error) {
     console.error('Support admin response error:', error);
     res.status(500).json({ error: 'Failed to send response' });

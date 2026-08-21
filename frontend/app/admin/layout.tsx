@@ -18,34 +18,10 @@ import {
   FaTable,
   FaUsers,
   FaWallet,
+  FaUserTie,
 } from 'react-icons/fa';
 import Logo from '@/components/Logo';
 import { getUser, logout, User } from '@/lib/auth';
-
-const adminNav = [
-  { href: '/admin', label: 'Dashboard', icon: FaHome },
-  { href: '/admin/plans', label: 'Mining Center', icon: FaLayerGroup },
-  { href: '/admin/users', label: 'Bubble Team', icon: FaUsers },
-  { href: '/admin/treasury', label: 'Wallet', icon: FaWallet },
-  { href: '/admin/deposits', label: 'Transactions', icon: FaTable },
-  { href: '/admin/withdrawals', label: 'Rewards & Activity', icon: FaCoins },
-  { href: '/admin/plans', label: 'Marketplace', icon: FaStore },
-  { href: '/admin/deposits', label: 'Reports', icon: FaChartPie },
-  { href: '/admin/settings', label: 'Settings', icon: FaCogs },
-  { href: '/admin/support', label: 'Support', icon: FaHeadset },
-  { href: '/admin/withdrawals', label: 'Notifications', icon: FaBell },
-  { href: '/admin', label: 'Analytics', icon: FaChartLine },
-];
-
-const mobileNav = [
-  { href: '/admin', label: 'Home', icon: FaHome },
-  { href: '/admin/plans', label: 'Mining', icon: FaLayerGroup },
-  { href: '/admin/users', label: 'Team', icon: FaUsers },
-  { href: '/admin/treasury', label: 'Wallet', icon: FaWallet },
-  { href: '/admin/settings', label: 'More', icon: FaCogs },
-];
-
-const RETRY_DELAY = 100; // ms
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -59,7 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const hydrateOptionalUser = async () => {
       try {
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        await new Promise(resolve => setTimeout(resolve, 100));
         setUser(getUser());
       } catch (err) {
         console.error('[AdminLayout] Optional user hydration failed:', err);
@@ -71,6 +47,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     hydrateOptionalUser();
   }, []);
 
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+  const isEmployee = user?.role === 'EMPLOYEE';
+  const isStaff = isSuperAdmin || isEmployee;
+
+  // Build navigation based on role
+  const adminNav = [
+    { href: '/admin', label: 'Dashboard', icon: FaHome, show: isStaff },
+    { href: '/admin/plans', label: 'Mining Center', icon: FaLayerGroup, show: isStaff },
+    { href: '/admin/users', label: 'Bubble Team', icon: FaUsers, show: isStaff },
+    // Wallet panel - SUPER_ADMIN ONLY
+    { href: '/admin/treasury', label: 'Wallet', icon: FaWallet, show: isSuperAdmin },
+    { href: '/admin/deposits', label: 'Transactions', icon: FaTable, show: isStaff },
+    { href: '/admin/withdrawals', label: 'Rewards & Activity', icon: FaCoins, show: isStaff },
+    { href: '/admin/plans', label: 'Marketplace', icon: FaStore, show: isStaff },
+    { href: '/admin/deposits', label: 'Reports', icon: FaChartPie, show: isStaff },
+    { href: '/admin/settings', label: 'Settings', icon: FaCogs, show: isStaff },
+    { href: '/admin/support', label: 'Support', icon: FaHeadset, show: isStaff },
+    { href: '/admin/withdrawals', label: 'Notifications', icon: FaBell, show: isStaff },
+    { href: '/admin', label: 'Analytics', icon: FaChartLine, show: isStaff },
+  ].filter(item => item.show);
+
+  const mobileNav = [
+    { href: '/admin', label: 'Home', icon: FaHome, show: isStaff },
+    { href: '/admin/plans', label: 'Mining', icon: FaLayerGroup, show: isStaff },
+    { href: '/admin/users', label: 'Team', icon: FaUsers, show: isStaff },
+    { href: '/admin/treasury', label: 'Wallet', icon: FaWallet, show: isSuperAdmin },
+    { href: '/admin/settings', label: 'More', icon: FaCogs, show: isStaff },
+  ].filter(item => item.show);
+
   // Show loading while checking access
   if (isChecking || !isMounted) {
     return (
@@ -81,6 +86,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
     );
+  }
+
+  // If not staff, redirect to login
+  if (!isStaff) {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    return null;
   }
 
   return (
@@ -130,7 +143,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="rounded-2xl bg-gradient-to-br from-cmblue-50 to-white p-3 ring-1 ring-sky-100">
               <p className="text-[10px] font-bold uppercase text-slate-400">Signed in</p>
               <p className="mt-1 truncate text-sm font-bold text-slate-900">{user?.username || 'Admin'}</p>
-              <p className="truncate text-[10px] text-slate-500">{user?.walletAddress || 'Direct admin access'}</p>
+              <p className="truncate text-[10px] text-slate-500">
+                {isSuperAdmin ? 'Super Admin' : isEmployee ? 'Employee' : user?.walletAddress || 'Direct admin access'}
+              </p>
             </div>
             <Link
               href="/dashboard"

@@ -830,12 +830,45 @@ router.get('/support/tickets', async (req: AuthRequest, res) => {
     const tickets = await prisma.supportTicket.findMany({
       where: { userId },
       include: { SupportMessage: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { updatedAt: 'desc' },
     });
-    res.json({ tickets });
+
+    // Add unread count for user messages
+    const ticketsWithUnread = tickets.map(ticket => {
+      const unreadMessages = ticket.SupportMessage.filter(m => m.senderRole !== 'user' && !m.readByUser).length;
+      return { ...ticket, unreadMessages };
+    });
+
+    res.json({ tickets: ticketsWithUnread });
   } catch (error) {
     console.error('Support tickets error:', error);
     res.status(500).json({ error: 'Failed to load tickets' });
+  }
+});
+
+// Get single conversation with full message history
+router.get('/support/tickets/:ticketId', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const { ticketId } = req.params;
+
+    const ticket = await prisma.supportTicket.findFirst({
+      where: { id: ticketId, userId },
+      include: { SupportMessage: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    if (!ticket) return res.status(404).json({ error: 'Conversation not found' });
+
+    // Mark staff messages as read by user
+    await prisma.supportMessage.updateMany({
+      where: { ticketId, senderRole: { not: 'user' }, readByUser: false },
+      data: { readByUser: true },
+    });
+
+    res.json({ ticket });
+  } catch (error) {
+    console.error('Support ticket detail error:', error);
+    res.status(500).json({ error: 'Failed to load conversation' });
   }
 });
 
@@ -863,6 +896,8 @@ router.post('/support/tickets', async (req: AuthRequest, res) => {
             senderId: userId,
             senderRole: 'user',
             message,
+            readByUser: true,
+            readByStaff: false,
           },
         },
       },
@@ -896,7 +931,15 @@ router.post('/support/tickets/:ticketId/messages', async (req: AuthRequest, res)
         senderId: userId,
         senderRole: 'user',
         message,
+        readByUser: true,
+        readByStaff: false,
       },
+    });
+
+    // Update ticket updatedAt
+    await prisma.supportTicket.update({
+      where: { id: ticketId },
+      data: { updatedAt: new Date() },
     });
 
     res.json({ success: true, message: msg });

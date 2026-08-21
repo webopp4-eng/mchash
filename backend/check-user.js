@@ -12,7 +12,7 @@ const client = new Client({
 async function main() {
   await client.connect();
   const res = await client.query(
-    'SELECT id, email, role, "passwordHash", "authMethod" FROM "User" WHERE email = $1',
+    'SELECT id, email, role, "employeeStatus", "passwordHash", "authMethod" FROM "User" WHERE email = $1',
     ['qwerty7yh@gmail.com']
   );
   console.log(JSON.stringify(res.rows, null, 2));

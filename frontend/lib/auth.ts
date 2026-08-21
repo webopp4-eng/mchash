@@ -9,6 +9,7 @@ export interface User {
   referralCode: string;
   platformBalance: string;
   role: string;
+  employeeStatus?: string;
   avatar?: string;
 }
 

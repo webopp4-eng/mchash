@@ -6,6 +6,10 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     walletAddress?: string | null;
+    role?: string;
+    email?: string | null;
+    username?: string | null;
+    fullName?: string | null;
   };
 }
 
@@ -42,6 +46,18 @@ export async function loadUser(req: AuthRequest, res: Response, next: NextFuncti
     return res.status(403).json({ error: 'Account is ' + user.status });
   }
 
-  req.user = { id: user.id, walletAddress: user.walletAddress || undefined };
+  // Check employee status for employee accounts
+  if (user.role === 'EMPLOYEE' && user.employeeStatus !== 'active') {
+    return res.status(403).json({ error: 'Employee account is ' + user.employeeStatus });
+  }
+
+  req.user = {
+    id: user.id,
+    walletAddress: user.walletAddress || undefined,
+    role: user.role,
+    email: user.email,
+    username: user.username,
+    fullName: user.fullName,
+  };
   next();
 }

@@ -30,7 +30,7 @@ async function setupAdminAccount() {
        WHERE email = $9
        RETURNING id, email, role, "authMethod", status, "fullName"`,
       [
-        'admin',                                    // role
+        'SUPER_ADMIN',                              // role
         hashedPassword,                             // passwordHash
         'EMAIL',                                    // authMethod
         'active',                                   // status
