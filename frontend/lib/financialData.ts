@@ -134,8 +134,12 @@ function buildFinancialData(
   const availableBalance = Math.max(0, platformBalance - pendingAmount);
   const pendingBalance = pendingAmount;
 
+  // Display the server-side platformBalance exactly as stored — it is already
+  // debited atomically when a withdrawal is requested (e.g. $500 - $400 = $100).
+  // Never mask it with Math.max() against raw per-asset sums, otherwise a
+  // withdrawal would appear not to reduce the visible balance.
   return {
-    platformBalance: Math.max(platformBalance, Object.values(assets).reduce((a, b) => a + b, 0)),
+    platformBalance,
     walletBalance,
     assets,
     miningEarnings,

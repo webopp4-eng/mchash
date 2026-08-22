@@ -81,14 +81,18 @@ export default function HomePage() {
   return (
     <div className="mc-page space-y-3 sm:space-y-5">
       <section className="mc-page-header">
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-          <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600">
-            <FaUserCircle className="h-5 w-5" />
+        {/* Profile icon aligned side-by-side with the welcome text — compact
+            and balanced on mobile screens */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cmblue-50 text-cmblue-600 sm:h-10 sm:w-10">
+            <FaUserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase text-cmblue-600">Dashboard</p>
-            <h1 className="mc-title truncate">Welcome back, {displayName}</h1>
-            <p className="mc-subtitle truncate">{displayEmail}</p>
+            <p className="text-[9px] font-bold uppercase text-cmblue-600 sm:text-[10px]">Dashboard</p>
+            <h1 className="truncate text-sm font-extrabold tracking-normal text-slate-950 sm:text-lg">
+              Welcome back, {displayName}
+            </h1>
+            <p className="truncate text-[10px] text-slate-500 sm:text-xs">{displayEmail}</p>
           </div>
         </div>
         <Link href="/dashboard/settings" className="mc-button-secondary w-full sm:w-auto">
