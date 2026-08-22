@@ -28,6 +28,9 @@ services:
         value: production
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
+      # Optional — raises CoinGecko market-price rate limits (set in Dashboard)
+      - key: COINGECKO_API_KEY
+        sync: false
 
 databases:
   - name: cmhash-db

@@ -42,28 +42,72 @@ router.get('/hash-renting', async (_req, res) => {
 });
 
 // Live market prices - public endpoint (CoinGecko)
+//
+// Rate-limit safe: CoinGecko's free tier allows only a handful of calls per
+// minute, so results are cached server-side and shared across ALL users.
+// - Fresh cache (< 60s old) is served without hitting CoinGecko at all.
+// - A single in-flight fetch is reused for concurrent requests.
+// - If CoinGecko returns 429/errors, the last known prices are served from
+//   cache instead of zeros, so the UI keeps working during rate limits.
+const MARKET_CACHE_TTL_MS = 60 * 1000;
+let marketCache: { prices: any; updatedAt: string; fetchedAt: number } | null = null;
+let marketFetchInFlight: Promise<any> | null = null;
+
+async function fetchMarketPrices(): Promise<{ prices: any; updatedAt: string }> {
+  const headers: Record<string, string> = { accept: 'application/json' };
+  // Optional: set COINGECKO_API_KEY in the environment to raise rate limits
+  if (process.env.COINGECKO_API_KEY) {
+    headers['x-cg-demo-api-key'] = process.env.COINGECKO_API_KEY;
+  }
+
+  const response = await fetch(
+    'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether,binancecoin&vs_currencies=usd&include_24hr_change=true',
+    { signal: AbortSignal.timeout(5000), headers }
+  );
+  if (!response.ok) {
+    throw new Error(`CoinGecko API error: ${response.status}`);
+  }
+  const data = await response.json();
+  return {
+    prices: {
+      BTC: { price: data.bitcoin?.usd || 0, change24h: data.bitcoin?.usd_24h_change || 0 },
+      ETH: { price: data.ethereum?.usd || 0, change24h: data.ethereum?.usd_24h_change || 0 },
+      USDT: { price: data.tether?.usd || 1, change24h: data.tether?.usd_24h_change || 0 },
+      BNB: { price: data.binancecoin?.usd || 0, change24h: data.binancecoin?.usd_24h_change || 0 },
+    },
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 router.get('/market-prices', async (_req, res) => {
+  const now = Date.now();
+
+  // Serve fresh cache instantly — no external call, no rate-limit risk.
+  if (marketCache && now - marketCache.fetchedAt < MARKET_CACHE_TTL_MS) {
+    return res.json({ ...marketCache, source: 'cache' });
+  }
+
   try {
-    const response = await fetch(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether,binancecoin&vs_currencies=usd&include_24hr_change=true',
-      { signal: AbortSignal.timeout(5000) }
-    );
-    if (!response.ok) {
-      throw new Error(`CoinGecko API error: ${response.status}`);
+    // Reuse one in-flight fetch for concurrent requests (thundering herd guard).
+    if (!marketFetchInFlight) {
+      marketFetchInFlight = fetchMarketPrices()
+        .then((result) => {
+          marketCache = { ...result, fetchedAt: Date.now() };
+          return result;
+        })
+        .finally(() => {
+          marketFetchInFlight = null;
+        });
     }
-    const data = await response.json();
-    res.json({
-      prices: {
-        BTC: { price: data.bitcoin?.usd || 0, change24h: data.bitcoin?.usd_24h_change || 0 },
-        ETH: { price: data.ethereum?.usd || 0, change24h: data.ethereum?.usd_24h_change || 0 },
-        USDT: { price: data.tether?.usd || 1, change24h: data.tether?.usd_24h_change || 0 },
-        BNB: { price: data.binancecoin?.usd || 0, change24h: data.binancecoin?.usd_24h_change || 0 },
-      },
-      updatedAt: new Date().toISOString(),
-    });
+    const result = await marketFetchInFlight;
+    res.json({ ...result, source: 'coingecko' });
   } catch (error) {
     console.error('Market prices error:', error);
-    // Fallback to cached/default values if API fails
+    // Rate-limited or offline: serve the last known good prices if we have them.
+    if (marketCache) {
+      return res.json({ ...marketCache, source: 'stale-cache' });
+    }
+    // No cache yet — fall back to neutral defaults.
     res.json({
       prices: {
         BTC: { price: 0, change24h: 0 },
