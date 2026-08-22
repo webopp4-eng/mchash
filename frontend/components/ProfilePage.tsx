@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { FaBell, FaCogs, FaHeadset, FaLock, FaPencilAlt, FaSignOutAlt, FaUserCircle, FaCheck, FaWallet, FaMoneyBill } from 'react-icons/fa';
+import { FaBell, FaCogs, FaHeadset, FaLock, FaPencilAlt, FaSignOutAlt, FaUserCircle, FaCheck, FaWallet, FaMoneyBill, FaCoins, FaBitcoin, FaEthereum } from 'react-icons/fa';
 import { getUser, logout, User } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { shortenAddress } from '@/lib/wallet';
+import { useFinancialData } from '@/lib/financialData';
+import { SiTether } from 'react-icons/si';
 
 const items = [
   { icon: FaCogs, label: 'Settings', desc: 'Manage your preferences', href: '/dashboard/settings' },
@@ -22,6 +24,7 @@ export default function ProfilePage() {
   const [username, setUsername] = useState('User');
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(username);
+  const financial = useFinancialData();
 
   useEffect(() => {
     const currentUser = getUser();
@@ -128,6 +131,26 @@ export default function ProfilePage() {
               <p className="text-base font-bold text-slate-950">{user?.walletType || 'Wallet'}</p>
               <p className="text-[9px] font-bold uppercase text-slate-500 tracking-[0.16em]">Type</p>
             </div>
+          </div>
+
+          {/* Asset Balances */}
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {[
+              { symbol: 'USDT', value: financial.assets.USDT, icon: SiTether, color: 'bg-emerald-50 text-emerald-600' },
+              { symbol: 'BTC', value: financial.assets.BTC, icon: FaBitcoin, color: 'bg-amber-50 text-amber-600' },
+              { symbol: 'ETH', value: financial.assets.ETH, icon: FaEthereum, color: 'bg-sky-50 text-cmblue-700' },
+              { symbol: 'MC Coin', value: financial.assets.MCCoin, icon: FaCoins, color: 'bg-cmblue-50 text-cmblue-600' },
+            ].map((asset) => (
+              <div key={asset.symbol} className="flex items-center gap-2 rounded-2xl border border-sky-100 bg-sky-50/50 p-2.5">
+                <span className={`mc-stat-icon shrink-0 ${asset.color}`}>
+                  <asset.icon className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-950 truncate">{asset.symbol}</p>
+                  <p className="text-[10px] font-extrabold text-slate-600">{asset.value.toFixed(6)}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>

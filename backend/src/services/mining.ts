@@ -1,5 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
+import { getBalanceField } from './balances';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MIN_ACCRUAL = 0.00000001;
@@ -118,11 +119,17 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
   const shouldComplete = purchase.endsAt <= now;
 
   if (shouldRecordMiningReward(earned)) {
+    // Determine which per-asset balance to credit based on reward currency.
+    // Uses the centralized helper so mining accrual always matches the same
+    // column the withdrawal flow debits.
+    const balanceField = getBalanceField(rewardCurrency);
+
     await prisma.$transaction([
       prisma.user.update({
         where: { id: purchase.userId },
         data: {
           platformBalance: { increment: earned },
+          [balanceField]: { increment: earned },
           totalEarned: { increment: earned },
         },
       }),
@@ -191,11 +198,15 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
         },
       });
       if (!alreadyCredited) {
+        const bonusCurrency = getMiningRewardCurrency(plan.currency || purchase.currency);
+        const bonusBalanceField = getBalanceField(bonusCurrency);
+
         await prisma.$transaction([
           prisma.user.update({
             where: { id: purchase.userId },
             data: {
               platformBalance: { increment: bonusReward },
+              [bonusBalanceField]: { increment: bonusReward },
               totalEarned: { increment: bonusReward },
             },
           }),

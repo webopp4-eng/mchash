@@ -10,7 +10,7 @@
  * Exposes:
  * - platformBalance: Total USDT/balance in account
  * - walletBalance: Connected wallet balance
- * - assetsBreakdown: { USDT, ETH, BTC, MCCoin }
+ * - assets: { USDT, ETH, BTC, MCCoin }
  * - miningEarnings: Current mining rewards
  * - totalDeposits: Lifetime deposits
  * - totalWithdrawals: Lifetime withdrawals
@@ -87,6 +87,87 @@ function notifyListeners() {
   listeners.forEach(listener => listener());
 }
 
+/**
+ * Build the FinancialData object from raw API responses.
+ * Shared by both useFinancialData.refetch and refreshFinancialData so the
+ * transformation logic exists in exactly one place.
+ */
+function buildFinancialData(
+  dashboardRes: any,
+  walletRes: any,
+  earningsRes: any,
+  depositsRes: any,
+  withdrawalsRes: any
+): FinancialData {
+  const walletBalance = Number(walletRes?.walletBalance || 0);
+  const platformBalance = Number(walletRes?.platformBalance || dashboardRes?.user?.platformBalance || 0);
+
+  const assets = {
+    USDT: Number(walletRes?.balances?.USDT ?? walletRes?.balances?.usdt ?? 0),
+    ETH: Number(walletRes?.balances?.ETH ?? walletRes?.balances?.eth ?? 0),
+    BTC: Number(walletRes?.balances?.BTC ?? walletRes?.balances?.btc ?? 0),
+    MCCoin: Number(walletRes?.balances?.['MC Coin'] ?? walletRes?.balances?.mcCoin ?? 0),
+  };
+
+  // Mining & referral earnings come from the real server-side aggregates
+  // (totalMiningEarnings / totalReferralEarnings) so these are no longer 0.
+  const miningEarnings = Number(earningsRes?.totalMiningEarnings || 0);
+  const referralEarnings = Number(earningsRes?.totalReferralEarnings || 0);
+  const totalEarned = Number(
+    earningsRes?.totalEarned ||
+      dashboardRes?.user?.totalEarned ||
+      miningEarnings + referralEarnings
+  );
+
+  const deposits = Array.isArray(depositsRes?.deposits) ? depositsRes.deposits : [];
+  const withdrawals = Array.isArray(withdrawalsRes?.withdrawals) ? withdrawalsRes.withdrawals : [];
+
+  const totalDeposits = deposits.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
+  const totalWithdrawals = withdrawals.reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
+
+  const activePlan = dashboardRes?.activePlan || null;
+
+  const pendingAmount = withdrawals
+    .filter((w: any) => w.status === 'pending')
+    .reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
+
+  const availableBalance = Math.max(0, platformBalance - pendingAmount);
+  const pendingBalance = pendingAmount;
+
+  return {
+    platformBalance: Math.max(platformBalance, Object.values(assets).reduce((a, b) => a + b, 0)),
+    walletBalance,
+    assets,
+    miningEarnings,
+    totalDeposits,
+    totalWithdrawals,
+    totalEarned,
+    referralEarnings,
+    availableBalance,
+    pendingBalance,
+    activePlan,
+    lastUpdated: Date.now(),
+  };
+}
+
+/** Fetch all financial endpoints in parallel and return raw responses. */
+async function fetchFinancialData(): Promise<{
+  dashboardRes: any;
+  walletRes: any;
+  earningsRes: any;
+  depositsRes: any;
+  withdrawalsRes: any;
+}> {
+  const [dashboardRes, walletRes, earningsRes, depositsRes, withdrawalsRes] = await Promise.all([
+    apiFetch('/api/dashboard').catch(() => ({})),
+    apiFetch('/api/wallet').catch(() => ({})),
+    apiFetch('/api/earnings').catch(() => ({})),
+    apiFetch('/api/deposits').catch(() => ({})),
+    apiFetch('/api/withdrawals').catch(() => ({})),
+  ]);
+  return { dashboardRes, walletRes, earningsRes, depositsRes, withdrawalsRes };
+}
+
 export function useFinancialData(): UseFinancialDataReturn {
   const [data, setData] = useState<FinancialData>(DEFAULT_DATA);
   const [loading, setLoading] = useState(true);
@@ -96,65 +177,14 @@ export function useFinancialData(): UseFinancialDataReturn {
   const refetch = async () => {
     try {
       setError(null);
-      
-      // Fetch all financial data in parallel
-      const [dashboardRes, walletRes, earningsRes, depositsRes, withdrawalsRes] = await Promise.all([
-        apiFetch('/api/dashboard').catch(() => ({})),
-        apiFetch('/api/wallet').catch(() => ({})),
-        apiFetch('/api/earnings').catch(() => ({})),
-        apiFetch('/api/deposits').catch(() => ({})),
-        apiFetch('/api/withdrawals').catch(() => ({})),
-      ]);
-
-      // Extract wallet data
-      const walletBalance = Number(walletRes?.walletBalance || 0);
-      const platformBalance = Number(walletRes?.platformBalance || dashboardRes?.user?.platformBalance || 0);
-      
-      const assets = {
-        USDT: Number(walletRes?.balances?.USDT ?? walletRes?.balances?.usdt ?? 0),
-        ETH: Number(walletRes?.balances?.ETH ?? walletRes?.balances?.eth ?? 0),
-        BTC: Number(walletRes?.balances?.BTC ?? walletRes?.balances?.btc ?? 0),
-        MCCoin: Number(walletRes?.balances?.['MC Coin'] ?? walletRes?.balances?.mcCoin ?? 0),
-      };
-
-      // Extract mining and referral earnings
-      const miningEarnings = Number(earningsRes?.totalMiningEarnings || 0);
-      const referralEarnings = Number(earningsRes?.totalReferralEarnings || 0);
-      const totalEarned = Number(earningsRes?.totalEarned || dashboardRes?.user?.totalEarned || miningEarnings + referralEarnings);
-
-      // Extract deposit/withdrawal data
-      const deposits = Array.isArray(depositsRes?.deposits) ? depositsRes.deposits : [];
-      const withdrawals = Array.isArray(withdrawalsRes?.withdrawals) ? withdrawalsRes.withdrawals : [];
-      
-      const totalDeposits = deposits.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
-      const totalWithdrawals = withdrawals.reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
-
-      // Extract active plan data
-      const activePlan = dashboardRes?.activePlan || null;
-
-      // Calculate available vs pending
-      const pendingAmount = withdrawals
-        .filter((w: any) => w.status === 'pending')
-        .reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
-      
-      const availableBalance = Math.max(0, platformBalance - pendingAmount);
-      const pendingBalance = pendingAmount;
-
-      const newData = {
-        platformBalance: Math.max(platformBalance, Object.values(assets).reduce((a, b) => a + b, 0)),
-        walletBalance,
-        assets,
-        miningEarnings,
-        totalDeposits: totalDeposits,
-        totalWithdrawals,
-        totalEarned,
-        referralEarnings,
-        availableBalance,
-        pendingBalance,
-        activePlan,
-        lastUpdated: Date.now(),
-      };
-
+      const raw = await fetchFinancialData();
+      const newData = buildFinancialData(
+        raw.dashboardRes,
+        raw.walletRes,
+        raw.earningsRes,
+        raw.depositsRes,
+        raw.withdrawalsRes
+      );
       globalFinancialData = newData;
       setData(newData);
       notifyListeners();
@@ -197,62 +227,26 @@ export function useFinancialData(): UseFinancialDataReturn {
 }
 
 /**
- * Trigger a refetch of financial data across all components
- * Call this after mutations like deposits, withdrawals, plan purchases
+ * Trigger a refetch of financial data across all components.
+ * Call this after mutations like deposits, withdrawals, plan purchases.
+ *
+ * Optional `overrides` lets callers apply a server response (e.g. the fresh
+ * balances returned by POST /api/withdrawals) immediately so the UI updates
+ * without waiting for another round-trip. The refetch still runs to reconcile.
  */
-export async function refreshFinancialData() {
-  const [dashboardRes, walletRes, earningsRes, depositsRes, withdrawalsRes] = await Promise.all([
-    apiFetch('/api/dashboard').catch(() => ({})),
-    apiFetch('/api/wallet').catch(() => ({})),
-    apiFetch('/api/earnings').catch(() => ({})),
-    apiFetch('/api/deposits').catch(() => ({})),
-    apiFetch('/api/withdrawals').catch(() => ({})),
-  ]);
+export async function refreshFinancialData(overrides?: Partial<FinancialData>) {
+  const raw = await fetchFinancialData();
+  const newData = buildFinancialData(
+    raw.dashboardRes,
+    raw.walletRes,
+    raw.earningsRes,
+    raw.depositsRes,
+    raw.withdrawalsRes
+  );
 
-  const walletBalance = Number(walletRes?.walletBalance || 0);
-  const platformBalance = Number(walletRes?.platformBalance || dashboardRes?.user?.platformBalance || 0);
-  
-  const assets = {
-    USDT: Number(walletRes?.balances?.USDT ?? walletRes?.balances?.usdt ?? 0),
-    ETH: Number(walletRes?.balances?.ETH ?? walletRes?.balances?.eth ?? 0),
-    BTC: Number(walletRes?.balances?.BTC ?? walletRes?.balances?.btc ?? 0),
-    MCCoin: Number(walletRes?.balances?.['MC Coin'] ?? walletRes?.balances?.mcCoin ?? 0),
-  };
-
-  const miningEarnings = Number(earningsRes?.totalMiningEarnings || 0);
-  const referralEarnings = Number(earningsRes?.totalReferralEarnings || 0);
-  const totalEarned = Number(earningsRes?.totalEarned || dashboardRes?.user?.totalEarned || miningEarnings + referralEarnings);
-
-  const deposits = Array.isArray(depositsRes?.deposits) ? depositsRes.deposits : [];
-  const withdrawals = Array.isArray(withdrawalsRes?.withdrawals) ? withdrawalsRes.withdrawals : [];
-  
-  const totalDeposits = deposits.reduce((sum: number, d: any) => sum + Number(d.amount || 0), 0);
-  const totalWithdrawals = withdrawals.reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
-
-  const activePlan = dashboardRes?.activePlan || null;
-
-  const pendingAmount = withdrawals
-    .filter((w: any) => w.status === 'pending')
-    .reduce((sum: number, w: any) => sum + Number(w.amount || 0), 0);
-  
-  const availableBalance = Math.max(0, platformBalance - pendingAmount);
-  const pendingBalance = pendingAmount;
-
-  globalFinancialData = {
-    platformBalance: Math.max(platformBalance, Object.values(assets).reduce((a, b) => a + b, 0)),
-    walletBalance,
-    assets,
-    miningEarnings,
-    totalDeposits: totalDeposits,
-    totalWithdrawals,
-    totalEarned,
-    referralEarnings,
-    availableBalance,
-    pendingBalance,
-    activePlan,
-    lastUpdated: Date.now(),
-  };
-
+  // Merge any instant overrides (e.g. balances already known from a POST response)
+  const merged: FinancialData = { ...newData, ...overrides };
+  globalFinancialData = merged;
   notifyListeners();
 }
 

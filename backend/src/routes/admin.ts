@@ -6,6 +6,7 @@ import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 import { requireSuperAdmin, requireAdminOrEmployee } from '../middleware/admin';
 import { hashPassword } from '../services/emailAuth';
 import { createAuditLog, getActorName } from '../services/auditLog';
+import { getBalanceField } from '../services/balances';
 
 const router = Router();
 
@@ -870,7 +871,12 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
       await prisma.$transaction([
         prisma.user.update({
           where: { id: user.id },
-          data: { platformBalance: { increment: withdrawal.amount }, totalWithdrawn: { decrement: withdrawal.amount } },
+          data: {
+            platformBalance: { increment: withdrawal.amount },
+            totalWithdrawn: { decrement: withdrawal.amount },
+            // Restore the SAME per-asset balance that was debited at withdrawal time
+            [getBalanceField(withdrawal.asset || 'USDT')]: { increment: withdrawal.amount },
+          } as any,
         }),
         prisma.withdrawal.update({
           where: { id },

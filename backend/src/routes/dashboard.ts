@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 import { getActivePlan, getMiningSessions } from '../services/mining';
+import { normalizeAsset, getBalanceField, getAssetBalances } from '../services/balances';
 
 const router = Router();
 
@@ -592,10 +593,10 @@ router.get('/wallet', async (req: AuthRequest, res) => {
       walletType: user?.walletType,
       wallets: user?.Wallet,
       balances: {
-        'MC Coin': Number(user?.platformBalance || 0),
-        USDT: Number(user?.platformBalance || 0),
-        ETH: 0,
-        BTC: 0,
+        'MC Coin': Number(user?.balanceMCCoin || 0),
+        USDT: Number(user?.balanceUSDT || 0),
+        ETH: Number(user?.balanceETH || 0),
+        BTC: Number(user?.balanceBTC || 0),
       },
       deposits,
       paymentAccounts,
@@ -611,18 +612,24 @@ router.get('/earnings', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    const miningTx = await prisma.transaction.findMany({
-      where: { userId, type: 'mining' },
-      orderBy: { createdAt: 'desc' },
-    });
-    const referralEarnings = await prisma.referralEarning.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [miningTx, referralEarnings, miningSum, referralSum] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { userId, type: 'mining' },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.referralEarning.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.transaction.aggregate({ _sum: { amount: true }, where: { userId, type: 'mining' } }),
+      prisma.referralEarning.aggregate({ _sum: { amount: true }, where: { userId } }),
+    ]);
 
     res.json({
       totalEarned: user?.totalEarned,
       platformBalance: user?.platformBalance,
+      totalMiningEarnings: Number(miningSum._sum.amount || 0),
+      totalReferralEarnings: Number(referralSum._sum.amount || 0),
       miningEarnings: miningTx,
       referralEarnings,
     });
@@ -719,13 +726,16 @@ router.get('/withdrawals', async (req: AuthRequest, res) => {
   }
 });
 
-// Request withdrawal
+// Request withdrawal — atomic: creates withdrawal, debits per-asset balance + platformBalance,
+// records transaction + notification all inside a single DB transaction so balances
+// always stay synchronized.
 router.post('/withdrawals', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     const { amount, currency, asset, payoutMethodId } = req.body;
+    const numAmount = Number(amount);
 
-    if (!amount || amount <= 0) {
+    if (!numAmount || numAmount <= 0) {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
@@ -753,69 +763,85 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (Number(user.platformBalance) < amount) {
-      return res.status(400).json({ error: 'Insufficient balance' });
+    // Resolve the canonical asset symbol + the User column that backs its balance.
+    const normalizedAsset = normalizeAsset(asset || 'USDT');
+    const balanceField = getBalanceField(normalizedAsset);
+    const balances = getAssetBalances(user);
+    const assetBalance = balances[normalizedAsset];
+
+    if (assetBalance < numAmount) {
+      return res.status(400).json({
+        error: `Insufficient ${normalizedAsset} balance. You have ${assetBalance.toFixed(6)} ${normalizedAsset}.`,
+        availableBalance: assetBalance,
+      });
     }
 
-    // Create withdrawal record with payout method reference
-    const withdrawal = await prisma.withdrawal.create({
-      data: {
-        id: uuid(),
-        userId,
-        payoutMethodId,
-        amount: Number(amount),
-        currency: currency || 'USDT',
-        asset: asset || 'USDT',
-        status: 'pending',
-      },
-    });
-
-    // Deduct balance after withdrawal is created
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        platformBalance: { decrement: amount },
-        totalWithdrawn: { increment: amount },
-      },
-    });
-
-    // Record transaction
-    await prisma.transaction.create({
-      data: {
-        id: uuid(),
-        userId,
-        type: 'withdrawal',
-        amount: -amount,
-        currency: currency || 'USDT',
-        chain: 'platform',
-        status: 'pending',
-        metadata: { 
-          withdrawalId: withdrawal.id,
-          payoutMethodType: payoutMethod.type,
+    // All mutation steps in one transaction — balances, withdrawal record,
+    // transaction log and notification either all commit or all roll back.
+    const { withdrawal: createdWithdrawal, balances: updatedBalances } = await prisma.$transaction(async (tx) => {
+      const withdrawal = await tx.withdrawal.create({
+        data: {
+          id: uuid(),
+          userId,
+          payoutMethodId,
+          amount: numAmount,
+          currency: currency || normalizedAsset,
+          asset: normalizedAsset,
+          status: 'pending',
         },
-      },
+      });
+
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          [balanceField]: { decrement: numAmount },
+          platformBalance: { decrement: numAmount },
+          totalWithdrawn: { increment: numAmount },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          id: uuid(),
+          userId,
+          type: 'withdrawal',
+          amount: -numAmount,
+          currency: currency || normalizedAsset,
+          chain: 'platform',
+          status: 'pending',
+          metadata: {
+            withdrawalId: withdrawal.id,
+            payoutMethodType: payoutMethod.type,
+          },
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          id: uuid(),
+          userId,
+          type: 'withdrawal',
+          title: 'Withdrawal Requested',
+          message: `Withdrawal of ${numAmount.toFixed(6)} ${normalizedAsset} is pending approval.`,
+        },
+      });
+
+      return { withdrawal, balances: getAssetBalances(updatedUser) };
     });
 
-    // Notify user
-    await prisma.notification.create({
-      data: {
-        id: uuid(),
-        userId,
-        type: 'withdrawal',
-        title: 'Withdrawal Requested',
-        message: `Withdrawal of ${amount} ${asset || 'USDT'} is pending approval.`,
-      },
-    });
-
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       withdrawal: {
-        ...withdrawal,
+        ...createdWithdrawal,
         payoutMethod: {
           type: payoutMethod.type,
           name: payoutMethod.name,
         },
       },
+      // Return the freshly-debited balances so the frontend can sync instantly
+      // without waiting for a separate refetch.
+      balances: updatedBalances,
+      platformBalance: Number(user.platformBalance) - numAmount,
     });
   } catch (error) {
     console.error('Withdrawal error:', error);
