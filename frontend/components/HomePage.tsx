@@ -111,17 +111,19 @@ export default function HomePage() {
               </p>
             </div>
             <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-56">
-              <Link href="/dashboard/deposits" className="rounded-xl sm:rounded-2xl bg-white/18 px-3 py-2.5 sm:p-3 text-center text-xs sm:text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25 transition-colors">
+              {/* Mobile: energetic gradient buttons; desktop keeps translucent style */}
+              <Link href="/dashboard/deposits" className="rounded-xl bg-gradient-to-r from-cmblue-500 to-sky-500 px-3 py-2.5 text-center text-xs font-bold text-white shadow-[0_8px_20px_rgba(0,130,255,0.35)] ring-1 ring-white/30 transition-all hover:brightness-110 sm:rounded-2xl sm:bg-white/18 sm:p-3 sm:text-xs sm:shadow-none sm:ring-white/25 sm:hover:bg-white/25">
                 Deposit
               </Link>
-              <Link href="/dashboard/withdrawals" className="rounded-xl sm:rounded-2xl bg-white/18 px-3 py-2.5 sm:p-3 text-center text-xs sm:text-xs font-bold text-white ring-1 ring-white/25 hover:bg-white/25 transition-colors">
+              <Link href="/dashboard/withdrawals" className="rounded-xl bg-gradient-to-r from-cmblue-500 to-sky-500 px-3 py-2.5 text-center text-xs font-bold text-white shadow-[0_8px_20px_rgba(0,130,255,0.35)] ring-1 ring-white/30 transition-all hover:brightness-110 sm:rounded-2xl sm:bg-white/18 sm:p-3 sm:text-xs sm:shadow-none sm:ring-white/25 sm:hover:bg-white/25">
                 Withdraw
               </Link>
             </div>
           </div>
         </section>
 
-        <section className="mc-card flex flex-col items-center justify-between gap-4 sm:flex-row">
+        {/* Desktop/tablet-only progress card — mobile uses the unified Mining Pool card below */}
+        <section className="mc-card hidden flex-col items-center justify-between gap-4 sm:flex-row lg:flex">
           <div className="w-full sm:flex-1">
             <p className="text-[10px] font-bold uppercase text-slate-400">Mining Progress</p>
             <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-950">
@@ -143,7 +145,75 @@ export default function HomePage() {
         </section>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ===== MOBILE ONLY: one clean, unified Mining Pool card ===== */}
+      <section className="relative overflow-hidden rounded-[24px] border border-cmblue-100 bg-gradient-to-br from-sky-50 via-white to-cmblue-50 p-5 shadow-[0_18px_44px_rgba(0,130,255,0.16)] lg:hidden">
+        {/* Soft decorative glows */}
+        <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-cmblue-300/30 blur-2xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-14 -left-10 h-32 w-32 rounded-full bg-sky-300/40 blur-2xl" />
+
+        {/* Header: title + live status pill */}
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-cmblue-500 to-sky-500 text-white shadow-md">
+              <FaBolt className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-sm font-extrabold text-slate-950">Mining Pool</p>
+              <p className="text-[10px] font-semibold text-slate-500">
+                {activePlan ? 'Your active mining package' : 'Start mining to earn rewards'}
+              </p>
+            </div>
+          </div>
+          <span className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+            activePlan ? 'bg-emerald-100/80 text-emerald-600' : 'bg-slate-200/70 text-slate-500'
+          }`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${activePlan ? 'animate-pulse bg-emerald-500' : 'bg-slate-400'}`} />
+            {activePlan ? 'Active' : 'Idle'}
+          </span>
+        </div>
+
+        {/* Prominent circular TVS metric */}
+        <div
+          className="relative mx-auto mt-6 grid h-44 w-44 place-items-center rounded-full"
+          style={{ background: `conic-gradient(#008cff ${progress}%, #dcefff 0)` }}
+        >
+          <div className="grid h-[9.5rem] w-[9.5rem] place-items-center rounded-full bg-white shadow-inner ring-1 ring-sky-100">
+            <div className="text-center">
+              <p className="text-4xl font-black leading-none text-slate-950">
+                {progress}
+                <span className="text-lg font-extrabold text-cmblue-500">%</span>
+              </p>
+              <p className="mt-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">TVS Metric</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Supporting metrics — compact, neat, secondary to the main metric */}
+        <div className="relative mt-6 grid grid-cols-3 divide-x divide-sky-100 rounded-2xl border border-sky-100 bg-white/80 py-3 backdrop-blur">
+          <div className="px-2 text-center">
+            <p className="text-sm font-extrabold text-slate-950">
+              {activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}
+              <span className="ml-0.5 text-[9px] font-bold text-cmblue-600">TH/s</span>
+            </p>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">Hashrate</p>
+          </div>
+          <div className="px-2 text-center">
+            <p className="text-sm font-extrabold text-slate-950">
+              ${(financial.miningEarnings || Number(data?.user?.totalEarned || 0)).toFixed(2)}
+            </p>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">Earnings</p>
+          </div>
+          <div className="px-2 text-center">
+            <p className={`text-sm font-extrabold ${activePlan ? 'text-emerald-600' : 'text-slate-400'}`}>
+              {activePlan ? 'On' : 'Off'}
+            </p>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">Mining</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Desktop-only quick stats (mobile uses the unified Mining Pool card above) */}
+      <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4">
         {quickStats.map((item) => (
           <section key={item.label} className="mc-card">
             <span className={`mc-stat-icon ${item.color}`}>
