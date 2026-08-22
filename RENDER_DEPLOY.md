@@ -5,15 +5,20 @@
 Set these in your Render Web Service **Environment** tab:
 
 ```env
-DATABASE_URL=postgresql://cmhast_user:R3DvCyQyGFCzxiQI5z4i0VcQgNOb06RU@dpg-d9t7tdh42hec73fi3vtg-a.oregon-postgres.render.com/cmhast
-JWT_SECRET=cmhash-super-secret-key-2026-change-in-production-to-something-very-long-and-random
+# SECRET — copy the "External Database URL" from your Render PostgreSQL dashboard.
+# Never commit the real value to this repository.
+DATABASE_URL=<paste-your-render-external-database-url-here>
+
+# SECRET — generate a long random value. Use: openssl rand -base64 32
+JWT_SECRET=<paste-a-long-random-secret-here>
+
 PORT=4000
 NODE_ENV=production
 FRONTEND_URL=https://your-frontend-domain.vercel.app
 ```
 
 ### Important Notes:
-- `DATABASE_URL`: Already provided - your Render PostgreSQL connection string
+- `DATABASE_URL`: Copy it from the Render Dashboard → your PostgreSQL instance → "Connections" (never hard-code it in the repo)
 - `JWT_SECRET`: Generate a secure random string (min 32 chars). Use: `openssl rand -base64 32`
 - `FRONTEND_URL`: Update this after deploying your frontend (used for CORS)
 

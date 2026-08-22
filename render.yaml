@@ -8,21 +8,20 @@ services:
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
+      # SECRET — set the real value in the Render Dashboard (Environment tab).
+      # Never commit credentials to this file.
       - key: DATABASE_URL
         sync: false
-        value: postgresql://cmhast_user:R3DvCyQyGFCzxiQI5z4i0VcQgNOb06RU@dpg-d9t7tdh42hec73fi3vtg-a.oregon-postgres.render.com/cmhast
+      # SECRET — set the real value in the Render Dashboard (Environment tab).
+      # Generate with: openssl rand -base64 32
       - key: JWT_SECRET
         sync: false
-        value: cmhash-super-secret-key-2026-change-in-production-to-something-very-long-and-random
       - key: PUBLIC_FRONTEND_URL
         sync: false
-        value: https://webopp4-eng.github.io/mchash/
       - key: RENDER_FRONTEND_URL
         sync: false
-        value: https://webopp4-eng.github.io/mchash/
       - key: FRONTEND_URL
         sync: false
-        value: https://webopp4-eng.github.io/mchash/
       - key: PORT
         value: 4000
       - key: NODE_ENV

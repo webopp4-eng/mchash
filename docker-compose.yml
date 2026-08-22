@@ -1,12 +1,16 @@
 version: '3.9'
 
+# All credentials are provided via environment variables (or a local .env file
+# next to this compose file — which is git-ignored). Defaults are for LOCAL
+# DEVELOPMENT ONLY and must be overridden in any shared/production environment.
+
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: cmhash
-      POSTGRES_PASSWORD: cmhashpass
-      POSTGRES_DB: cmhash
+      POSTGRES_USER: ${POSTGRES_USER:-cmhash}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+      POSTGRES_DB: ${POSTGRES_DB:-cmhash}
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -18,8 +22,9 @@ services:
       dockerfile: Dockerfile
     environment:
       PORT: 4000
-      DATABASE_URL: postgres://cmhash:cmhashpass@db:5432/cmhash
-      JWT_SECRET: supersecret
+      DATABASE_URL: postgres://${POSTGRES_USER:-cmhash}:${POSTGRES_PASSWORD:-change-me-local-only}@db:5432/${POSTGRES_DB:-cmhash}
+      # SECRET — override via your shell environment or a git-ignored .env file
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your environment or .env file}
     ports:
       - '4000:4000'
     depends_on:
