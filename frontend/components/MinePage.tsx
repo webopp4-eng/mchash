@@ -105,7 +105,8 @@ export default function MinePage() {
       </section>
 
       <div className="grid gap-3 sm:gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-        <section className="mc-card flex flex-col items-center justify-center text-center">
+        {/* Same polished animation language as the Home Mining Pool card */}
+        <section className={`mc-card mc-sheen flex flex-col items-center justify-center text-center ${activePlan && !activePlan.isExpired ? 'animate-mc-breathe' : ''}`}>
           <div className={`grid h-32 w-32 sm:h-40 sm:w-40 lg:h-48 lg:w-48 place-items-center rounded-full transition-all ${activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''}`} style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
             <div className={`grid h-24 w-24 sm:h-32 sm:w-32 lg:h-36 lg:w-36 place-items-center rounded-full bg-white shadow-inner ${activePlan && !activePlan.isExpired ? 'animate-mining-pulse' : ''}`}>
               <div>
@@ -122,7 +123,7 @@ export default function MinePage() {
           )}
         </section>
 
-        <section className="mc-card">
+        <section className={`mc-card ${activePlan && !activePlan.isExpired ? 'mc-sheen' : ''}`}>
           <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-950">Mining Performance</h2>

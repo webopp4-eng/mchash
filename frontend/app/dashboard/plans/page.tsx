@@ -28,6 +28,22 @@ export default function PlansPage() {
 
   useEffect(() => {
     loadPlans();
+
+    // Live synchronization: silently re-fetch plans so any change made in the
+    // admin panel (create / activate / deactivate / price / duration / hashrate)
+    // appears here automatically without a manual reload.
+    const interval = setInterval(() => loadPlans(true), 30000);
+    const resync = () => {
+      if (document.visibilityState === 'visible') loadPlans(true);
+    };
+    window.addEventListener('focus', resync);
+    document.addEventListener('visibilitychange', resync);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', resync);
+      document.removeEventListener('visibilitychange', resync);
+    };
   }, []);
 
   useEffect(() => {
@@ -49,8 +65,9 @@ export default function PlansPage() {
     setHashStartIndex((current) => Math.min(current, Math.max(0, hashRentingPlans.length - visiblePlanCount)));
   }, [hashRentingPlans.length, visiblePlanCount]);
 
-  const loadPlans = async () => {
-    setLoading(true);
+  // `silent` skips the full-screen loading state for background re-syncs
+  const loadPlans = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await apiFetch('/api/plans');
@@ -183,7 +200,7 @@ export default function PlansPage() {
         <div className="flex flex-col gap-3 rounded-[22px] border border-rose-200/80 bg-rose-50/80 p-4 backdrop-blur-xl">
           <p className="text-sm font-semibold text-rose-600">{error}</p>
           <button
-            onClick={loadPlans}
+            onClick={() => loadPlans()}
             className="mc-button-secondary w-fit"
           >
             Retry

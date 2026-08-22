@@ -122,8 +122,9 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Desktop/tablet-only progress card — mobile uses the unified Mining Pool card below */}
-        <section className="mc-card hidden flex-col items-center justify-between gap-4 sm:flex-row lg:flex">
+        {/* Desktop/tablet-only progress card — mobile uses the unified Mining Pool card below.
+            Gentle breathing glow + sheen communicate active mining. */}
+        <section className={`mc-card hidden flex-col items-center justify-between gap-4 sm:flex-row lg:flex mc-sheen ${activePlan ? 'animate-mc-breathe' : ''}`}>
           <div className="w-full sm:flex-1">
             <p className="text-[10px] font-bold uppercase text-slate-400">Mining Progress</p>
             <p className="mt-2 text-2xl sm:text-3xl font-extrabold text-slate-950">
@@ -146,7 +147,7 @@ export default function HomePage() {
       </div>
 
       {/* ===== MOBILE ONLY: one clean, unified Mining Pool card ===== */}
-      <section className="relative overflow-hidden rounded-[24px] border border-cmblue-100 bg-gradient-to-br from-sky-50 via-white to-cmblue-50 p-5 shadow-[0_18px_44px_rgba(0,130,255,0.16)] lg:hidden">
+      <section className={`relative overflow-hidden rounded-[24px] border border-cmblue-100 bg-gradient-to-br from-sky-50 via-white to-cmblue-50 p-5 shadow-[0_18px_44px_rgba(0,130,255,0.16)] mc-sheen animate-mc-float lg:hidden ${activePlan ? 'animate-mc-breathe' : ''}`}>
         {/* Soft decorative glows */}
         <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-36 w-36 rounded-full bg-cmblue-300/30 blur-2xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-14 -left-10 h-32 w-32 rounded-full bg-sky-300/40 blur-2xl" />
