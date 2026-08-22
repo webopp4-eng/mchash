@@ -204,9 +204,18 @@ export function useFinancialData(): UseFinancialDataReturn {
   useEffect(() => {
     refetch();
 
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(refetch, 30000);
-    
+    // Auto-refresh every 5 minutes. Mining rewards are processed server-side
+    // once per hour, so frequent polling is unnecessary — the UI refreshes
+    // immediately when the user returns to the tab instead.
+    const interval = setInterval(refetch, 300000);
+
+    // Instant resync when the user returns to the tab (no background polling)
+    const resync = () => {
+      if (document.visibilityState === 'visible') refetch();
+    };
+    window.addEventListener('focus', resync);
+    document.addEventListener('visibilitychange', resync);
+
     // Subscribe to global updates
     const unsubscribe = subscribeToFinancialData(() => {
       setData(globalFinancialData);
@@ -214,6 +223,8 @@ export function useFinancialData(): UseFinancialDataReturn {
 
     return () => {
       clearInterval(interval);
+      window.removeEventListener('focus', resync);
+      document.removeEventListener('visibilitychange', resync);
       unsubscribe();
       if (refetchTimeoutRef.current) clearTimeout(refetchTimeoutRef.current);
     };

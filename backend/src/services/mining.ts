@@ -3,6 +3,7 @@ import prisma from '../lib/prisma';
 import { getBalanceField } from './balances';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
 const MIN_ACCRUAL = 0.00000001;
 
 function msBetween(start: Date, end: Date) {
@@ -81,6 +82,15 @@ export function buildMiningStats(purchase: any, session?: any) {
   };
 }
 
+/**
+ * Accrue mining rewards for a single purchase in WHOLE-HOUR batches.
+ *
+ * Rewards are credited once per completed hour of mining (server-side). The
+ * write is guarded by a conditional update on `lastPayoutAt`, which makes the
+ * operation idempotent: if the same hour is processed twice (retry, server
+ * restart, or two workers racing), only the first claim succeeds and the
+ * balance is credited exactly once.
+ */
 async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renting') {
   const now = new Date();
   const plan = getPlanFromPurchase(purchase);
@@ -89,7 +99,7 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
   }
 
   const hashRate = Number(plan.hashRate ?? plan.hashPower ?? 0);
-  const dailyRate = Number(plan.dailyRate ?? (Number(plan.expectedYield || 0) / 100 / Math.max(1, Number(plan.durationDays || 1))));
+  const dailyRate = Number(plan.dailyRate ?? (Number(plan.expectedYield || 0) / 100 / Math.max(1, Number(plan?.durationDays || 1))));
   const dailyEarnings = calculateDailyEarnings(hashRate, dailyRate);
   const rewardCurrency = getMiningRewardCurrency(plan.currency || purchase.currency);
   const accrualEnd = new Date(Math.min(now.getTime(), purchase.endsAt.getTime()));
@@ -115,8 +125,16 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
 
   const lastAccruedAt = session.lastPayoutAt || purchase.startedAt;
   const elapsedMs = msBetween(lastAccruedAt, accrualEnd);
-  const earned = (dailyEarnings * elapsedMs) / DAY_MS;
   const shouldComplete = purchase.endsAt <= now;
+
+  // Hourly batching: only credit once at least one FULL hour has elapsed.
+  // On completion, the final partial hour is settled so no earnings are lost.
+  const wholeHours = Math.floor(elapsedMs / HOUR_MS);
+  const billableMs = shouldComplete ? elapsedMs : wholeHours * HOUR_MS;
+  const earned = (dailyEarnings * billableMs) / DAY_MS;
+  const newLastPayoutAt = shouldComplete
+    ? accrualEnd
+    : new Date(lastAccruedAt.getTime() + wholeHours * HOUR_MS);
 
   if (shouldRecordMiningReward(earned)) {
     // Determine which per-asset balance to credit based on reward currency.
@@ -124,24 +142,34 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
     // column the withdrawal flow debits.
     const balanceField = getBalanceField(rewardCurrency);
 
-    await prisma.$transaction([
-      prisma.user.update({
+    // Idempotent claim: the session row is only updated when lastPayoutAt still
+    // equals the value we computed from. Concurrent/retried runs lose the race
+    // and skip crediting, preventing duplicate rewards.
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.miningSession.updateMany({
+        where: { id: session!.id, lastPayoutAt: lastAccruedAt },
+        data: {
+          totalMined: { increment: earned },
+          lastPayoutAt: newLastPayoutAt,
+          status: shouldComplete ? 'completed' : 'active',
+        },
+      });
+
+      if (claimed.count === 0) {
+        // Another worker already processed this hour window — do not double-pay.
+        return;
+      }
+
+      await tx.user.update({
         where: { id: purchase.userId },
         data: {
           platformBalance: { increment: earned },
           [balanceField]: { increment: earned },
           totalEarned: { increment: earned },
         },
-      }),
-      prisma.miningSession.update({
-        where: { id: session.id },
-        data: {
-          totalMined: { increment: earned },
-          lastPayoutAt: accrualEnd,
-          status: shouldComplete ? 'completed' : 'active',
-        },
-      }),
-      prisma.transaction.create({
+      });
+
+      await tx.transaction.create({
         data: {
           id: uuid(),
           userId: purchase.userId,
@@ -155,26 +183,31 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
             planName: plan.name,
             packageType,
             accruedFrom: lastAccruedAt.toISOString(),
-            accruedTo: accrualEnd.toISOString(),
+            accruedTo: newLastPayoutAt.toISOString(),
             rewardCurrency,
           },
         },
-      }),
-    ]);
+      });
+    });
+  } else if (shouldComplete) {
+    await prisma.miningSession.updateMany({
+      where: { userId: purchase.userId, purchaseId: purchase.id },
+      data: { status: 'completed', lastPayoutAt: accrualEnd },
+    });
   }
 
   if (shouldComplete) {
     if (packageType === 'mining') {
-      await prisma.miningPurchase.update({
-        where: { id: purchase.id },
+      await prisma.miningPurchase.updateMany({
+        where: { id: purchase.id, status: 'active' },
         data: {
           status: 'completed',
           completedAt: now,
         },
       });
     } else {
-      await prisma.hashRentingPurchase.update({
-        where: { id: purchase.id },
+      await prisma.hashRentingPurchase.updateMany({
+        where: { id: purchase.id, status: 'active' },
         data: {
           status: 'completed',
           completedAt: now,
@@ -182,19 +215,17 @@ async function accruePurchase(purchase: any, packageType: 'mining' | 'hash_renti
       });
     }
 
-    await prisma.miningSession.updateMany({
-      where: { userId: purchase.userId, purchaseId: purchase.id },
-      data: { status: 'completed', lastPayoutAt: accrualEnd },
-    });
-
-    // Credit bonus reward if not yet credited
+    // Credit bonus reward if not yet credited (idempotent per purchase)
     const bonusReward = Number(plan.bonusReward || 0);
     if (shouldRecordMiningReward(bonusReward)) {
       const alreadyCredited = await prisma.transaction.findFirst({
         where: {
           userId: purchase.userId,
           type: 'mining',
-          metadata: { path: ['bonusCredited'], equals: true },
+          AND: [
+            { metadata: { path: ['bonusCredited'], equals: true } },
+            { metadata: { path: ['purchaseId'], equals: purchase.id } },
+          ],
         },
       });
       if (!alreadyCredited) {
@@ -257,35 +288,46 @@ export async function refreshMiningForUser(userId: string) {
   }
 }
 
-export async function getActivePlan(userId: string) {
+/** All simultaneously-active plans for a user (multi-mining support). */
+export async function getActivePlans(userId: string) {
   await refreshMiningForUser(userId);
   const now = new Date();
-  const [miningPurchase, hashRentingPurchase] = await Promise.all([
-    prisma.miningPurchase.findFirst({
+  const [miningPurchases, hashRentingPurchases] = await Promise.all([
+    prisma.miningPurchase.findMany({
       where: { userId, status: 'active', endsAt: { gt: now } },
       include: { MiningPlan: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     }),
-    prisma.hashRentingPurchase.findFirst({
+    prisma.hashRentingPurchase.findMany({
       where: { userId, status: 'active', endsAt: { gt: now } },
       include: { HashRentingPlan: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'asc' },
     }),
   ]);
 
-  const purchase = miningPurchase
-    ? { ...miningPurchase, packageType: 'mining', plan: miningPurchase.MiningPlan }
-    : hashRentingPurchase
-    ? { ...hashRentingPurchase, packageType: 'hash_renting', plan: hashRentingPurchase.HashRentingPlan }
-    : null;
-  if (!purchase) return null;
+  const purchases = [
+    ...miningPurchases.map((p) => ({ ...p, packageType: 'mining', plan: p.MiningPlan })),
+    ...hashRentingPurchases.map((p) => ({ ...p, packageType: 'hash_renting', plan: p.HashRentingPlan })),
+  ];
 
-  const session = await prisma.miningSession.findFirst({
-    where: { userId, purchaseId: purchase.id },
+  if (purchases.length === 0) return [];
+
+  const sessions = await prisma.miningSession.findMany({
+    where: { userId, purchaseId: { in: purchases.map((p) => p.id) } },
     orderBy: { createdAt: 'desc' },
   });
+  const sessionByPurchase = new Map<string | null, any>();
+  for (const s of sessions) {
+    if (!sessionByPurchase.has(s.purchaseId)) sessionByPurchase.set(s.purchaseId, s);
+  }
 
-  return buildMiningStats(purchase, session);
+  return purchases.map((p) => buildMiningStats(p, sessionByPurchase.get(p.id)));
+}
+
+export async function getActivePlan(userId: string) {
+  const plans = await getActivePlans(userId);
+  // Most recently purchased plan remains the "primary" active plan.
+  return plans.length > 0 ? plans[plans.length - 1] : null;
 }
 
 export async function getMiningSessions(userId: string) {
@@ -295,16 +337,79 @@ export async function getMiningSessions(userId: string) {
   });
 }
 
-export async function processDailyPayouts() {
-  const users = await prisma.user.findMany({ select: { id: true } });
-  for (const user of users) {
-    await refreshMiningForUser(user.id);
-  }
-  return prisma.transaction.findMany({
-    where: { type: 'mining' },
+/**
+ * SERVER-SIDE SCHEDULED HOURLY REWARD PROCESSOR.
+ *
+ * Called once per hour by the scheduler in src/index.ts (not by frontend
+ * timers). Efficiently batches work so thousands of concurrent miners are
+ * handled with a small number of DB round-trips:
+ *  1. One query fetches all active purchases (+plans).
+ *  2. One query fetches all their mining sessions.
+ *  3. Only sessions with a completed hour since lastPayoutAt are processed,
+ *     in chunks, using idempotent claims (see accruePurchase).
+ */
+export async function processHourlyRewards(): Promise<{ scanned: number; processed: number }> {
+  const now = new Date();
+  const dueBefore = new Date(now.getTime() - HOUR_MS);
+
+  const [miningPurchases, hashRentingPurchases] = await Promise.all([
+    prisma.miningPurchase.findMany({
+      where: { status: 'active' },
+      select: {
+        id: true, userId: true, startedAt: true, endsAt: true,
+        currency: true, chain: true, MiningPlan: true,
+      },
+    }),
+    prisma.hashRentingPurchase.findMany({
+      where: { status: 'active' },
+      select: {
+        id: true, userId: true, startedAt: true, endsAt: true,
+        currency: true, chain: true, HashRentingPlan: true,
+      },
+    }),
+  ]);
+
+  const purchases = [
+    ...miningPurchases.map((p) => ({ ...p, packageType: 'mining' as const, plan: (p as any).MiningPlan })),
+    ...hashRentingPurchases.map((p) => ({ ...p, packageType: 'hash_renting' as const, plan: (p as any).HashRentingPlan })),
+  ];
+
+  if (purchases.length === 0) return { scanned: 0, processed: 0 };
+
+  const sessions = await prisma.miningSession.findMany({
+    where: { purchaseId: { in: purchases.map((p) => p.id) } },
     orderBy: { createdAt: 'desc' },
-    take: users.length,
   });
+  const sessionByPurchase = new Map<string | null, any>();
+  for (const s of sessions) {
+    if (!sessionByPurchase.has(s.purchaseId)) sessionByPurchase.set(s.purchaseId, s);
+  }
+
+  // Only purchases whose session is due for an hourly payout (or that ended).
+  const due = purchases.filter((p) => {
+    const session = sessionByPurchase.get(p.id);
+    const lastPayout = session?.lastPayoutAt ? new Date(session.lastPayoutAt) : new Date(p.startedAt);
+    return lastPayout <= dueBefore || p.endsAt <= now;
+  });
+
+  const CHUNK_SIZE = 50;
+  let processed = 0;
+  for (let i = 0; i < due.length; i += CHUNK_SIZE) {
+    const chunk = due.slice(i, i + CHUNK_SIZE);
+    await Promise.all(
+      chunk.map((p) =>
+        accruePurchase(
+          { ...p, plan: (p as any).plan ?? (p as any).MiningPlan ?? (p as any).HashRentingPlan },
+          p.packageType
+        ).catch((err) => {
+          console.error(`Hourly reward processing failed for purchase ${p.id}:`, err);
+        })
+      )
+    );
+    processed += chunk.length;
+  }
+
+  return { scanned: purchases.length, processed };
 }
 
 export async function getReceivingWallet(chain: string): Promise<string | null> {

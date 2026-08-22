@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
-import { getActivePlan, getMiningSessions } from '../services/mining';
+import { getActivePlan, getActivePlans, getMiningSessions } from '../services/mining';
 import { normalizeAsset, getBalanceField, getAssetBalances } from '../services/balances';
 
 const router = Router();
@@ -116,6 +116,8 @@ router.get('/mining', async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.id;
     const activePlan = await getActivePlan(userId);
+    // Multi-mining: every simultaneously-active plan for this user
+    const activePlans = await getActivePlans(userId);
     const sessions = await getMiningSessions(userId);
     const history = await prisma.miningPurchase.findMany({
       where: { userId },
@@ -123,7 +125,7 @@ router.get('/mining', async (req: AuthRequest, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json({ activePlan, sessions, history });
+    res.json({ activePlan, activePlans, sessions, history });
   } catch (error) {
     console.error('Mining error:', error);
     res.status(500).json({ error: 'Failed to load mining data' });
@@ -257,11 +259,8 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const existing = await getActivePlan(userId);
-    if (existing) {
-      return res.status(400).json({ error: 'You already have an active mining package' });
-    }
-
+    // Multi-mining: users may hold several active plans at once, so no
+    // single-active-plan restriction is applied here.
     const platformBalance = Number(user.platformBalance);
     const planPrice = Number(plan.price);
     if (planPrice > 0 && platformBalance < planPrice) {
@@ -391,10 +390,7 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    const existing = await getActivePlan(userId);
-    if (existing) {
-      return res.status(400).json({ error: 'You already have an active mining package' });
-    }
+    // Multi-mining: hash renting can be combined with any number of active plans.
 
     // Validate balance only for paid plans
     const platformBalance = Number(user.platformBalance);

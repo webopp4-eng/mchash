@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import dashboardRoutes from './routes/dashboard';
 import adminRoutes from './routes/admin';
 import payoutMethodsRoutes from './routes/payoutMethods';
+import { processHourlyRewards } from './services/mining';
 
 dotenv.config();
 
@@ -95,3 +96,28 @@ const port = process.env.PORT || 4000;
 app.listen(port, () => {
   console.log(`CM HASH backend running on http://localhost:${port}`);
 });
+
+// ============ HOURLY MINING REWARD SCHEDULER (server-side) ============
+// Mining rewards are processed ONCE PER HOUR here — never by frontend timers.
+// The processor is batched and idempotent, so thousands of concurrent miners
+// are handled efficiently and retries/restarts can never double-credit.
+let hourlyRewardsRunning = false;
+async function runHourlyRewards() {
+  if (hourlyRewardsRunning) return; // guard against overlapping runs
+  hourlyRewardsRunning = true;
+  try {
+    const result = await processHourlyRewards();
+    if (result.processed > 0) {
+      console.log(`[scheduler] Hourly mining rewards processed: ${result.processed}/${result.scanned} active purchases`);
+    }
+  } catch (error) {
+    console.error('[scheduler] Hourly mining reward processing failed:', error);
+  } finally {
+    hourlyRewardsRunning = false;
+  }
+}
+
+// First run shortly after boot (catches up hours missed while offline),
+// then once every hour.
+setTimeout(runHourlyRewards, 60 * 1000);
+setInterval(runHourlyRewards, 60 * 60 * 1000);
