@@ -27,6 +27,10 @@ credentials.json
 **/credentials.json
 service-account*.json
 
+# Local-only security tooling (contains literal secret values for redaction — never commit)
+scrub-history.js
+store-private-report.js
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
