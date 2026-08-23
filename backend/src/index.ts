@@ -70,16 +70,18 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 
 // Demo mode: wallet-auth and onboarding requests should not be throttled.
+// Health check — MUST be registered before the API routers so the
+// dashboard router's auth gate cannot intercept it (it previously returned
+// 401, breaking Render's health check).
+app.get('/api/health', (_, res) => {
+  res.json({ status: 'ok', name: 'CM HASH API', version: '1.0.0' });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payout-methods', payoutMethodsRoutes);
-
-// Health check
-app.get('/api/health', (_, res) => {
-  res.json({ status: 'ok', name: 'CM HASH API', version: '1.0.0' });
-});
 
 // 404 handler
 app.use((_, res) => {

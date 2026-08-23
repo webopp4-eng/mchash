@@ -60,6 +60,7 @@ model Deposit {
   @@index([txHash])
   @@index([userId])
   @@index([processedById])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model HashRentingPlan {
@@ -96,6 +97,7 @@ model HashRentingPurchase {
 
   @@index([planId])
   @@index([userId])
+  @@index([status])
 }
 
 model LoginHistory {
@@ -149,6 +151,8 @@ model MiningPurchase {
 
   @@index([planId])
   @@index([userId])
+  @@index([status])
+  @@index([userId, status])
 }
 
 model MiningSession {
@@ -164,6 +168,8 @@ model MiningSession {
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([purchaseId])
+  @@index([status, lastPayoutAt])
 }
 
 model Notification {
@@ -180,6 +186,7 @@ model Notification {
   @@index([read])
   @@index([userId])
   @@index([conversationId])
+  @@index([userId, read])
 }
 
 model PaymentAccount {
@@ -264,6 +271,7 @@ model ReferralEarning {
   User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([referralId])
+  @@index([userId])
 }
 
 model SupportMessage {
@@ -316,6 +324,7 @@ model Transaction {
 
   @@index([type])
   @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model TreasuryTransaction {
@@ -439,4 +448,5 @@ model Withdrawal {
   @@index([payoutMethodId])
   @@index([status])
   @@index([processedById])
+  @@index([userId, requestedAt(sort: Desc)])
 }
