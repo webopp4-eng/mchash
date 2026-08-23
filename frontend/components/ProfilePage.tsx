@@ -52,8 +52,8 @@ export default function ProfilePage() {
     <div className="mc-page max-w-6xl">
       {/* ===== Identity card ===== */}
       <section className="mc-card overflow-hidden p-0">
-        {/* Cover banner */}
-        <div className="relative h-28 bg-gradient-to-r from-cmblue-700 via-cmblue-600 to-sky-400 sm:h-36">
+        {/* Cover banner — compact on mobile */}
+        <div className="relative h-20 bg-gradient-to-r from-cmblue-700 via-cmblue-600 to-sky-400 sm:h-36">
           <div className="pointer-events-none absolute -right-6 -top-8 h-32 w-32 rounded-full bg-white/10" />
           <div className="pointer-events-none absolute -bottom-10 left-1/4 h-28 w-28 rounded-full bg-white/5" />
           <div className="pointer-events-none absolute right-1/3 top-4 h-16 w-16 rounded-full bg-white/10" />
@@ -63,8 +63,8 @@ export default function ProfilePage() {
           {/* Avatar + identity */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-end">
-              <div className={`-mt-10 flex h-20 w-20 items-center justify-center rounded-3xl border-4 border-white text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:-mt-12 sm:h-24 sm:w-24 ${avatarClass}`}>
-                <span className="text-2xl font-extrabold sm:text-3xl">{username?.slice(0, 2).toUpperCase() || 'MC'}</span>
+              <div className={`-mt-8 flex h-16 w-16 items-center justify-center rounded-3xl border-4 border-white text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:-mt-12 sm:h-24 sm:w-24 ${avatarClass}`}>
+                <span className="text-xl font-extrabold sm:text-3xl">{username?.slice(0, 2).toUpperCase() || 'MC'}</span>
               </div>
 
               <div className="text-center sm:text-left">

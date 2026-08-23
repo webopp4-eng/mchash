@@ -1,200 +1,128 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+/**
+ * MINING PAGE — consumes the SAME unified mining store and component as Home.
+ * No separate mining state, timers, or calculations exist here; everything is
+ * derived from lib/miningData.ts (single source of truth).
+ */
+
 import Link from 'next/link';
-import { FaBolt, FaClock, FaChartLine, FaCalendarAlt, FaCheckCircle, FaWallet } from 'react-icons/fa';
-import { apiFetch } from '@/lib/auth';
-import { getBalanceFontSize } from '@/lib/typography';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function formatRemainingTime(ms: number) {
-  const safeMs = Math.max(0, ms);
-  const days = Math.floor(safeMs / DAY_MS);
-  const hours = Math.floor((safeMs % DAY_MS) / (60 * 60 * 1000));
-  const minutes = Math.floor((safeMs % (60 * 60 * 1000)) / (60 * 1000));
-  const seconds = Math.floor((safeMs % (60 * 1000)) / 1000);
-  if (days > 0) return `${days}D ${hours}h ${minutes}m`;
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-  return `${minutes}m ${seconds}s`;
-}
-
-function deriveLivePlan(activePlan: any, tick: number) {
-  if (!activePlan) return null;
-  const now = tick;
-  const startedAt = new Date(activePlan.startedAt || activePlan.purchase?.startedAt).getTime();
-  const endsAt = new Date(activePlan.endsAt || activePlan.purchase?.endsAt).getTime();
-  const totalMs = Math.max(1, endsAt - startedAt);
-  const elapsedMs = Math.min(totalMs, Math.max(0, now - startedAt));
-  const remainingMs = Math.max(0, endsAt - now);
-  const lastPayoutAt = new Date(activePlan.session?.lastPayoutAt || activePlan.startedAt || activePlan.purchase?.startedAt).getTime();
-  const liveDeltaMs = Math.max(0, Math.min(now, endsAt) - lastPayoutAt);
-  const liveEarned = Number(activePlan.earnedToDate || 0) + (Number(activePlan.dailyEarnings || 0) * liveDeltaMs) / DAY_MS;
-
-  return {
-    ...activePlan,
-    progress: Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100)),
-    progressPercent: Math.round(Math.min(100, Math.max(0, (elapsedMs / totalMs) * 100))),
-    remainingMs,
-    timeRemaining: formatRemainingTime(remainingMs),
-    liveEarned,
-    isExpired: remainingMs <= 0,
-  };
-}
+import { FaBolt, FaChartLine, FaClock, FaCoins, FaWallet } from 'react-icons/fa';
+import MiningPools from './MiningPools';
+import { useMiningPools, sumHashRate, totalLiveEarned } from '@/lib/miningData';
 
 export default function MinePage() {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [tick, setTick] = useState(Date.now());
+  const { pools } = useMiningPools();
 
-  useEffect(() => {
-    loadMining();
-    const clock = setInterval(() => setTick(Date.now()), 1000);
-    return () => clearInterval(clock);
-  }, []);
+  // Aggregates computed from the SAME pool list Home uses — always identical.
+  const totalHashRate = sumHashRate(pools);
+  const totalEarned = totalLiveEarned(pools);
+  const activeCount = pools.filter((p) => p.status === 'active').length;
 
-  const loadMining = async () => {
-    try {
-      const res = await apiFetch('/api/mining');
-      setData(res);
-    } catch (err) {
-      console.error('Failed to load mining:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const activePlan = useMemo(() => deriveLivePlan(data?.activePlan, tick), [data, tick]);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
-      </div>
-    );
-  }
-
-  const progress = activePlan ? activePlan.progressPercent : 0;
   const stats = [
-    { label: 'Current Hashrate', value: activePlan ? `${Number(activePlan.hashRate || 0).toFixed(2)} TH/s` : '0 TH/s', icon: FaBolt, color: 'bg-cmblue-50 text-cmblue-600' },
-    { label: 'Daily Earnings', value: activePlan ? `$${Number(activePlan.dailyEarnings || 0).toFixed(2)}` : '$0.00', icon: FaWallet, color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Efficiency', value: activePlan && !activePlan.isExpired ? '98.6%' : '0%', icon: FaChartLine, color: 'bg-sky-50 text-cmblue-700' },
-    { label: 'Time Left', value: activePlan ? activePlan.timeRemaining : 'No session', icon: FaClock, color: 'bg-amber-50 text-amber-600' },
-  ];
-
-  const miningDetails = [
-    { label: 'Mining Plan', value: activePlan ? activePlan.plan?.name || 'Active Plan' : 'No Active Plan', icon: FaBolt, badge: activePlan ? 'Active' : 'Idle', badgeColor: activePlan ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' },
-    { label: 'Paid Plan', value: activePlan ? `$${Number(activePlan.amount || 0).toFixed(2)}` : '$0.00', icon: FaWallet, badge: activePlan ? 'Paid' : 'None', badgeColor: 'bg-cmblue-50 text-cmblue-700' },
-    { label: 'Status', value: activePlan && !activePlan.isExpired ? 'Mining in progress' : 'Not mining', icon: FaCheckCircle, badge: activePlan && !activePlan.isExpired ? 'Running' : 'Idle', badgeColor: activePlan && !activePlan.isExpired ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600' },
-    { label: 'Start Time', value: activePlan ? new Date(activePlan.startedAt).toLocaleString() : 'No start time', icon: FaCalendarAlt, badge: '-', badgeColor: 'bg-slate-100 text-slate-600' },
-    { label: 'End Time', value: activePlan ? new Date(activePlan.endsAt).toLocaleString() : 'No end time', icon: FaCalendarAlt, badge: '-', badgeColor: 'bg-slate-100 text-slate-600' },
-    { label: 'Total Earnings', value: `$${Number(data?.user?.totalEarned || 0).toFixed(2)}`, icon: FaChartLine, badge: '+', badgeColor: 'bg-emerald-50 text-emerald-700' },
+    {
+      label: 'Total Hashrate',
+      value: `${totalHashRate.toFixed(2)} TH/s`,
+      icon: FaBolt,
+      color: 'bg-cmblue-50 text-cmblue-600',
+    },
+    {
+      label: 'Live Earnings',
+      value: totalEarned.toFixed(6),
+      icon: FaCoins,
+      color: 'bg-emerald-50 text-emerald-600',
+    },
+    {
+      label: 'Active Pools',
+      value: `${activeCount} / ${pools.length}`,
+      icon: FaChartLine,
+      color: 'bg-sky-50 text-cmblue-700',
+    },
+    {
+      label: 'Daily Rate',
+      value: `$${pools.reduce((s, p) => s + p.dailyEarnings, 0).toFixed(4)}`,
+      icon: FaWallet,
+      color: 'bg-amber-50 text-amber-600',
+    },
   ];
 
   return (
-    <div className="mc-page">
-      <section className="mc-page-header">
-        <div>
-          <p className="text-[10px] font-bold uppercase text-cmblue-600">Mining Center</p>
-          <h1 className="mc-title">MC HASH Mine</h1>
-          <p className="mc-subtitle">Track hashrate, rewards, efficiency, and active plan progress.</p>
-        </div>
-        <span className={`mc-status ${activePlan && !activePlan.isExpired ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-          {activePlan && !activePlan.isExpired ? 'Status: Active' : 'Status: Inactive'}
-        </span>
-      </section>
+    <div className="mc-page space-y-3 sm:space-y-5">
+      {/* Unified multi-mining display — identical to Home */}
+      <MiningPools
+        title="My Mining Pools"
+        subtitle="Purchase a plan to start earning — live progress and earnings"
+      />
 
-      <div className="grid gap-3 sm:gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-        {/* Same polished animation language as the Home Mining Pool card */}
-        <section className={`mc-card mc-sheen flex flex-col items-center justify-center text-center ${activePlan && !activePlan.isExpired ? 'animate-mc-breathe' : ''}`}>
-          <div className={`grid h-32 w-32 sm:h-40 sm:w-40 lg:h-48 lg:w-48 place-items-center rounded-full transition-all ${activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''}`} style={{ background: `conic-gradient(#008cff ${progress}%, #e3f3ff 0)` }}>
-            <div className={`grid h-24 w-24 sm:h-32 sm:w-32 lg:h-36 lg:w-36 place-items-center rounded-full bg-white shadow-inner ${activePlan && !activePlan.isExpired ? 'animate-mining-pulse' : ''}`}>
-              <div>
-                <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-950">{activePlan ? Number(activePlan.hashRate || 0).toFixed(2) : '0.00'}</p>
-                <p className="text-[8px] sm:text-[10px] font-bold uppercase text-slate-400">TH/s</p>
-              </div>
-            </div>
-          </div>
-          <p className="mt-3 sm:mt-4 text-xs sm:text-sm font-bold text-cmblue-600">{progress}% mining progress</p>
-          {!activePlan && (
-            <Link href="/dashboard/plans" className="mc-button mt-3 sm:mt-4 w-full max-w-xs">
-              Upgrade Plan
-            </Link>
-          )}
-        </section>
-
-        <section className={`mc-card ${activePlan && !activePlan.isExpired ? 'mc-sheen' : ''}`}>
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-950">Mining Performance</h2>
-              <p className="text-[10px] sm:text-xs text-slate-500">Live contract and reward performance</p>
-            </div>
-            <Link href="/dashboard/plans" className="mc-button-secondary min-h-8 px-2.5 sm:px-3 py-1 text-xs sm:text-sm">
-              View plans
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-            {stats.map((item) => (
-              <div key={item.label} className={`rounded-2xl border border-sky-100 bg-sky-50/50 p-2.5 sm:p-3 transition-all ${
-                item.label === 'Current Hashrate' && activePlan && !activePlan.isExpired ? 'animate-mining-glow' : ''
-              }`}>
-                <span className={`mc-stat-icon ${item.color} ${
-                  item.label === 'Current Hashrate' && activePlan && !activePlan.isExpired ? 'animate-pulse-glow' : ''
-                }`}>
-                  <item.icon className="h-4 w-4" />
-                </span>
-                <p className="mt-2 sm:mt-3 text-[8px] sm:text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
-                <p className="mt-1 text-xs sm:text-sm font-extrabold text-slate-950">{item.value}</p>
-              </div>
-            ))}
-          </div>
-          <div className={`mt-4 sm:mt-5 h-24 sm:h-32 lg:h-36 rounded-2xl border border-sky-100 bg-white/80 p-3 sm:p-4 transition-all ${
-            activePlan && !activePlan.isExpired ? 'animate-progress-shimmer' : ''
-          }`} style={{
-            background: activePlan && !activePlan.isExpired 
-              ? 'linear-gradient(90deg, transparent, rgba(0, 130, 255, 0.1), transparent)'
-              : 'white'
-          }}>
-            <div className="flex h-full items-end gap-1.5 sm:gap-2">
-              {[36, 52, 44, 66, 58, 82, 74, 92, 76, 88].map((height, index) => (
-                <div 
-                  key={index} 
-                  className={`flex-1 rounded-t-lg sm:rounded-t-xl bg-gradient-to-t from-cmblue-500 to-sky-300 transition-all ${
-                    activePlan && !activePlan.isExpired ? 'animate-pulse' : ''
-                  }`}
-                  style={{ 
-                    height: `${activePlan ? height : 12}%`,
-                    animationDelay: activePlan && !activePlan.isExpired ? `${index * 0.1}s` : '0s'
-                  }} 
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      </div>
-
+      {/* Aggregated performance strip — same data source */}
       <section className="mc-card">
-        <div className="mb-4">
-          <h2 className="text-base sm:text-lg font-bold text-slate-950">Mining Details</h2>
-          <p className="text-[10px] sm:text-xs text-slate-500">Complete contract information</p>
+        <div className="mb-3 sm:mb-4">
+          <h2 className="text-base font-bold text-slate-950">Mining Performance</h2>
+          <p className="text-[10px] sm:text-xs text-slate-500">Aggregated across all your active pools</p>
         </div>
-        <div className="grid gap-2 sm:gap-3 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
-          {miningDetails.map((item) => (
-            <div key={item.label} className="flex flex-col sm:flex-row sm:items-center sm:gap-2 gap-1 rounded-2xl border border-sky-100 bg-sky-50/50 p-2.5 sm:p-3">
-              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <span className="mc-stat-icon bg-white text-cmblue-600 shrink-0">
-                  <item.icon className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[8px] sm:text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
-                  <p className="mt-1 text-[10px] sm:text-xs font-bold text-slate-950 truncate">{item.value}</p>
-                </div>
-              </div>
-              <span className={`mc-status text-[8px] sm:text-xs shrink-0 ${item.badgeColor}`}>{item.badge}</span>
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+          {stats.map((item) => (
+            <div key={item.label} className={`rounded-2xl border border-sky-100 bg-sky-50/50 p-2.5 sm:p-3 transition-all ${
+              item.label === 'Total Hashrate' && activeCount > 0 ? 'animate-mining-glow' : ''
+            }`}>
+              <span className={`mc-stat-icon ${item.color} ${
+                item.label === 'Total Hashrate' && activeCount > 0 ? 'animate-pulse-glow' : ''
+              }`}>
+                <item.icon className="h-4 w-4" />
+              </span>
+              <p className="mt-2 sm:mt-3 text-[8px] sm:text-[10px] font-bold uppercase text-slate-500">{item.label}</p>
+              <p className="mt-1 truncate text-xs sm:text-sm font-extrabold text-slate-950">{item.value}</p>
             </div>
           ))}
         </div>
       </section>
+
+      {/* Per-pool details — same records shown in the cards above */}
+      {pools.length > 0 && (
+        <section className="mc-card">
+          <div className="mb-4">
+            <h2 className="text-base sm:text-lg font-bold text-slate-950">Pool Details</h2>
+            <p className="text-[10px] sm:text-xs text-slate-500">Complete contract information for every pool</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {pools.map((pool) => (
+              <div key={pool.id} className="flex flex-col gap-1 rounded-2xl border border-sky-100 bg-sky-50/50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-xs font-bold text-slate-950">{pool.name}</p>
+                  <span className={`mc-status shrink-0 ${
+                    pool.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {pool.status === 'active' ? 'Running' : 'Ended'}
+                  </span>
+                </div>
+                <div className="mt-1 space-y-1 text-[10px] font-semibold text-slate-500">
+                  <p className="flex items-center justify-between gap-2">
+                    <span>Rewards credit to</span>
+                    <span className="font-bold text-cmblue-700">{pool.rewardAsset}</span>
+                  </p>
+                  <p className="flex items-center justify-between gap-2">
+                    <span>Start</span>
+                    <span className="font-bold text-slate-950">{new Date(pool.startedAt).toLocaleString()}</span>
+                  </p>
+                  <p className="flex items-center justify-between gap-2">
+                    <FaClock className="h-2.5 w-2.5" />
+                    <span className="font-bold text-slate-950">{pool.timeRemaining}</span>
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {pools.length === 0 && (
+        <section className="mc-card text-center">
+          <p className="text-sm font-semibold text-slate-500">No active mining pools yet</p>
+          <Link href="/dashboard/plans" className="mc-button mx-auto mt-3 w-fit px-5">
+            Browse Mining Plans
+          </Link>
+        </section>
+      )}
     </div>
   );
 }

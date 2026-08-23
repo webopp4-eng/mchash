@@ -83,16 +83,23 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
       <div>
         <button
           onClick={onBack}
-          className="text-slate-600 hover:text-slate-900 text-sm flex items-center gap-2 mb-4"
+          className="mb-4 flex items-center gap-2 rounded-full border border-sky-100 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm transition-colors hover:border-cmblue-200 hover:text-cmblue-700"
         >
           ← Back
         </button>
-        <h2 className="text-2xl font-bold text-slate-900">Sign In</h2>
-        <p className="text-slate-600 text-sm mt-1">Welcome back to CM HASH</p>
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cmblue-500 to-sky-500 text-white shadow-md">
+            ⛏
+          </span>
+          <div>
+            <h2 className="text-xl font-extrabold tracking-tight text-slate-950">Welcome back</h2>
+            <p className="text-xs font-medium text-slate-500">Sign in to continue mining with CM HASH</p>
+          </div>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+        <div className="rounded-[22px] border border-rose-200/80 bg-rose-50/80 px-4 py-3 text-sm font-semibold text-rose-600 backdrop-blur-xl">
           {error}
         </div>
       )}
@@ -100,14 +107,14 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Email */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Email</label>
           <input
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
             placeholder="you@example.com"
-            className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cmblue-500 focus:ring-1 focus:ring-cmblue-500 transition"
+            className="mc-input"
             disabled={loading}
             required
           />
@@ -115,14 +122,14 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
 
         {/* Password */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">Password</label>
           <input
             type="password"
             name="password"
             value={formData.password}
             onChange={handleChange}
             placeholder="••••••••"
-            className="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cmblue-500 focus:ring-1 focus:ring-cmblue-500 transition"
+            className="mc-input"
             disabled={loading}
             required
           />
@@ -132,16 +139,23 @@ export default function EmailLogIn({ onBack, onSignUpClick }: EmailLogInProps) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-cmblue-600 hover:bg-cmblue-700 disabled:bg-slate-300 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 shadow-sm"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cmblue-500 to-sky-500 px-4 py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(0,130,255,0.35)] ring-1 ring-white/30 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? 'Signing In...' : 'Sign In'}
+          {loading ? (
+            <>
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              Signing In...
+            </>
+          ) : (
+            'Sign In'
+          )}
         </button>
       </form>
 
       {/* Sign Up Link */}
-      <p className="text-center text-slate-600 text-sm">
+      <p className="text-center text-sm font-medium text-slate-500">
         Don't have an account?{' '}
-        <button onClick={onSignUpClick} className="text-cmblue-600 hover:text-cmblue-700 font-semibold">
+        <button onClick={onSignUpClick} className="font-bold text-cmblue-600 hover:text-cmblue-700">
           Create One
         </button>
       </p>

@@ -46,8 +46,10 @@
     @apply text-slate-900;
   }
 
+  /* Page-intro header — hidden on mobile (redundant top container), shown on
+     tablet/desktop exactly as before. */
   .mc-page-header {
-    @apply flex flex-col gap-3 rounded-[20px] sm:rounded-[22px] border border-sky-100/80 bg-white/75 p-3 sm:p-5 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between;
+    @apply hidden gap-3 rounded-[20px] sm:rounded-[22px] border border-sky-100/80 bg-white/75 p-3 sm:p-5 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl sm:flex sm:flex-row sm:items-center sm:justify-between;
   }
 
   .mc-title {

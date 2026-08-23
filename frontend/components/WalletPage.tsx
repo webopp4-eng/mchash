@@ -113,7 +113,9 @@ export default function WalletPage() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="mc-glass-blue">
+        {/* Large wallet hero — desktop/tablet only; mobile uses the compact
+            action bar below so no functionality is lost */}
+        <section className="mc-glass-blue hidden sm:block">
           <div className="flex flex-col gap-4 sm:gap-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
@@ -169,6 +171,37 @@ export default function WalletPage() {
           </div>
         </section>
       </div>
+
+      {/* ===== Mobile-only compact wallet actions (replaces the removed hero) ===== */}
+      <section className="rounded-[24px] border border-cmblue-100 bg-gradient-to-br from-sky-50 via-white to-cmblue-50 p-4 shadow-[0_14px_36px_rgba(0,130,255,0.12)] sm:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Connected Wallet</p>
+            <p className="mt-0.5 truncate text-xs font-bold text-slate-950">
+              {shortenAddress(walletAddress, 10) || 'No wallet connected'}
+            </p>
+          </div>
+          <button onClick={copyAddress} aria-label="Copy address" className="mc-icon-button h-9 w-9 shrink-0">
+            <FaCopy className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[
+            { label: 'Deposit', href: '/dashboard/deposits', icon: FaArrowDown, className: 'bg-gradient-to-r from-emerald-500 to-emerald-600' },
+            { label: 'Withdraw', href: '/dashboard/withdrawals', icon: FaArrowUp, className: 'bg-gradient-to-r from-rose-500 to-rose-600' },
+            { label: 'Transfer', href: '/dashboard/transactions', icon: FaExchangeAlt, className: 'bg-gradient-to-r from-cmblue-500 to-sky-500' },
+          ].map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-center text-[10px] font-bold text-white shadow-md transition-all hover:brightness-110 ${item.className}`}
+            >
+              <item.icon className="h-3.5 w-3.5" />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <section className="mc-card">
         <div className="mb-4 flex items-center justify-between">
