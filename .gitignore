@@ -31,6 +31,9 @@ service-account*.json
 scrub-history.js
 store-private-report.js
 
+# One-time destructive DB reset tooling (self-disabling; never commit)
+backend/scripts/reset-db-once.js
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
