@@ -1,8 +1,18 @@
 'use client';
 
+/**
+ * PROFILE PANEL — presentation-layer redesign only.
+ * All logic (auth state, username editing, navigation, logout, financial
+ * data hooks) is preserved exactly as before.
+ */
+
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
-import { FaBell, FaCogs, FaChevronRight, FaHeadset, FaLock, FaPencilAlt, FaSignOutAlt, FaCheck, FaWallet, FaMoneyBill, FaCoins, FaBitcoin, FaEthereum, FaFingerprint, FaIdBadge, FaNetworkWired } from 'react-icons/fa';
+import {
+  FaBell, FaCogs, FaChevronRight, FaHeadset, FaLock, FaPencilAlt,
+  FaSignOutAlt, FaCheck, FaWallet, FaMoneyBill, FaCoins, FaBitcoin,
+  FaEthereum, FaFingerprint, FaIdBadge, FaNetworkWired, FaShieldAlt,
+} from 'react-icons/fa';
 import { getUser, logout, User } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { shortenAddress } from '@/lib/wallet';
@@ -49,22 +59,30 @@ export default function ProfilePage() {
     'bg-gradient-to-br from-violet-500 to-purple-700';
 
   return (
-    <div className="mc-page max-w-6xl">
-      {/* ===== Identity card ===== */}
-      <section className="mc-card overflow-hidden p-0">
-        {/* Cover banner — compact on mobile */}
-        <div className="relative h-20 bg-gradient-to-r from-cmblue-700 via-cmblue-600 to-sky-400 sm:h-36">
-          <div className="pointer-events-none absolute -right-6 -top-8 h-32 w-32 rounded-full bg-white/10" />
-          <div className="pointer-events-none absolute -bottom-10 left-1/4 h-28 w-28 rounded-full bg-white/5" />
-          <div className="pointer-events-none absolute right-1/3 top-4 h-16 w-16 rounded-full bg-white/10" />
+    <div className="mc-page mx-auto max-w-6xl space-y-4 sm:space-y-5">
+      {/* ================= IDENTITY HERO ================= */}
+      <section className="overflow-hidden rounded-[24px] border border-cmblue-100 bg-white shadow-[0_18px_50px_rgba(0,139,255,0.10)]">
+        {/* Cover */}
+        <div className="relative h-24 bg-gradient-to-r from-[#0a4aa8] via-cmblue-600 to-sky-400 sm:h-36">
+          {/* decorative pattern */}
+          <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/10" />
+          <div aria-hidden className="pointer-events-none absolute -bottom-12 left-1/4 h-32 w-32 rounded-full bg-white/[0.07]" />
+          <div aria-hidden className="pointer-events-none absolute right-1/3 top-3 h-14 w-14 rounded-full bg-white/10" />
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/10 to-transparent" />
         </div>
 
-        <div className="px-4 pb-5 sm:px-6">
-          {/* Avatar + identity */}
+        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
+          {/* Avatar + identity row */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-end">
-              <div className={`-mt-8 flex h-16 w-16 items-center justify-center rounded-3xl border-4 border-white text-white shadow-[0_8px_24px_rgba(0,0,0,0.24)] sm:-mt-12 sm:h-24 sm:w-24 ${avatarClass}`}>
-                <span className="text-xl font-extrabold sm:text-3xl">{username?.slice(0, 2).toUpperCase() || 'MC'}</span>
+              {/* Avatar with gradient ring */}
+              <div className={`relative -mt-9 flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-[1.35rem] p-[3px] shadow-[0_10px_28px_rgba(0,60,140,0.35)] sm:-mt-12 sm:h-24 sm:w-24 sm:rounded-[1.75rem] ${avatarClass}`}>
+                <span className="grid h-full w-full place-items-center rounded-[1.2rem] bg-slate-900/20 text-xl font-black tracking-wide text-white backdrop-blur-[1px] sm:rounded-[1.6rem] sm:text-3xl">
+                  {username?.slice(0, 2).toUpperCase() || 'MC'}
+                </span>
+                <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid h-5 w-5 place-items-center rounded-full border-2 border-white bg-emerald-500 sm:h-6 sm:w-6">
+                  <FaCheck className="h-2 w-2 text-white" />
+                </span>
               </div>
 
               <div className="text-center sm:text-left">
@@ -77,95 +95,136 @@ export default function ProfilePage() {
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveUsername()}
-                        className="mc-input w-40"
+                        className="mc-input w-44"
                         autoFocus
                       />
                       <button
                         onClick={handleSaveUsername}
                         aria-label="Save username"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-cmblue-600 text-white transition hover:bg-cmblue-700"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-cmblue-500 to-sky-500 text-white shadow-md transition-all hover:brightness-110"
                       >
                         <FaCheck className="h-3 w-3" />
                       </button>
                     </div>
                   ) : (
                     <>
-                      <h1 className="text-lg font-bold tracking-tight text-slate-950 sm:text-xl">{username}</h1>
+                      <h1 className="text-lg font-extrabold tracking-tight text-slate-950 sm:text-2xl">{username}</h1>
                       <button
                         onClick={() => {
                           setEditValue(username);
                           setIsEditing(true);
                         }}
                         aria-label="Edit username"
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-cmblue-50 text-cmblue-600 transition hover:bg-cmblue-100"
+                        className="group flex h-7 w-7 items-center justify-center rounded-lg bg-cmblue-50 text-cmblue-600 ring-1 ring-cmblue-100 transition-all hover:bg-cmblue-600 hover:text-white"
                       >
-                        <FaPencilAlt className="h-3 w-3" />
+                        <FaPencilAlt className="h-2.5 w-2.5 transition-transform group-hover:scale-110" />
                       </button>
                     </>
                   )}
                 </div>
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  {user?.walletAddress ? shortenAddress(user.walletAddress, 8) : 'No wallet connected'}
-                </p>
-                <p className="mc-status mt-1.5 inline-flex items-center gap-1 bg-cmblue-50 text-cmblue-700">
-                  <FaIdBadge className="h-2.5 w-2.5" />
-                  ID: {user?.referralCode || 'CMH-0000'}
-                </p>
+
+                {/* Chips */}
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50/80 px-2.5 py-1 text-[10px] font-bold text-slate-600">
+                    <FaWallet className="h-2.5 w-2.5 text-cmblue-600" />
+                    {user?.walletAddress ? shortenAddress(user.walletAddress, 8) : 'No wallet connected'}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-cmblue-50/80 px-2.5 py-1 text-[10px] font-bold text-cmblue-700">
+                    <FaIdBadge className="h-2.5 w-2.5" />
+                    ID: {user?.referralCode || 'CMH-0000'}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                    Online
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-2 sm:justify-end">
-              <span className="mc-status bg-emerald-50 text-emerald-600">Verified</span>
-              <span className="mc-status bg-cmblue-50 text-cmblue-600">Online</span>
-            </div>
+            <span className="hidden items-center gap-1.5 self-start rounded-full border border-emerald-100 bg-emerald-50/80 px-3 py-1.5 text-[10px] font-bold text-emerald-600 sm:inline-flex">
+              <FaShieldAlt className="h-3 w-3" />
+              Verified account
+            </span>
           </div>
 
-          {/* Key stats */}
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            <div className="rounded-2xl border border-sky-100 bg-gradient-to-b from-white to-sky-50/60 p-3 text-center shadow-sm">
-              <p className="text-base font-extrabold text-slate-950 sm:text-lg">
-                ${(financial.platformBalance || Number(user?.platformBalance || 0)).toFixed(2)}
-              </p>
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">Balance</p>
-            </div>
-            <div className="rounded-2xl border border-sky-100 bg-gradient-to-b from-white to-sky-50/60 p-3 text-center shadow-sm">
-              <p className="truncate text-base font-extrabold capitalize text-slate-950 sm:text-lg">{user?.chain || 'N/A'}</p>
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">Network</p>
-            </div>
-            <div className="rounded-2xl border border-sky-100 bg-gradient-to-b from-white to-sky-50/60 p-3 text-center shadow-sm">
-              <p className="truncate text-base font-extrabold capitalize text-slate-950 sm:text-lg">{user?.walletType || 'Wallet'}</p>
-              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">Type</p>
-            </div>
-          </div>
-
-          {/* Asset balances */}
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {/* ===== Key stats ===== */}
+          <p className="mb-2 mt-6 text-[10px] font-bold uppercase tracking-widest text-slate-400">Account overview</p>
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
-              { symbol: 'USDT', value: financial.assets.USDT, icon: SiTether, color: 'bg-emerald-50 text-emerald-600' },
-              { symbol: 'BTC', value: financial.assets.BTC, icon: FaBitcoin, color: 'bg-amber-50 text-amber-600' },
-              { symbol: 'ETH', value: financial.assets.ETH, icon: FaEthereum, color: 'bg-sky-50 text-cmblue-700' },
-              { symbol: 'MC Coin', value: financial.assets.MCCoin, icon: FaCoins, color: 'bg-cmblue-50 text-cmblue-600' },
-            ].map((asset) => (
-              <div key={asset.symbol} className="flex items-center gap-2.5 rounded-2xl border border-sky-100 bg-white/80 p-2.5 shadow-sm transition-colors hover:border-cmblue-200">
-                <span className={`mc-stat-icon shrink-0 ${asset.color}`}>
-                  <asset.icon className="h-3.5 w-3.5" />
+              {
+                label: 'Balance',
+                value: `$${(financial.platformBalance || Number(user?.platformBalance || 0)).toFixed(2)}`,
+                icon: FaWallet,
+                tint: 'from-cmblue-500 to-sky-500',
+              },
+              {
+                label: 'Network',
+                value: user?.chain || 'N/A',
+                icon: FaNetworkWired,
+                tint: 'from-violet-500 to-purple-500',
+              },
+              {
+                label: 'Wallet Type',
+                value: user?.walletType || 'Wallet',
+                icon: FaShieldAlt,
+                tint: 'from-emerald-500 to-teal-500',
+              },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm transition-shadow hover:shadow-md sm:p-4"
+              >
+                <span className={`inline-grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br ${stat.tint} text-white shadow-sm`}>
+                  <stat.icon className="h-3 w-3" />
                 </span>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-slate-950 truncate">{asset.symbol}</p>
-                  <p className="text-[10px] font-extrabold text-slate-600">{asset.value.toFixed(6)}</p>
+                <p className="mt-2 truncate text-sm font-extrabold capitalize text-slate-950 sm:text-base">{stat.value}</p>
+                <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ===== Asset balances ===== */}
+          <div className="mb-2 mt-5 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Asset balances</p>
+            <Link href="/dashboard/wallet" className="text-[10px] font-bold text-cmblue-600 hover:text-cmblue-700">
+              View wallet →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {[
+              { symbol: 'USDT', value: financial.assets.USDT, icon: SiTether, color: 'bg-emerald-50 text-emerald-600', ring: 'ring-emerald-100' },
+              { symbol: 'BTC', value: financial.assets.BTC, icon: FaBitcoin, color: 'bg-amber-50 text-amber-600', ring: 'ring-amber-100' },
+              { symbol: 'ETH', value: financial.assets.ETH, icon: FaEthereum, color: 'bg-sky-50 text-cmblue-700', ring: 'ring-sky-100' },
+              { symbol: 'MC Coin', value: financial.assets.MCCoin, icon: FaCoins, color: 'bg-cmblue-50 text-cmblue-600', ring: 'ring-cmblue-100' },
+            ].map((asset) => (
+              <div
+                key={asset.symbol}
+                className="rounded-2xl border border-sky-100 bg-white p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`mc-stat-icon ${asset.color} ring-1 ${asset.ring}`}>
+                    <asset.icon className="h-3.5 w-3.5" />
+                  </span>
+                  <p className="text-[11px] font-extrabold tabular-nums text-slate-950">{asset.value.toFixed(6)}</p>
                 </div>
+                <p className="mt-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">{asset.symbol}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        {/* ===== Account options ===== */}
+      <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+        {/* ================= ACCOUNT OPTIONS ================= */}
         <section className="mc-card">
-          <div className="mb-4">
-            <p className="text-[10px] font-bold uppercase text-cmblue-600">Menu</p>
-            <h2 className="mt-1 text-base font-bold text-slate-950">Account Options</h2>
+          <div className="mb-4 flex items-center gap-3">
+            <span className="mc-stat-icon bg-cmblue-50 text-cmblue-600 ring-1 ring-cmblue-100">
+              <FaCogs className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Menu</p>
+              <h2 className="text-base font-extrabold text-slate-950">Account Options</h2>
+            </div>
           </div>
 
           <div className="grid gap-1.5">
@@ -176,13 +235,15 @@ export default function ProfilePage() {
                 onClick={(e) => item.disabled && e.preventDefault()}
                 className={`group flex items-center justify-between gap-3 rounded-2xl border p-3 transition-all ${
                   item.disabled
-                    ? 'border-slate-100 bg-slate-50/50 opacity-60 cursor-not-allowed'
-                    : 'border-transparent bg-slate-50/70 hover:border-cmblue-200 hover:bg-cmblue-50/80 hover:shadow-sm'
+                    ? 'cursor-not-allowed border-slate-100 bg-slate-50/50 opacity-60'
+                    : 'border-transparent bg-slate-50/70 hover:-translate-y-px hover:border-cmblue-200 hover:bg-cmblue-50/80 hover:shadow-md'
                 }`}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <span className={`mc-stat-icon shrink-0 transition-colors ${
-                    item.disabled ? 'bg-slate-100 text-slate-400' : 'bg-white text-cmblue-600 ring-1 ring-sky-100 group-hover:bg-cmblue-600 group-hover:text-white'
+                    item.disabled
+                      ? 'bg-slate-100 text-slate-400'
+                      : 'bg-white text-cmblue-600 ring-1 ring-sky-100 group-hover:bg-gradient-to-br group-hover:from-cmblue-500 group-hover:to-sky-500 group-hover:text-white'
                   }`}>
                     <item.icon className="h-3.5 w-3.5" />
                   </span>
@@ -199,47 +260,61 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* ===== Account activity & security ===== */}
+        {/* ================= SECURITY & ACTIVITY ================= */}
         <section className="mc-card">
           <div className="mb-4 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase text-cmblue-600">Security</p>
-              <h2 className="mt-1 text-base font-bold text-slate-950">Account Activity</h2>
+            <div className="flex items-center gap-3">
+              <span className="mc-stat-icon bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+                <FaFingerprint className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Security</p>
+                <h2 className="text-base font-extrabold text-slate-950">Account Activity</h2>
+              </div>
             </div>
-            <span className="mc-status bg-cmblue-50 text-cmblue-600">Online</span>
+            <span className="mc-status bg-emerald-50 text-emerald-600">Online</span>
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-start gap-3 rounded-2xl border border-sky-100 bg-slate-50/70 p-3">
-              <span className="mc-stat-icon shrink-0 bg-white text-cmblue-600 ring-1 ring-sky-100">
-                <FaWallet className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Wallet address</p>
-                <p className="mt-0.5 break-all text-sm font-bold text-slate-950">{user?.walletAddress || 'No wallet connected'}</p>
+            {[
+              {
+                icon: FaWallet,
+                tint: 'text-cmblue-600',
+                label: 'Wallet address',
+                value: user?.walletAddress || 'No wallet connected',
+                mono: true,
+              },
+              {
+                icon: FaFingerprint,
+                tint: 'text-emerald-600',
+                label: 'Verification',
+                value: 'User verified by wallet signature',
+                mono: false,
+              },
+              {
+                icon: FaIdBadge,
+                tint: 'text-cmblue-600',
+                label: 'Member since',
+                value: user?.referralCode ? 'Active member' : 'New member',
+                mono: false,
+              },
+            ].map((row) => (
+              <div key={row.label} className="flex items-start gap-3 rounded-2xl border border-sky-100 bg-gradient-to-b from-white to-sky-50/40 p-3 shadow-sm">
+                <span className={`mc-stat-icon shrink-0 bg-white ring-1 ring-sky-100 ${row.tint}`}>
+                  <row.icon className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{row.label}</p>
+                  <p className={`mt-0.5 break-all text-sm font-bold text-slate-950 ${row.mono ? 'font-mono text-xs leading-relaxed' : ''}`}>
+                    {row.value}
+                  </p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-2xl border border-sky-100 bg-slate-50/70 p-3">
-              <span className="mc-stat-icon shrink-0 bg-white text-emerald-600 ring-1 ring-sky-100">
-                <FaFingerprint className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Verification</p>
-                <p className="mt-0.5 text-sm font-bold text-slate-950">User verified by wallet signature</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 rounded-2xl border border-sky-100 bg-slate-50/70 p-3">
-              <span className="mc-stat-icon shrink-0 bg-white text-cmblue-600 ring-1 ring-sky-100">
-                <FaNetworkWired className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Member since</p>
-                <p className="mt-0.5 text-sm font-bold text-slate-950">{user?.referralCode ? 'Active member' : 'New member'}</p>
-              </div>
-            </div>
+            ))}
+
             <button
               onClick={() => logout(router)}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-2.5 text-xs font-bold text-white shadow-[0_10px_24px_rgba(239,68,68,0.22)] transition-all hover:brightness-110 hover:shadow-[0_14px_30px_rgba(239,68,68,0.32)]"
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-rose-500 to-rose-600 px-3 py-3 text-xs font-bold text-white shadow-[0_10px_24px_rgba(239,68,68,0.25)] ring-1 ring-white/30 transition-all hover:brightness-110 hover:shadow-[0_14px_30px_rgba(239,68,68,0.35)]"
             >
               <FaSignOutAlt className="h-3.5 w-3.5" />
               Log Out
