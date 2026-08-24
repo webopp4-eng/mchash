@@ -1,12 +1,8 @@
 const { Client } = require('pg');
+require('dotenv').config();
 
 const client = new Client({
-  host: 'dpg-d9t7tdh42hec73fi3vtg-a.oregon-postgres.render.com',
-  database: 'cmhast',
-  user: 'cmhast_user',
-  password: 'R3DvCyQyGFCzxiQI5z4i0VcQgNOb06RU',
-  port: 5432,
-  ssl: { rejectUnauthorized: false },
+  connectionString: process.env.DATABASE_URL,
 });
 
 async function makeAdmin() {
