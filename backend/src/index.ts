@@ -43,7 +43,7 @@ app.use((req, res, next) => {
 const allowedOrigins = [
   process.env.PUBLIC_FRONTEND_URL,
   process.env.RENDER_FRONTEND_URL,
-  'https://webopp4-eng.github.io',
+  'https://mchash.site',
 ].filter(Boolean);
 
 // Add localhost origins only in development

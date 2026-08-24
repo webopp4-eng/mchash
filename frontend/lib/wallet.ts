@@ -320,20 +320,11 @@ const walletConnectionRoutes = new Set(['/login', '/', '/dashboard', '/dashboard
 
 /**
  * Extract basePath from current location pathname
- * E.g., /mchash/login → /mchash
+ * The site is served at the domain root, so no basePath is used.
  * E.g., /login → ''
  */
 function extractBasePath(): string {
   if (typeof window === 'undefined') return '';
-  const pathname = window.location.pathname;
-  
-  // Known basePaths that might be used
-  const possibleBasePaths = ['/mchash', '/cm-hash', '/cmhash'];
-  for (const basePath of possibleBasePaths) {
-    if (pathname.startsWith(basePath) && pathname !== basePath) {
-      return basePath;
-    }
-  }
   return '';
 }
 

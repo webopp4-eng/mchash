@@ -46,9 +46,9 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
           NEXT_PUBLIC_DEPLOY_MODE: github-pages
           NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY: "false"
-          NEXT_PUBLIC_ALLOWED_ADMIN_ORIGIN: https://webopp4-eng.github.io
-          NEXT_PUBLIC_ADMIN_ORIGIN: https://webopp4-eng.github.io
-          NEXT_PUBLIC_ADMIN_LOCAL_URL: https://webopp4-eng.github.io
+          NEXT_PUBLIC_ALLOWED_ADMIN_ORIGIN: https://mchash.site
+          NEXT_PUBLIC_ADMIN_ORIGIN: https://mchash.site
+          NEXT_PUBLIC_ADMIN_LOCAL_URL: https://mchash.site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

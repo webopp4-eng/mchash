@@ -92,7 +92,7 @@ router.get('/nonce/:address', (req, res) => {
   const deviceFingerprint = generateDeviceFingerprint(userAgent, clientIp);
 
   const nonce = generateNonce(address, chain, deviceFingerprint, clientIp);
-  const message = createAuthMessage(address, chain, nonce, process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL || 'https://mchash.onrender.com');
+  const message = createAuthMessage(address, chain, nonce, process.env.FRONTEND_URL || process.env.PUBLIC_FRONTEND_URL || 'https://mchash.site');
   
   // Set rate limit headers
   res.set('RateLimit-Limit', '5');
