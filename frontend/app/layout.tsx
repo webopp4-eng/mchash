@@ -61,8 +61,8 @@ export const metadata: Metadata = {
       {
         url: `${SITE_URL}/mchash-og.png`,
         width: 1200,
-        height: 1200,
-        alt: 'MC HASH — Cloud Mining Platform',
+        height: 630,
+        alt: 'MC HASH — Cloud Mining on Solana, Ethereum and BNB',
       },
     ],
   },
