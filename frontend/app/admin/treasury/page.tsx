@@ -31,6 +31,12 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'other', label: 'Other' },
 ];
 
+interface CurrencyOption {
+  code?: string;
+  symbol?: string;
+  name: string;
+}
+
 export default function AdminTreasury() {
   const [accounts, setAccounts] = useState<PaymentAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,10 +59,28 @@ export default function AdminTreasury() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [fiatCurrencies, setFiatCurrencies] = useState<CurrencyOption[]>([]);
+  const [cryptoCurrencies, setCryptoCurrencies] = useState<CurrencyOption[]>([]);
 
   useEffect(() => {
     loadAccounts();
+    loadCurrencyLists();
   }, []);
+
+  // Supported fiat (ExchangeRate API) + crypto (CoinMarketCap) lists —
+  // served from the backend's server-side cache; API keys stay backend-only.
+  const loadCurrencyLists = async () => {
+    try {
+      const [fiatRes, cryptoRes] = await Promise.all([
+        apiFetch('/api/currencies/fiat'),
+        apiFetch('/api/currencies/crypto'),
+      ]);
+      setFiatCurrencies(fiatRes.currencies || []);
+      setCryptoCurrencies(cryptoRes.currencies || []);
+    } catch (err) {
+      console.error('Failed to load currency lists:', err);
+    }
+  };
 
   const loadAccounts = async () => {
     try {
@@ -107,6 +131,15 @@ export default function AdminTreasury() {
     setEditing(null);
     resetForm();
     setShowForm(true);
+  };
+
+  // Reset the currency default when switching between crypto and fiat types.
+  const handleTypeChange = (type: string) => {
+    setForm((prev) => ({
+      ...prev,
+      type,
+      currency: type === 'crypto' ? 'USDT' : 'USD',
+    }));
   };
 
   const openEdit = (account: PaymentAccount) => {
@@ -251,7 +284,7 @@ export default function AdminTreasury() {
         <div className="mc-card">
           <h2 className="text-base font-bold text-slate-950">{editing ? 'Edit' : 'Add'} Payment Account</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="mc-input">
+            <select value={form.type} onChange={(e) => handleTypeChange(e.target.value)} className="mc-input">
               {PAYMENT_METHOD_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -268,11 +301,34 @@ export default function AdminTreasury() {
               <option value="solana">Solana</option>
               <option value="bank">Bank</option>
             </select>
-            <select value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} className="mc-input">
-              <option value="USDT">USDT</option>
-              <option value="USDC">USDC</option>
-              <option value="USD">USD</option>
-            </select>
+            {/* Dynamic currency field:
+                crypto → searchable CoinMarketCap list; bank/momo/opay/other →
+                searchable ExchangeRate API fiat list (alphabetical). */}
+            <div className="sm:col-span-2">
+              <input
+                type="text"
+                list="payment-account-currency-options"
+                value={form.currency}
+                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
+                placeholder={form.type === 'crypto' ? 'Cryptocurrency (e.g. USDT)' : 'Fiat currency (e.g. USD, GHS, NGN)'}
+                className="mc-input"
+              />
+              <datalist id="payment-account-currency-options">
+                {(form.type === 'crypto' ? cryptoCurrencies : fiatCurrencies).map((option) => {
+                  const code = option.code || option.symbol || '';
+                  return (
+                    <option key={code} value={code}>
+                      {code} — {option.name}
+                    </option>
+                  );
+                })}
+              </datalist>
+              <p className="mt-1 text-[10px] text-slate-500">
+                {form.type === 'crypto'
+                  ? 'Search any supported cryptocurrency — deposits are converted to USD via CoinMarketCap.'
+                  : 'Search any supported fiat currency — deposits are converted to USD via the ExchangeRate API.'}
+              </p>
+            </div>
             <label className="flex items-center gap-2 text-sm font-medium text-slate-600">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
               Active

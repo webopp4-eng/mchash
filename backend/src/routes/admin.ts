@@ -731,11 +731,17 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
         return res.status(400).json({ error: 'Deposit has already been processed' });
       }
 
-      const amount = Number(deposit.amount);
+      // Credit the LOCKED USD amount stored with the deposit at submission
+      // time — never recalculate using a newer exchange rate. Legacy deposits
+      // created before currency conversion have no usdAmount and keep the
+      // original behaviour (credit their raw amount).
+      const originalAmount = Number(deposit.amount);
+      const creditedAmount = deposit.usdAmount != null ? Number(deposit.usdAmount) : originalAmount;
+
       const processed = await prisma.$transaction([
         prisma.user.update({
           where: { id: deposit.userId },
-          data: { platformBalance: { increment: amount }, totalDeposited: { increment: amount } },
+          data: { platformBalance: { increment: creditedAmount }, totalDeposited: { increment: creditedAmount } },
         }),
         prisma.deposit.update({
           where: { id },
@@ -749,16 +755,21 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
         }),
         prisma.transaction.create({
           data: {
-            id: uuid(), userId: deposit.userId, type: 'deposit', amount,
-            currency: deposit.currency, chain: deposit.chain || 'ethereum',
+            id: uuid(), userId: deposit.userId, type: 'deposit', amount: creditedAmount,
+            currency: 'USD', chain: deposit.chain || 'ethereum',
             txHash: deposit.txHash || null, status: 'completed',
-            metadata: { depositId: deposit.id, source: deposit.method || 'manual', paymentAccountId: deposit.paymentAccountId },
+            metadata: {
+              depositId: deposit.id, source: deposit.method || 'manual', paymentAccountId: deposit.paymentAccountId,
+              originalAmount, originalCurrency: deposit.currency,
+              exchangeRate: deposit.exchangeRate != null ? Number(deposit.exchangeRate) : null,
+              usdAmount: creditedAmount, rateSource: deposit.rateSource || null,
+            },
           },
         }),
         prisma.notification.create({
           data: {
             id: uuid(), userId: deposit.userId, type: 'deposit', title: 'Deposit Approved',
-            message: `Your ${deposit.currency} deposit of ${amount.toFixed(2)} has been approved and credited to your balance.`,
+            message: `Your ${deposit.currency} deposit of ${originalAmount.toFixed(2)} (≈ $${creditedAmount.toFixed(2)} USD) has been approved and $${creditedAmount.toFixed(2)} USD has been credited to your balance.`,
           },
         }),
       ]);
@@ -769,7 +780,9 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
         details: {
           transactionId: id, employeeId: req.user?.id, employeeName: actorName,
           previousStatus, newStatus: status === 'completed' ? 'completed' : 'approved',
-          amount, currency: deposit.currency,
+          originalAmount, originalCurrency: deposit.currency,
+          exchangeRate: deposit.exchangeRate != null ? Number(deposit.exchangeRate) : null,
+          usdAmount: creditedAmount, rateSource: deposit.rateSource || null,
         },
       });
 

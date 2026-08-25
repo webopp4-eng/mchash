@@ -4,6 +4,13 @@ import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 import { getActivePlan, getActivePlans, getMiningSessions } from '../services/mining';
 import { normalizeAsset, getBalanceField, getAssetBalances } from '../services/balances';
+import {
+  convertToUsd,
+  getCryptoCurrencies,
+  getCryptoToUsdPrice,
+  getFiatCurrencies,
+  getFiatToUsdRate,
+} from '../services/exchangeRates';
 
 const router = Router();
 
@@ -123,6 +130,71 @@ router.get('/market-prices', async (_req, res) => {
 
 // All remaining dashboard routes require auth
 router.use(authenticateToken, loadUser);
+
+// ============ CURRENCY CONVERSION (manual deposits) ============
+// Supported fiat currencies for the deposit / payment-method forms.
+// The list comes from the ExchangeRate API (90+ codes) — never hard-coded.
+router.get('/currencies/fiat', async (_req, res) => {
+  try {
+    const currencies = await getFiatCurrencies();
+    res.json({ currencies });
+  } catch (error) {
+    console.error('Fiat currencies error:', error);
+    res.status(502).json({ error: 'Failed to load supported fiat currencies' });
+  }
+});
+
+// Supported cryptocurrencies for the crypto deposit / payment-method forms.
+router.get('/currencies/crypto', async (_req, res) => {
+  try {
+    const currencies = await getCryptoCurrencies();
+    res.json({ currencies });
+  } catch (error) {
+    console.error('Crypto currencies error:', error);
+    res.status(502).json({ error: 'Failed to load supported cryptocurrencies' });
+  }
+});
+
+// Live USD quote for a given amount + currency (fiat or crypto).
+// Rates are cached server-side, so this never triggers an upstream API call
+// per keystroke. The value shown here is an ESTIMATE only — the authoritative
+// conversion is recalculated server-side when the deposit request is created.
+router.get('/rates/quote', async (req, res) => {
+  try {
+    const amount = Number(req.query.amount);
+    const currency = String(req.query.currency || '').trim();
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'A positive amount is required' });
+    }
+    if (!currency) {
+      return res.status(400).json({ error: 'Currency is required' });
+    }
+
+    // Optional explicit kind; otherwise resolved automatically by the service.
+    const type = String(req.query.type || '').toLowerCase();
+    let rate: number;
+    if (type === 'fiat') {
+      rate = await getFiatToUsdRate(currency);
+    } else if (type === 'crypto') {
+      rate = await getCryptoToUsdPrice(currency);
+    } else {
+      const converted = await convertToUsd(amount, currency);
+      return res.json({
+        kind: converted.kind,
+        currency: converted.originalCurrency,
+        amount,
+        exchangeRate: converted.exchangeRate,
+        usdAmount: converted.usdAmount,
+        source: converted.source,
+      });
+    }
+
+    res.json({ kind: type, currency: currency.toUpperCase(), amount, exchangeRate: rate, usdAmount: Math.round(amount * rate * 1e8) / 1e8 });
+  } catch (error) {
+    console.error('Rate quote error:', error);
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to quote exchange rate' });
+  }
+});
 
 // ============ DASHBOARD ============
 router.get('/dashboard', async (req: AuthRequest, res) => {
@@ -579,6 +651,22 @@ router.post('/deposits', async (req: AuthRequest, res) => {
       }
     }
 
+    // The ORIGINAL currency the user is paying in (fiat or crypto).
+    const depositCurrency = String(currency || paymentAccount?.currency || 'USDT').toUpperCase().trim();
+
+    // AUTHORITATIVE server-side conversion. The rate is LOCKED here and stored
+    // with the deposit — approval later credits exactly this USD amount and
+    // never re-rates with a newer price. Any client-supplied estimate is ignored.
+    let conversion;
+    try {
+      conversion = await convertToUsd(normalizedAmount, depositCurrency);
+    } catch (conversionError) {
+      console.error('Deposit conversion error:', conversionError);
+      return res.status(502).json({
+        error: 'Currency conversion is temporarily unavailable. Please try again in a moment.',
+      });
+    }
+
     const deposit = await prisma.deposit.create({
       data: {
         id: uuid(),
@@ -587,13 +675,16 @@ router.post('/deposits', async (req: AuthRequest, res) => {
         walletAddress: walletAddress || user.walletAddress || null,
         chain: chain || user.chain || 'ethereum',
         amount: normalizedAmount,
-        currency: currency || paymentAccount?.currency || 'USDT',
-        token: currency || paymentAccount?.currency || 'USDT',
+        currency: depositCurrency,
+        token: depositCurrency,
         txHash: txHash || null,
         status: 'pending',
         method: method || paymentAccount?.type || 'manual',
         proofUrl: proofUrl || null,
         note: note || null,
+        exchangeRate: conversion.exchangeRate,
+        usdAmount: conversion.usdAmount,
+        rateSource: conversion.source,
       },
       include: { PaymentAccount: true },
     });
@@ -604,7 +695,7 @@ router.post('/deposits', async (req: AuthRequest, res) => {
         userId,
         type: 'deposit',
         title: 'Deposit Submitted',
-        message: `Your ${currency || 'USDT'} deposit request for ${normalizedAmount.toFixed(2)} is pending admin review.`,
+        message: `Your ${depositCurrency} deposit request for ${normalizedAmount.toFixed(2)} (≈ $${conversion.usdAmount.toFixed(2)} USD) is pending admin review.`,
       },
     });
 

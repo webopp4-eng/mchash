@@ -41,6 +41,20 @@ interface DepositFormData {
   proofUrl: string;
 }
 
+interface CurrencyOption {
+  code?: string;
+  symbol?: string;
+  name: string;
+}
+
+// Server-side USD quote estimate (display only — the backend recalculates
+// the authoritative rate when the deposit request is created).
+interface UsdQuote {
+  exchangeRate: number;
+  usdAmount: number;
+  source: string;
+}
+
 export default function DepositsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -60,6 +74,10 @@ export default function DepositsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [fiatCurrencies, setFiatCurrencies] = useState<CurrencyOption[]>([]);
+  const [cryptoCurrencies, setCryptoCurrencies] = useState<CurrencyOption[]>([]);
+  const [usdQuote, setUsdQuote] = useState<UsdQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
 
   useEffect(() => {
     const currentUser = getUser();
@@ -69,8 +87,23 @@ export default function DepositsPage() {
     }
     setUser(currentUser);
     loadPaymentAccounts();
+    loadCurrencies();
     setLoading(false);
   }, [router]);
+
+  // Load supported fiat + crypto currency lists once (server-cached).
+  const loadCurrencies = async () => {
+    try {
+      const [fiatRes, cryptoRes] = await Promise.all([
+        apiFetch('/api/currencies/fiat'),
+        apiFetch('/api/currencies/crypto'),
+      ]);
+      setFiatCurrencies(fiatRes.currencies || []);
+      setCryptoCurrencies(cryptoRes.currencies || []);
+    } catch (err) {
+      console.error('Failed to load currency lists:', err);
+    }
+  };
 
   const loadPaymentAccounts = async () => {
     try {
@@ -92,6 +125,38 @@ export default function DepositsPage() {
 
   const filteredAccounts = accounts.filter(a => a.type === form.paymentMethod);
   const selectedAccount = filteredAccounts.find(a => a.id === form.accountId);
+
+  // Currency options depend on the payment method:
+  // crypto → CoinMarketCap list; bank/momo/opay → ExchangeRate API fiat list.
+  const isCryptoMethod = form.paymentMethod === 'crypto';
+  const currencyOptions: CurrencyOption[] = isCryptoMethod ? cryptoCurrencies : fiatCurrencies;
+
+  // Debounced USD quote — one cached server call per settled input,
+  // never an upstream API request per keystroke.
+  useEffect(() => {
+    const amountNum = Number(form.amount);
+    if (!form.amount || !Number.isFinite(amountNum) || amountNum <= 0 || !form.currency) {
+      setUsdQuote(null);
+      return;
+    }
+    let cancelled = false;
+    setQuoteLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await apiFetch(`/api/rates/quote?amount=${encodeURIComponent(form.amount)}&currency=${encodeURIComponent(form.currency)}`);
+        if (!cancelled) setUsdQuote(res as UsdQuote);
+      } catch {
+        if (!cancelled) setUsdQuote(null);
+      } finally {
+        if (!cancelled) setQuoteLoading(false);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      setQuoteLoading(false);
+    };
+  }, [form.amount, form.currency]);
 
   const copyToClipboard = async (text: string, field: string) => {
     if (!text) return;
@@ -474,17 +539,52 @@ export default function DepositsPage() {
             {/* Currency */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">
-                Currency
+                {isCryptoMethod ? 'Cryptocurrency you are paying with' : 'Currency you are paying with'}
               </label>
-              <select
+              <input
+                type="text"
+                list="deposit-currency-options"
                 value={form.currency}
-                onChange={(e) => setForm(prev => ({ ...prev, currency: e.target.value }))}
+                onChange={(e) => setForm(prev => ({ ...prev, currency: e.target.value.toUpperCase() }))}
+                placeholder={isCryptoMethod ? 'USDT' : 'USD'}
                 className="mc-input"
-              >
-                <option value="USDT">USDT (Tether)</option>
-                <option value="USD">USD (US Dollar)</option>
-                <option value="NGN">NGN (Nigerian Naira)</option>
-              </select>
+              />
+              <datalist id="deposit-currency-options">
+                {currencyOptions.map((option) => {
+                  const code = option.code || option.symbol || '';
+                  return (
+                    <option key={code} value={code}>
+                      {code} — {option.name}
+                    </option>
+                  );
+                })}
+              </datalist>
+              <p className="text-xs text-slate-500 mt-1">
+                {isCryptoMethod ? 'Search any supported cryptocurrency (e.g. USDT, BTC, ETH)' : 'Search any supported fiat currency (e.g. USD, GHS, NGN, EUR)'}
+              </p>
+            </div>
+
+            {/* USD Credit — read-only, locked server-side on submission */}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">
+                USD Credit
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={
+                  usdQuote && Number(form.amount) > 0
+                    ? `$${usdQuote.usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : ''
+                }
+                placeholder={quoteLoading ? 'Calculating…' : 'Enter an amount to see the USD equivalent'}
+                className="mc-input bg-slate-50 font-bold text-emerald-700 cursor-not-allowed"
+              />
+              {usdQuote && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Rate: 1 {form.currency} ≈ ${usdQuote.exchangeRate} USD · Locked when your deposit is submitted
+                </p>
+              )}
             </div>
 
             {/* Transaction Reference */}

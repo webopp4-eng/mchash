@@ -47,6 +47,10 @@ model Deposit {
   method           String         @default("manual")
   proofUrl         String?
   note             String?
+  // Currency conversion (locked at submission time — never re-rated on approval)
+  exchangeRate     Decimal?       @db.Decimal(18, 8) // USD per 1 unit of `currency`
+  usdAmount        Decimal?       @db.Decimal(18, 8) // locked USD credit for this deposit
+  rateSource       String?                            // 'exchangerate-api' | 'coinmarketcap' | 'usd-pegged'
   approvedAt       DateTime?
   confirmedAt      DateTime?
   processedById    String?        @db.Uuid
