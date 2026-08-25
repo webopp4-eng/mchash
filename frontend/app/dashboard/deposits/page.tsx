@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FaArrowDown, FaArrowLeft, FaCheck, FaTimes, FaEye, FaUpload, FaCopy } from 'react-icons/fa';
+import { FaArrowDown, FaArrowLeft, FaCheck, FaTimes, FaEye, FaUpload, FaCopy, FaExchangeAlt } from 'react-icons/fa';
 import { apiFetch, getUser, User } from '@/lib/auth';
 import { refreshFinancialData } from '@/lib/financialData';
 import { toastEmitter } from '@/components/NotificationToast';
@@ -41,12 +41,6 @@ interface DepositFormData {
   proofUrl: string;
 }
 
-interface CurrencyOption {
-  code?: string;
-  symbol?: string;
-  name: string;
-}
-
 // Server-side USD quote estimate (display only — the backend recalculates
 // the authoritative rate when the deposit request is created).
 interface UsdQuote {
@@ -74,8 +68,6 @@ export default function DepositsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [fiatCurrencies, setFiatCurrencies] = useState<CurrencyOption[]>([]);
-  const [cryptoCurrencies, setCryptoCurrencies] = useState<CurrencyOption[]>([]);
   const [usdQuote, setUsdQuote] = useState<UsdQuote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
 
@@ -87,23 +79,8 @@ export default function DepositsPage() {
     }
     setUser(currentUser);
     loadPaymentAccounts();
-    loadCurrencies();
     setLoading(false);
   }, [router]);
-
-  // Load supported fiat + crypto currency lists once (server-cached).
-  const loadCurrencies = async () => {
-    try {
-      const [fiatRes, cryptoRes] = await Promise.all([
-        apiFetch('/api/currencies/fiat'),
-        apiFetch('/api/currencies/crypto'),
-      ]);
-      setFiatCurrencies(fiatRes.currencies || []);
-      setCryptoCurrencies(cryptoRes.currencies || []);
-    } catch (err) {
-      console.error('Failed to load currency lists:', err);
-    }
-  };
 
   const loadPaymentAccounts = async () => {
     try {
@@ -126,10 +103,19 @@ export default function DepositsPage() {
   const filteredAccounts = accounts.filter(a => a.type === form.paymentMethod);
   const selectedAccount = filteredAccounts.find(a => a.id === form.accountId);
 
-  // Currency options depend on the payment method:
-  // crypto → CoinMarketCap list; bank/momo/opay → ExchangeRate API fiat list.
+  // Default paying-in currency per payment method (used when the selected
+  // account does not declare its own currency).
   const isCryptoMethod = form.paymentMethod === 'crypto';
-  const currencyOptions: CurrencyOption[] = isCryptoMethod ? cryptoCurrencies : fiatCurrencies;
+  const defaultCurrencyForMethod = isCryptoMethod ? 'USDT' : 'USD';
+
+  // The amount field ALWAYS transacts in the selected payment method's
+  // currency — sync automatically whenever the method or account changes.
+  useEffect(() => {
+    const account = accounts.find(a => a.id === form.accountId);
+    const targetCurrency = (account?.currency || defaultCurrencyForMethod).toUpperCase();
+    setForm(prev => (prev.currency === targetCurrency ? prev : { ...prev, currency: targetCurrency }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.paymentMethod, form.accountId, accounts]);
 
   // Debounced USD quote — one cached server call per settled input,
   // never an upstream API request per keystroke.
@@ -190,11 +176,14 @@ export default function DepositsPage() {
     if (!form.amount || Number(form.amount) <= 0) {
       return 'Please enter a valid deposit amount greater than 0';
     }
-    if (Number(form.amount) < 10) {
-      return 'Minimum deposit amount is $10';
+    // Min/max limits apply to the USD equivalent, since the typed amount is
+    // in the selected payment method's currency (which may not be USD).
+    const usdEquivalent = usdQuote?.usdAmount ?? Number(form.amount);
+    if (usdEquivalent < 10) {
+      return 'Minimum deposit is $10 USD equivalent';
     }
-    if (Number(form.amount) > 1000000) {
-      return 'Maximum deposit amount is $1,000,000';
+    if (usdEquivalent > 1000000) {
+      return 'Maximum deposit is $1,000,000 USD equivalent';
     }
     if (!form.accountId) {
       return 'Please select a receiving account';
@@ -236,11 +225,12 @@ export default function DepositsPage() {
         }),
       });
 
-      const message = `Deposit of $${Number(form.amount).toFixed(2)} submitted and awaiting verification.`;
+      const usdEstimate = usdQuote ? ` (≈ $${usdQuote.usdAmount.toFixed(2)} USD)` : '';
+      const message = `Deposit of ${Number(form.amount).toFixed(2)} ${form.currency}${usdEstimate} submitted and awaiting verification.`;
       setSuccess(message);
       toastEmitter.success(
         'Deposit Submitted',
-        `Your $${Number(form.amount).toFixed(2)} deposit is pending verification`
+        `Your ${Number(form.amount).toFixed(2)} ${form.currency} deposit${usdEstimate} is pending verification`
       );
 
       // Refresh financial data across the app
@@ -249,7 +239,7 @@ export default function DepositsPage() {
       // Reset form
       setForm({
         amount: '',
-        currency: 'USDT',
+        currency: defaultCurrencyForMethod,
         paymentMethod: 'bank',
         accountId: filteredAccounts.length > 0 ? filteredAccounts[0].id : '',
         txHash: '',
@@ -318,10 +308,12 @@ export default function DepositsPage() {
                     key={method.value}
                     type="button"
                     onClick={() => {
+                      const firstAccount = accounts.find(a => a.type === method.value && a.active);
                       setForm(prev => ({
                         ...prev,
                         paymentMethod: method.value,
                         accountId: '',
+                        currency: (firstAccount?.currency || (method.value === 'crypto' ? 'USDT' : 'USD')).toUpperCase(),
                       }));
                     }}
                     className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-4 transition ${
@@ -509,22 +501,25 @@ export default function DepositsPage() {
               </div>
             )}
 
-            {/* Amount */}
+            {/* Amount — always typed in the selected payment method's currency */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">
-                Amount to Deposit
+                Amount to Deposit ({form.currency})
               </label>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  min="10"
-                  max="1000000"
-                  value={form.amount}
-                  onChange={(e) => setForm(prev => ({ ...prev, amount: e.target.value }))}
-                  placeholder="500.00"
-                  className="mc-input flex-1"
-                />
+                <div className="relative flex-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={form.amount}
+                    onChange={(e) => setForm(prev => ({ ...prev, amount: e.target.value }))}
+                    placeholder={`Amount in ${form.currency}`}
+                    className="mc-input w-full pr-16"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">
+                    {form.currency}
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setForm(prev => ({ ...prev, amount: '1000' }))}
@@ -533,41 +528,33 @@ export default function DepositsPage() {
                   Quick
                 </button>
               </div>
-              <p className="text-xs text-slate-500 mt-1">Min: $10 | Max: $1,000,000</p>
+              <p className="text-xs text-slate-500 mt-1">
+                You are paying in {form.currency} via {PAYMENT_METHODS.find(m => m.value === form.paymentMethod)?.label}. Limits: $10 – $1,000,000 USD equivalent.
+              </p>
             </div>
 
-            {/* Currency */}
+            {/* Paying Currency — read-only, derived from the selected payment method */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">
                 {isCryptoMethod ? 'Cryptocurrency you are paying with' : 'Currency you are paying with'}
               </label>
               <input
                 type="text"
-                list="deposit-currency-options"
+                readOnly
                 value={form.currency}
-                onChange={(e) => setForm(prev => ({ ...prev, currency: e.target.value.toUpperCase() }))}
-                placeholder={isCryptoMethod ? 'USDT' : 'USD'}
-                className="mc-input"
+                className="mc-input bg-slate-50 font-bold cursor-not-allowed"
               />
-              <datalist id="deposit-currency-options">
-                {currencyOptions.map((option) => {
-                  const code = option.code || option.symbol || '';
-                  return (
-                    <option key={code} value={code}>
-                      {code} — {option.name}
-                    </option>
-                  );
-                })}
-              </datalist>
-              <p className="text-xs text-slate-500 mt-1">
-                {isCryptoMethod ? 'Search any supported cryptocurrency (e.g. USDT, BTC, ETH)' : 'Search any supported fiat currency (e.g. USD, GHS, NGN, EUR)'}
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                <FaExchangeAlt className="h-3 w-3" />
+                Automatically matched to your selected payment method{selectedAccount?.currency ? ` (${selectedAccount.currency})` : ''}
               </p>
             </div>
 
-            {/* USD Credit — read-only, locked server-side on submission */}
+            {/* Estimated USD credit — read-only, updates live; the exact rate is
+                locked server-side on submission and credited on approval */}
             <div>
               <label className="block text-sm font-bold text-slate-700 mb-2">
-                USD Credit
+                You Will Receive (USD Assets)
               </label>
               <input
                 type="text"
@@ -577,12 +564,12 @@ export default function DepositsPage() {
                     ? `$${usdQuote.usdAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     : ''
                 }
-                placeholder={quoteLoading ? 'Calculating…' : 'Enter an amount to see the USD equivalent'}
+                placeholder={quoteLoading ? 'Calculating…' : 'Enter an amount to see your estimated USD credit'}
                 className="mc-input bg-slate-50 font-bold text-emerald-700 cursor-not-allowed"
               />
               {usdQuote && (
                 <p className="text-xs text-slate-500 mt-1">
-                  Rate: 1 {form.currency} ≈ ${usdQuote.exchangeRate} USD · Locked when your deposit is submitted
+                  Rate: 1 {form.currency} ≈ ${usdQuote.exchangeRate} USD · Locked when your deposit is submitted and credited to your balance on approval
                 </p>
               )}
             </div>
@@ -690,7 +677,7 @@ export default function DepositsPage() {
               </li>
               <li className="flex gap-2">
                 <span className="font-bold text-cmblue-600">•</span>
-                <span>All amounts are in USD/USDT equivalent</span>
+                <span>You pay in your payment method's currency; the locked rate at submission determines the exact USD credited on approval</span>
               </li>
             </ul>
           </div>
@@ -717,7 +704,7 @@ export default function DepositsPage() {
                 <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full bg-cmblue-500 text-white text-xs font-bold">3</span>
                 <div className="text-sm">
                   <p className="font-bold text-slate-900">Enter Amount</p>
-                  <p className="text-xs text-slate-500">Specify deposit amount</p>
+                  <p className="text-xs text-slate-500">Type the amount in your payment method's currency</p>
                 </div>
               </li>
               <li className="flex gap-3">
