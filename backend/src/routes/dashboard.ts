@@ -181,7 +181,14 @@ router.get('/rankings', async (req: AuthRequest, res) => {
     const userId = req.user!.id;
     const [users, activePlans, sessions] = await Promise.all([
       prisma.user.findMany({
-        where: { status: 'active' },
+        where: {
+          status: 'active',
+          // Public leaderboard shows normal customer/member accounts only.
+          // Exclude staff roles (defined in src/middleware/admin.ts ROLES):
+          // SUPER_ADMIN and EMPLOYEE. Filtered at the DB level so scoring,
+          // ranking, take(100) and the top-10 slice all apply post-exclusion.
+          role: { notIn: ['SUPER_ADMIN', 'EMPLOYEE'] },
+        },
         select: {
           id: true,
           username: true,
