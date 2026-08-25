@@ -16,6 +16,7 @@ import {
   FaSignOutAlt,
   FaStore,
   FaTable,
+  FaThLarge,
   FaUsers,
   FaWallet,
   FaUserTie,
@@ -73,6 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/plans', label: 'Mining', icon: FaLayerGroup, show: isStaff },
     { href: '/admin/users', label: 'Team', icon: FaUsers, show: isStaff },
     { href: '/admin/treasury', label: 'Wallet', icon: FaWallet, show: isSuperAdmin },
+    { href: '/admin/tabs', label: 'Tabs', icon: FaThLarge, show: isStaff },
     { href: '/admin/settings', label: 'More', icon: FaCogs, show: isStaff },
   ].filter(item => item.show);
 
@@ -182,7 +184,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-sky-100 bg-white/92 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-16px_38px_rgba(0,139,255,0.12)] backdrop-blur-xl lg:hidden">
-          <div className="mx-auto grid max-w-md grid-cols-5 gap-1 rounded-[22px] bg-sky-50/70 p-1 ring-1 ring-sky-100">
+          <div className="mx-auto grid max-w-md grid-cols-6 gap-1 rounded-[22px] bg-sky-50/70 p-1 ring-1 ring-sky-100">
             {mobileNav.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
