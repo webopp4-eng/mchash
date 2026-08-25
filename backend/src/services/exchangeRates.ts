@@ -181,16 +181,25 @@ export async function getFiatCurrencies(): Promise<{ code: string; name: string 
   });
 }
 
-/** Fiat → USD rate (how many USD one unit of `code` buys). */
+/**
+ * Fiat → USD rate (how many USD one unit of `code` buys).
+ *
+ * DIRECTION FIX: the ExchangeRate API's latest/USD feed reports each
+ * rate as "units of `code` per 1 USD" (e.g. GHS: 11 means 1 USD = 11 GHS).
+ * The raw value was previously returned as-is, which inverted every
+ * conversion (100 GHS became $1,100 instead of ≈ $9.09). The value is
+ * inverted here — base/quote swapped, same live API data, nothing hardcoded.
+ */
 export async function getFiatToUsdRate(code: string): Promise<number> {
   const upper = code.toUpperCase();
   if (upper === 'USD') return 1;
   const { rates } = await getFiatRates();
-  const rate = Number(rates[upper]);
-  if (!Number.isFinite(rate) || rate <= 0) {
+  const unitsPerUsd = Number(rates[upper]);
+  if (!Number.isFinite(unitsPerUsd) || unitsPerUsd <= 0) {
     throw new Error(`Unsupported fiat currency: ${upper}`);
   }
-  return rate;
+  // API gives X units of `upper` per 1 USD → 1 unit of `upper` = 1/X USD.
+  return round8(1 / unitsPerUsd);
 }
 
 // ---------------------------------------------------------------------------
