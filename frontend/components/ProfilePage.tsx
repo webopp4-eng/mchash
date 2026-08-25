@@ -20,7 +20,7 @@ import { useState, useEffect } from 'react';
 import {
   FaBell, FaCogs, FaChevronRight, FaHeadset, FaLock, FaPencilAlt,
   FaSignOutAlt, FaCheck, FaWallet, FaMoneyBill, FaCoins, FaBitcoin,
-  FaEthereum, FaFingerprint, FaIdBadge, FaShieldAlt,
+  FaEthereum, FaFingerprint, FaIdBadge, FaShieldAlt, FaUsers,
 } from 'react-icons/fa';
 import { getUser, logout, User } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
@@ -32,6 +32,7 @@ const settingsGroups = [
   {
     group: 'Preferences',
     items: [
+      { icon: FaUsers, label: 'Team', desc: 'View your referrals & team', href: '/dashboard/referrals' },
       { icon: FaCogs, label: 'Settings', desc: 'Manage your preferences', href: '/dashboard/settings' },
       { icon: FaBell, label: 'Notifications', desc: 'View all notifications', href: '/dashboard/withdrawals' },
     ],

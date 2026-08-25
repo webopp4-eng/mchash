@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { FaHome, FaWallet, FaBolt, FaUsers, FaUser } from 'react-icons/fa';
+import { FaHome, FaWallet, FaBolt, FaStore, FaUser } from 'react-icons/fa';
 
-// Mobile bottom navigation order: Home | Team | MINING (center) | Wallet | Profile
+// Mobile bottom navigation order: Home | Plans | MINING (center) | Wallet | Profile
 const nav = [
   { href: '/dashboard', label: 'Home', icon: FaHome },
-  { href: '/dashboard/referrals', label: 'Team', icon: FaUsers },
+  { href: '/dashboard/plans', label: 'Plans', icon: FaStore },
   { href: '/dashboard/mining', label: 'Mining', icon: FaBolt, featured: true },
   { href: '/dashboard/wallet', label: 'Wallet', icon: FaWallet },
   { href: '/dashboard/profile', label: 'Profile', icon: FaUser },
