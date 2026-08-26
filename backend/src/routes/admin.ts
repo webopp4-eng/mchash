@@ -265,7 +265,13 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
     const [totalUsers, activeMiners, totalDeposits, totalWithdrawals, totalRevenue, miningPlans, referrals, treasuryWallets] = await Promise.all([
       prisma.user.count(),
       prisma.miningPurchase.count({ where: { status: 'active' } }),
-      prisma.deposit.aggregate({ _sum: { amount: true } }),
+      prisma.deposit.aggregate({
+        _sum: { amount: true },
+        // Only count deposits that actually funded the user. Rejected deposits
+        // must NOT show in analytics, and pending ones haven't been credited
+        // yet (they are credited only on approval), so both are excluded.
+        where: { status: { in: ['approved', 'completed'] } },
+      }),
       prisma.withdrawal.aggregate({ _sum: { amount: true } }),
       // Plan sales are stored as NEGATIVE amounts on user transactions
       // (money leaving the USER's balance), for both mining plans ('purchase')
