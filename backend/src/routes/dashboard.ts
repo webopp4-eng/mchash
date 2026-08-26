@@ -107,7 +107,7 @@ async function fetchMarketPrices(): Promise<{ prices: any; updatedAt: string }> 
 router.get('/market-prices', async (_req, res) => {
   const now = Date.now();
 
-  // Serve fresh cache instantly — no external call, no rate-limit risk.
+  // Serve fresh cache instantly â€” no external call, no rate-limit risk.
   if (marketCache && now - marketCache.fetchedAt < MARKET_CACHE_TTL_MS) {
     return res.json({ ...marketCache, source: 'cache' });
   }
@@ -132,7 +132,7 @@ router.get('/market-prices', async (_req, res) => {
     if (marketCache) {
       return res.json({ ...marketCache, source: 'stale-cache' });
     }
-    // No cache yet — fall back to neutral defaults.
+    // No cache yet â€” fall back to neutral defaults.
     res.json({
       prices: {
         BTC: { price: 0, change24h: 0 },
@@ -151,7 +151,7 @@ router.use(authenticateToken, loadUser);
 
 // ============ CURRENCY CONVERSION (manual deposits) ============
 // Supported fiat currencies for the deposit / payment-method forms.
-// The list comes from the ExchangeRate API (90+ codes) — never hard-coded.
+// The list comes from the ExchangeRate API (90+ codes) â€” never hard-coded.
 router.get('/currencies/fiat', async (_req, res) => {
   try {
     const currencies = await getFiatCurrencies();
@@ -175,7 +175,7 @@ router.get('/currencies/crypto', async (_req, res) => {
 
 // Live USD quote for a given amount + currency (fiat or crypto).
 // Rates are cached server-side, so this never triggers an upstream API call
-// per keystroke. The value shown here is an ESTIMATE only — the authoritative
+// per keystroke. The value shown here is an ESTIMATE only â€” the authoritative
 // conversion is recalculated server-side when the deposit request is created.
 router.get('/rates/quote', async (req, res) => {
   try {
@@ -427,7 +427,10 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
       const updated = planPrice > 0
         ? await tx.user.update({
             where: { id: userId },
-            data: { platformBalance: { decrement: planPrice } },
+            data: {
+              platformBalance: { decrement: planPrice },
+              [getBalanceField(plan.currency || 'USDT')]: { decrement: planPrice },
+            },
           })
         : user;
 
@@ -571,7 +574,10 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
       const updated = planPrice > 0
         ? await tx.user.update({
             where: { id: userId },
-            data: { platformBalance: { decrement: planPrice } },
+            data: {
+              platformBalance: { decrement: planPrice },
+              [getBalanceField(plan.currency || 'USDT')]: { decrement: planPrice },
+            },
           })
         : user;
 
@@ -697,7 +703,7 @@ router.post('/deposits', async (req: AuthRequest, res) => {
     const depositCurrency = String(currency || paymentAccount?.currency || 'USDT').toUpperCase().trim();
 
     // AUTHORITATIVE server-side conversion. The rate is LOCKED here and stored
-    // with the deposit — approval later credits exactly this USD amount and
+    // with the deposit â€” approval later credits exactly this USD amount and
     // never re-rates with a newer price. Any client-supplied estimate is ignored.
     let conversion;
     try {
@@ -737,7 +743,7 @@ router.post('/deposits', async (req: AuthRequest, res) => {
         userId,
         type: 'deposit',
         title: 'Deposit Submitted',
-        message: `Your ${depositCurrency} deposit request for ${normalizedAmount.toFixed(2)} (≈ $${conversion.usdAmount.toFixed(2)} USD) is pending admin review.`,
+        message: `Your ${depositCurrency} deposit request for ${normalizedAmount.toFixed(2)} (â‰ˆ $${conversion.usdAmount.toFixed(2)} USD) is pending admin review.`,
       },
     });
 
@@ -834,7 +840,7 @@ router.get('/referrals', async (req: AuthRequest, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Build the production/public referral URL — never default to localhost.
+    // Build the production/public referral URL â€” never default to localhost.
     const publicOrigin =
       process.env.PUBLIC_FRONTEND_URL ||
       process.env.RENDER_FRONTEND_URL ||
@@ -906,7 +912,7 @@ router.get('/withdrawals', async (req: AuthRequest, res) => {
   }
 });
 
-// Request withdrawal — atomic: creates withdrawal, debits per-asset balance + platformBalance,
+// Request withdrawal â€” atomic: creates withdrawal, debits per-asset balance + platformBalance,
 // records transaction + notification all inside a single DB transaction so balances
 // always stay synchronized.
 router.post('/withdrawals', async (req: AuthRequest, res) => {
@@ -956,7 +962,7 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
       });
     }
 
-    // All mutation steps in one transaction — balances, withdrawal record,
+    // All mutation steps in one transaction â€” balances, withdrawal record,
     // transaction log and notification either all commit or all roll back.
     const { withdrawal: createdWithdrawal, balances: updatedBalances } = await prisma.$transaction(async (tx) => {
       const withdrawal = await tx.withdrawal.create({

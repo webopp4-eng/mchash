@@ -366,7 +366,16 @@ router.post('/users/:id/credit', requireSuperAdmin, async (req: AuthRequest, res
 
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: { [type]: { increment: creditAmount } },
+      data: {
+        [type]: { increment: creditAmount },
+        // Real (withdrawable) credits land in the platform balance and the
+        // matching per-asset balance so they are available for withdrawal and
+        // show up consistently everywhere in the app. Counter-only types
+        // (totalEarned / totalDeposited) are left untouched.
+        ...(type === 'platformBalance'
+          ? { [getBalanceField('USDT')]: { increment: creditAmount } }
+          : {}),
+      },
     });
 
     await prisma.transaction.create({
@@ -758,7 +767,15 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
       const processed = await prisma.$transaction([
         prisma.user.update({
           where: { id: deposit.userId },
-          data: { platformBalance: { increment: creditedAmount }, totalDeposited: { increment: creditedAmount } },
+          data: {
+            platformBalance: { increment: creditedAmount },
+            // Credit the withdrawable per-asset balance too (USDT is the base
+            // currency for USD-valued deposits) so deposited funds are
+            // immediately available for withdrawal and stay consistent with
+            // the mining/admin flows across the whole app.
+            [getBalanceField('USDT')]: { increment: creditedAmount },
+            totalDeposited: { increment: creditedAmount },
+          },
         }),
         prisma.deposit.update({
           where: { id },
