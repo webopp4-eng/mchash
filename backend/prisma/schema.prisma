@@ -134,6 +134,7 @@ model MiningPlan {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime
   expectedReturn Decimal          @default(0) @db.Decimal(18, 8)
+  maxPurchasesPerUser Int? // Maximum times ONE user can buy this plan (null = unlimited)
   MiningPurchase MiningPurchase[]
 }
 

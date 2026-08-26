@@ -2,17 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaBolt, FaCheck, FaWallet, FaClock, FaGift, FaUsers, FaCube, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaBolt, FaCheck, FaWallet, FaClock, FaGift, FaUsers, FaCube } from 'react-icons/fa';
 import { apiFetch, getUser } from '@/lib/auth';
 import { refreshFinancialData } from '@/lib/financialData';
 import { toastEmitter } from '@/components/NotificationToast';
 
-const getVisiblePlanCount = () => {
-  if (typeof window === 'undefined') return 4;
-  if (window.innerWidth < 640) return 1;
-  if (window.innerWidth < 1024) return 2;
-  return 4;
-};
+// A plan's per-user purchase cap (set by admins) is reached when the caller has
+// already bought it at least maxPurchasesPerUser times.
+const purchaseLimitReached = (plan: any) =>
+  Number(plan.maxPurchasesPerUser || 0) > 0 &&
+  Number(plan.userPurchaseCount || 0) >= Number(plan.maxPurchasesPerUser);
 
 export default function PlansPage() {
   const router = useRouter();
@@ -22,9 +21,6 @@ export default function PlansPage() {
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [visiblePlanCount, setVisiblePlanCount] = useState(4);
-  const [planStartIndex, setPlanStartIndex] = useState(0);
-  const [hashStartIndex, setHashStartIndex] = useState(0);
 
   useEffect(() => {
     loadPlans();
@@ -45,25 +41,6 @@ export default function PlansPage() {
       document.removeEventListener('visibilitychange', resync);
     };
   }, []);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setVisiblePlanCount(getVisiblePlanCount());
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    setPlanStartIndex((current) => Math.min(current, Math.max(0, plans.length - visiblePlanCount)));
-  }, [plans.length, visiblePlanCount]);
-
-  useEffect(() => {
-    setHashStartIndex((current) => Math.min(current, Math.max(0, hashRentingPlans.length - visiblePlanCount)));
-  }, [hashRentingPlans.length, visiblePlanCount]);
 
   // `silent` skips the full-screen loading state for background re-syncs
   const loadPlans = async (silent = false) => {
@@ -228,41 +205,12 @@ export default function PlansPage() {
               <h2 className="text-base font-bold text-slate-950">Mining Contracts</h2>
               <p className="text-xs text-slate-500">Lock in hashrate and earn daily mining rewards</p>
             </div>
-            {plans.length > visiblePlanCount && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPlanStartIndex((current) => Math.max(0, current - 1))}
-                  disabled={planStartIndex === 0}
-                  className="mc-icon-button h-9 w-9 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Previous mining plans"
-                >
-                  <FaChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPlanStartIndex((current) => Math.min(plans.length - visiblePlanCount, current + 1))}
-                  disabled={planStartIndex >= plans.length - visiblePlanCount}
-                  className="mc-icon-button h-9 w-9 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Next mining plans"
-                >
-                  <FaChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
           </div>
 
-          <div className="overflow-hidden">
-            <div
-              className="flex transition-transform duration-300 ease-out"
-              style={{ transform: `translateX(-${planStartIndex * (100 / visiblePlanCount)}%)` }}
-            >
+          {/* All plans shown side by side — two fit in a row */}
+          <div className="grid gap-4 sm:grid-cols-2">
               {plans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className="flex-shrink-0 px-1 sm:px-2"
-                  style={{ width: `${100 / visiblePlanCount}%` }}
-                >
+                <div key={plan.id}>
                   <div className="flex h-full flex-col rounded-[24px] border border-sky-100 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl transition-all hover:border-cmblue-200 hover:shadow-[0_24px_64px_rgba(0,139,255,0.16)]">
                     <div className="mb-4 flex items-start justify-between">
                       <div className="flex-1">
@@ -296,17 +244,30 @@ export default function PlansPage() {
                         <FaGift className="h-3.5 w-3.5 text-cmblue-500" />
                         <span>+${Number(plan.bonusReward).toFixed(2)} bonus</span>
                       </div>
+                      {Number(plan.maxPurchasesPerUser || 0) > 0 && (
+                        <div className="flex items-center gap-2.5 text-xs text-slate-600">
+                          <FaUsers className="h-3.5 w-3.5 text-cmblue-500" />
+                          <span>
+                            {Math.min(Number(plan.userPurchaseCount || 0), Number(plan.maxPurchasesPerUser))} of {Number(plan.maxPurchasesPerUser)} bought (your limit)
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <button
                       onClick={() => handlePurchase(plan)}
-                      disabled={purchasing === plan.id}
+                      disabled={purchasing === plan.id || purchaseLimitReached(plan)}
                       className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cmblue-600 to-cmblue-500 px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_24px_rgba(0,130,255,0.22)] transition-all hover:shadow-[0_16px_36px_rgba(0,130,255,0.32)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {purchasing === plan.id ? (
                         <>
                           <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                           Activating...
+                        </>
+                      ) : purchaseLimitReached(plan) ? (
+                        <>
+                          <FaCheck className="h-3.5 w-3.5" />
+                          Purchase Limit Reached
                         </>
                       ) : (
                         <>
@@ -318,7 +279,6 @@ export default function PlansPage() {
                   </div>
                 </div>
               ))}
-            </div>
           </div>
         </div>
       )}
@@ -330,41 +290,12 @@ export default function PlansPage() {
               <h2 className="text-base font-bold text-slate-950">Hash Renting</h2>
               <p className="text-xs text-slate-500">Rent hashpower with direct wallet yields</p>
             </div>
-            {hashRentingPlans.length > visiblePlanCount && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setHashStartIndex((current) => Math.max(0, current - 1))}
-                  disabled={hashStartIndex === 0}
-                  className="mc-icon-button h-9 w-9 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Previous hash renting plans"
-                >
-                  <FaChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHashStartIndex((current) => Math.min(hashRentingPlans.length - visiblePlanCount, current + 1))}
-                  disabled={hashStartIndex >= hashRentingPlans.length - visiblePlanCount}
-                  className="mc-icon-button h-9 w-9 disabled:cursor-not-allowed disabled:opacity-40"
-                  aria-label="Next hash renting plans"
-                >
-                  <FaChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
           </div>
 
-          <div className="overflow-hidden">
-            <div
-              className="flex transition-transform duration-300 ease-out"
-              style={{ transform: `translateX(-${hashStartIndex * (100 / visiblePlanCount)}%)` }}
-            >
+          {/* All hash renting plans shown side by side — two fit in a row */}
+          <div className="grid gap-4 sm:grid-cols-2">
               {hashRentingPlans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className="flex-shrink-0 px-1 sm:px-2"
-                  style={{ width: `${100 / visiblePlanCount}%` }}
-                >
+                <div key={plan.id}>
                   <div className="flex h-full flex-col rounded-[24px] border border-sky-100 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,139,255,0.08)] backdrop-blur-xl transition-all hover:border-purple-200 hover:shadow-[0_24px_64px_rgba(0,139,255,0.16)]">
                     <div className="mb-4 flex items-start justify-between">
                       <div className="flex-1">
@@ -418,7 +349,6 @@ export default function PlansPage() {
                   </div>
                 </div>
               ))}
-            </div>
           </div>
         </div>
       )}

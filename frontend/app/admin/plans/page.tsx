@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaPlus, FaEdit, FaTrash, FaBolt, FaClock, FaWallet } from 'react-icons/fa';
+import { FaPlus, FaEdit, FaTrash, FaBolt, FaClock, FaWallet, FaUsers } from 'react-icons/fa';
 import { apiFetch } from '@/lib/auth';
 import { toastEmitter } from '@/components/NotificationToast';
 
@@ -19,6 +19,7 @@ export default function AdminPlans() {
     durationDays: '',
     bonusReward: '',
     referralBonus: '',
+    maxPurchasesPerUser: '',
     chain: 'ethereum',
   });
 
@@ -60,7 +61,7 @@ export default function AdminPlans() {
       }
       setShowForm(false);
       setEditing(null);
-      setForm({ name: '', description: '', price: '', hashRate: '', dailyRate: '', durationDays: '', bonusReward: '', referralBonus: '', chain: 'ethereum' });
+      setForm({ name: '', description: '', price: '', hashRate: '', dailyRate: '', durationDays: '', bonusReward: '', referralBonus: '', maxPurchasesPerUser: '', chain: 'ethereum' });
       loadPlans();
     } catch (err: any) {
       const errorMsg = err.message || 'Failed to save plan';
@@ -105,6 +106,7 @@ export default function AdminPlans() {
       durationDays: String(plan.durationDays),
       bonusReward: String(plan.bonusReward || 0),
       referralBonus: String(plan.referralBonus || 0),
+      maxPurchasesPerUser: plan.maxPurchasesPerUser != null ? String(plan.maxPurchasesPerUser) : '',
       chain: plan.chain,
     });
     setShowForm(true);
@@ -235,6 +237,15 @@ export default function AdminPlans() {
               placeholder="Referral Bonus (%)"
               className="mc-input"
             />
+            <input
+              type="number"
+              min="1"
+              value={form.maxPurchasesPerUser}
+              onChange={(e) => setForm({ ...form, maxPurchasesPerUser: e.target.value })}
+              placeholder="Max Purchases Per User (blank = unlimited)"
+              title="Maximum number of times ONE user can buy this plan. Leave blank or 0 for unlimited."
+              className="mc-input"
+            />
             <select
               value={form.chain}
               onChange={(e) => setForm({ ...form, chain: e.target.value })}
@@ -278,6 +289,7 @@ export default function AdminPlans() {
               <p className="flex items-center gap-2 rounded-xl bg-cmblue-50 p-2"><FaBolt className="h-3 w-3 text-cmblue-600" /> {plan.hashRate} TH/s</p>
               <p className="flex items-center gap-2 rounded-xl bg-sky-50 p-2"><FaClock className="h-3 w-3 text-cmblue-600" /> {plan.durationDays} days</p>
               <p className="flex items-center gap-2 rounded-xl bg-emerald-50 p-2"><FaWallet className="h-3 w-3 text-emerald-600" /> {(Number(plan.dailyRate) * 100).toFixed(1)}% daily</p>
+              <p className="flex items-center gap-2 rounded-xl bg-purple-50 p-2"><FaUsers className="h-3 w-3 text-purple-600" /> {Number(plan.maxPurchasesPerUser || 0) > 0 ? `Max ${plan.maxPurchasesPerUser} purchase${Number(plan.maxPurchasesPerUser) === 1 ? '' : 's'} per user` : 'Unlimited purchases per user'}</p>
             </div>
             <div className="mt-4 flex gap-2">
               <button

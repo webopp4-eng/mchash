@@ -72,3 +72,24 @@ export async function loadUser(req: AuthRequest, res: Response, next: NextFuncti
   };
   next();
 }
+
+// Best-effort user resolution for PUBLIC endpoints: returns the user id when a
+// valid token is attached, otherwise null. Never rejects the request, so it is
+// safe to call on routes that must also work for anonymous visitors.
+export function getOptionalUserId(req: Request): string | null {
+  let token: string | undefined;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.substring(7);
+  }
+  if (!token && req.cookies && req.cookies.cmhash_token) {
+    token = req.cookies.cmhash_token;
+  }
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, getJwtSecret()) as { sub: string };
+    return decoded.sub;
+  } catch {
+    return null;
+  }
+}

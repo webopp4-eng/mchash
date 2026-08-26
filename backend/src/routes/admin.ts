@@ -419,14 +419,19 @@ router.get('/plans', requireAdminOrEmployee, async (_req, res) => {
 
 router.post('/plans', requireSuperAdmin, async (req, res) => {
   try {
-    const { name, description, price, currency, chain, hashRate, dailyRate, durationDays, bonusReward, referralBonus, expectedReturn } = req.body;
+    const { name, description, price, currency, chain, hashRate, dailyRate, durationDays, bonusReward, referralBonus, expectedReturn, maxPurchasesPerUser } = req.body;
     const plan = await prisma.miningPlan.create({
       data: {
         id: uuid(), name, description,
         price: Number(price), currency: currency || 'USDT', chain: chain || 'ethereum',
         hashRate: Number(hashRate), dailyRate: Number(dailyRate), durationDays: Number(durationDays),
         bonusReward: Number(bonusReward || 0), referralBonus: Number(referralBonus || 0),
-        expectedReturn: Number(expectedReturn || 0), updatedAt: new Date(),
+        expectedReturn: Number(expectedReturn || 0),
+        // Blank / 0 / invalid means "no limit" for how often a single user can buy this plan
+        maxPurchasesPerUser: maxPurchasesPerUser !== undefined && maxPurchasesPerUser !== null && maxPurchasesPerUser !== '' && Number(maxPurchasesPerUser) > 0
+          ? Math.floor(Number(maxPurchasesPerUser))
+          : null,
+        updatedAt: new Date(),
       },
     });
     res.json({ success: true, plan });
@@ -447,6 +452,13 @@ router.patch('/plans/:id', requireSuperAdmin, async (req, res) => {
     if (data.bonusReward) data.bonusReward = Number(data.bonusReward);
     if (data.referralBonus) data.referralBonus = Number(data.referralBonus);
     if (data.expectedReturn) data.expectedReturn = Number(data.expectedReturn);
+    if (data.maxPurchasesPerUser !== undefined) {
+      // Empty string / 0 clears the limit (unlimited purchases per user)
+      const parsedMax = Number(data.maxPurchasesPerUser);
+      data.maxPurchasesPerUser = data.maxPurchasesPerUser !== null && data.maxPurchasesPerUser !== '' && parsedMax > 0
+        ? Math.floor(parsedMax)
+        : null;
+    }
 
     const plan = await prisma.miningPlan.update({ where: { id }, data });
     res.json({ success: true, plan });

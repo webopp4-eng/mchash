@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import prisma from '../lib/prisma';
-import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
+import { authenticateToken, loadUser, AuthRequest, getOptionalUserId } from '../middleware/auth';
 import { getActivePlan, getActivePlans, getMiningSessions } from '../services/mining';
 import { normalizeAsset, getBalanceField, getAssetBalances } from '../services/balances';
 import {
@@ -16,8 +16,11 @@ const router = Router();
 
 // ============ PUBLIC ROUTES (no auth required) ============
 
-// Plans - public endpoint so Home page and unauthenticated users can browse
-router.get('/plans', async (_req, res) => {
+// Plans - public endpoint so Home page and unauthenticated users can browse.
+// When a valid auth token IS attached we additionally report how many times the
+// caller has already bought each mining plan (`userPurchaseCount`) so the UI
+// can show progress against the per-plan purchase limits set by admins.
+router.get('/plans', async (req: AuthRequest, res) => {
   try {
     const plans = await prisma.miningPlan.findMany({
       where: { active: true },
@@ -27,7 +30,22 @@ router.get('/plans', async (_req, res) => {
       where: { active: true },
       orderBy: { price: 'asc' },
     });
-    res.json({ plans, hashRentingPlans });
+
+    let userPurchaseCounts = new Map<string, number>();
+    const userId = getOptionalUserId(req);
+    if (userId) {
+      const counts = await prisma.miningPurchase.groupBy({
+        by: ['planId'],
+        where: { userId },
+        _count: { _all: true },
+      });
+      userPurchaseCounts = new Map(counts.map((entry) => [entry.planId, entry._count._all]));
+    }
+
+    res.json({
+      plans: plans.map((plan) => ({ ...plan, userPurchaseCount: userPurchaseCounts.get(plan.id) || 0 })),
+      hashRentingPlans,
+    });
   } catch (error) {
     console.error('Plans error:', error);
     res.status(500).json({ error: 'Failed to load plans' });
@@ -382,6 +400,15 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // Per-plan purchase cap configured by admins (`null`/0 = unlimited).
+    const maxBuys = plan.maxPurchasesPerUser != null ? Math.floor(Number(plan.maxPurchasesPerUser)) : 0;
+    if (maxBuys > 0) {
+      const existingPurchases = await prisma.miningPurchase.count({ where: { userId, planId } });
+      if (existingPurchases >= maxBuys) {
+        return res.status(400).json({ error: `You have reached the purchase limit (${maxBuys}) for the ${plan.name} plan.` });
+      }
+    }
+
     // Multi-mining: users may hold several active plans at once, so no
     // single-active-plan restriction is applied here.
     const platformBalance = Number(user.platformBalance);
@@ -400,6 +427,15 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
             data: { platformBalance: { decrement: planPrice } },
           })
         : user;
+
+      if (maxBuys > 0) {
+        // Re-check INSIDE the transaction so two concurrent purchases can never
+        // slip past the per-user purchase cap.
+        const ownedNow = await tx.miningPurchase.count({ where: { userId, planId } });
+        if (ownedNow >= maxBuys) {
+          throw new Error('PURCHASE_LIMIT_REACHED');
+        }
+      }
 
       const createdPurchase = await tx.miningPurchase.create({
         data: {
@@ -492,7 +528,10 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
 
     const activePlan = await getActivePlan(userId);
     res.json({ success: true, purchase, activePlan, platformBalance: updatedUser.platformBalance });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.message === 'PURCHASE_LIMIT_REACHED') {
+      return res.status(400).json({ error: 'You have reached the maximum number of purchases allowed for this plan.' });
+    }
     console.error('Purchase error:', error);
     res.status(500).json({ error: 'Failed to purchase plan' });
   }
