@@ -401,7 +401,10 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     // Per-plan purchase cap configured by admins (`null`/0 = unlimited).
-    const maxBuys = plan.maxPurchasesPerUser != null ? Math.floor(Number(plan.maxPurchasesPerUser)) : 0;
+    // Read via a local cast so compilation doesn't depend on how fresh the
+    // generated Prisma client types are (`prisma generate` regenerates them).
+    const planLimitRaw = (plan as { maxPurchasesPerUser?: number | string | null }).maxPurchasesPerUser;
+    const maxBuys = planLimitRaw != null ? Math.floor(Number(planLimitRaw)) : 0;
     if (maxBuys > 0) {
       const existingPurchases = await prisma.miningPurchase.count({ where: { userId, planId } });
       if (existingPurchases >= maxBuys) {
