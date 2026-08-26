@@ -267,7 +267,11 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
       prisma.miningPurchase.count({ where: { status: 'active' } }),
       prisma.deposit.aggregate({ _sum: { amount: true } }),
       prisma.withdrawal.aggregate({ _sum: { amount: true } }),
-      prisma.transaction.aggregate({ _sum: { amount: true }, where: { type: 'purchase' } }),
+      // Plan sales are stored as NEGATIVE amounts on user transactions
+      // (money leaving the USER's balance), for both mining plans ('purchase')
+      // and hash renting ('hash_renting'). Flip the sign below so this metric
+      // reports positive platform REVENUE from sales.
+      prisma.transaction.aggregate({ _sum: { amount: true }, where: { type: { in: ['purchase', 'hash_renting'] } } }),
       prisma.miningPlan.count(),
       prisma.referral.aggregate({ _sum: { totalEarned: true } }),
       prisma.treasuryWallet.findMany(),
@@ -277,7 +281,8 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
       totalUsers, activeMiners,
       totalDeposits: totalDeposits._sum.amount || 0,
       totalWithdrawals: totalWithdrawals._sum.amount || 0,
-      totalRevenue: totalRevenue._sum.amount || 0,
+      // Negate because sale transactions are stored as negative amounts
+      totalRevenue: totalRevenue._sum.amount ? -Number(totalRevenue._sum.amount) : 0,
       miningPlans,
       referralEarnings: referrals._sum.totalEarned || 0,
       treasuryWallets,
