@@ -4,6 +4,7 @@ import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest, getOptionalUserId } from '../middleware/auth';
 import { getActivePlan, getActivePlans, getMiningSessions } from '../services/mining';
 import { normalizeAsset, getBalanceField, getAssetBalances } from '../services/balances';
+import { withDbRetry, isTransientDbError } from '../services/dbRetry';
 import {
   convertToUsd,
   getCryptoCurrencies,
@@ -684,7 +685,7 @@ router.post('/deposits', async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Deposit amount is required' });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await withDbRetry(() => prisma.user.findUnique({ where: { id: userId } }));
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -693,7 +694,7 @@ router.post('/deposits', async (req: AuthRequest, res) => {
 
     let paymentAccount = null;
     if (paymentAccountId) {
-      paymentAccount = await prisma.paymentAccount.findUnique({ where: { id: paymentAccountId } });
+      paymentAccount = await withDbRetry(() => prisma.paymentAccount.findUnique({ where: { id: paymentAccountId } }));
       if (!paymentAccount || !paymentAccount.active) {
         return res.status(404).json({ error: 'Selected payment account is unavailable' });
       }
@@ -715,41 +716,57 @@ router.post('/deposits', async (req: AuthRequest, res) => {
       });
     }
 
-    const deposit = await prisma.deposit.create({
-      data: {
-        id: uuid(),
-        userId,
-        paymentAccountId: paymentAccount?.id || null,
-        walletAddress: walletAddress || user.walletAddress || null,
-        chain: chain || user.chain || 'ethereum',
-        amount: normalizedAmount,
-        currency: depositCurrency,
-        token: depositCurrency,
-        txHash: txHash || null,
-        status: 'pending',
-        method: method || paymentAccount?.type || 'manual',
-        proofUrl: proofUrl || null,
-        note: note || null,
-        exchangeRate: conversion.exchangeRate,
-        usdAmount: conversion.usdAmount,
-        rateSource: conversion.source,
-      },
-      include: { PaymentAccount: true },
-    });
+    // Atomic + retryable write: the deposit record and its notification are
+    // created in ONE transaction so a transient DB drop can never leave a
+    // half-created deposit. A failed transaction rolls back cleanly, so
+    // retrying it cannot produce orphaned records.
+    const deposit = await withDbRetry(() =>
+      prisma.$transaction(async (tx) => {
+        const created = await tx.deposit.create({
+          data: {
+            id: uuid(),
+            userId,
+            paymentAccountId: paymentAccount?.id || null,
+            walletAddress: walletAddress || user.walletAddress || null,
+            chain: chain || user.chain || 'ethereum',
+            amount: normalizedAmount,
+            currency: depositCurrency,
+            token: depositCurrency,
+            txHash: txHash || null,
+            status: 'pending',
+            method: method || paymentAccount?.type || 'manual',
+            proofUrl: proofUrl || null,
+            note: note || null,
+            exchangeRate: conversion.exchangeRate,
+            usdAmount: conversion.usdAmount,
+            rateSource: conversion.source,
+          },
+          include: { PaymentAccount: true },
+        });
 
-    await prisma.notification.create({
-      data: {
-        id: uuid(),
-        userId,
-        type: 'deposit',
-        title: 'Deposit Submitted',
-        message: `Your ${depositCurrency} deposit request for ${normalizedAmount.toFixed(2)} (â‰ˆ $${conversion.usdAmount.toFixed(2)} USD) is pending admin review.`,
-      },
-    });
+        await tx.notification.create({
+          data: {
+            id: uuid(),
+            userId,
+            type: 'deposit',
+            title: 'Deposit Submitted',
+            message: 'Your ' + depositCurrency + ' deposit request for ' + normalizedAmount.toFixed(2) + ' (\u2248 $' + conversion.usdAmount.toFixed(2) + ' USD) is pending admin review.',
+          },
+        });
+
+        return created;
+      })
+    );
 
     res.status(201).json({ success: true, deposit });
   } catch (error) {
     console.error('Create deposit error:', error);
+    // Give users a clear, actionable message during a transient infra blip.
+    if (isTransientDbError(error)) {
+      return res.status(503).json({
+        error: 'Deposit processing is temporarily unavailable. Please try again in a moment.',
+      });
+    }
     res.status(500).json({ error: 'Failed to submit deposit' });
   }
 });
