@@ -393,12 +393,12 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
     const { planId } = req.params;
     const { txHash, chain } = req.body;
 
-    const plan = await prisma.miningPlan.findUnique({ where: { id: planId } });
+    const plan = await withDbRetry(() => prisma.miningPlan.findUnique({ where: { id: planId } }));
     if (!plan || !plan.active) {
       return res.status(404).json({ error: 'Plan not found' });
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await withDbRetry(() => prisma.user.findUnique({ where: { id: userId } }));
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     // Per-plan purchase cap configured by admins (`null`/0 = unlimited).
@@ -421,10 +421,23 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
       return res.status(400).json({ error: `Insufficient platform balance. You need ${planPrice.toFixed(2)} ${plan.currency}.` });
     }
 
+    // The purchase debits the per-asset balance backing the plan's currency.
+    // Make sure THAT balance is sufficient too so it can never go negative.
+    if (planPrice > 0) {
+      const fundingAsset = normalizeAsset(plan.currency || 'USDT') as keyof ReturnType<typeof getAssetBalances>;
+      const fundingBalance = getAssetBalances(user)[fundingAsset];
+      if (fundingBalance < planPrice) {
+        return res.status(400).json({
+          error: `Insufficient ${fundingAsset} balance to buy this plan. You need ${planPrice.toFixed(2)} ${plan.currency || fundingAsset}.`,
+        });
+      }
+    }
+
     const now = new Date();
     const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
-    const [updatedUser, purchase] = await prisma.$transaction(async (tx) => {
+    const [updatedUser, purchase] = await withDbRetry(() =>
+      prisma.$transaction(async (tx) => {
       const updated = planPrice > 0
         ? await tx.user.update({
             where: { id: userId },
@@ -496,7 +509,8 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
       });
 
       return [updated, createdPurchase];
-    });
+      })
+    );
 
     // Referral commission
     if (user.referredBy) {
@@ -540,6 +554,9 @@ router.post('/plans/:planId/purchase', async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'You have reached the maximum number of purchases allowed for this plan.' });
     }
     console.error('Purchase error:', error);
+    if (isTransientDbError(error)) {
+      return res.status(503).json({ error: 'Purchase is temporarily unavailable. Please try again in a moment.' });
+    }
     res.status(500).json({ error: 'Failed to purchase plan' });
   }
 });
@@ -571,7 +588,8 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
     const now = new Date();
     const endsAt = new Date(now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
-    const [updatedUser, purchase] = await prisma.$transaction(async (tx) => {
+    const [updatedUser, purchase] = await withDbRetry(() =>
+      prisma.$transaction(async (tx) => {
       const updated = planPrice > 0
         ? await tx.user.update({
             where: { id: userId },
@@ -634,12 +652,16 @@ router.post('/hash-renting/:planId/purchase', async (req: AuthRequest, res) => {
       });
 
       return [updated, createdPurchase];
-    });
+      })
+    );
 
     const activePlan = await getActivePlan(userId);
     res.json({ success: true, purchase, activePlan, platformBalance: updatedUser.platformBalance });
   } catch (error) {
     console.error('Hash renting purchase error:', error);
+    if (isTransientDbError(error)) {
+      return res.status(503).json({ error: 'Purchase is temporarily unavailable. Please try again in a moment.' });
+    }
     res.status(500).json({ error: 'Failed to purchase hash renting plan' });
   }
 });
