@@ -156,20 +156,80 @@ export default function DepositsPage() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Downscale + compress an image file so the base64 data URL stays well
+  // under the API's JSON body limit (10MB). Non-image files are passed
+  // through with a hard size guard.
+  const compressImage = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        if (file.size > 5 * 1024 * 1024) {
+          reject(new Error('File is too large. Please attach a proof under 5MB.'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.onerror = () => reject(new Error('Failed to read the selected file.'));
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Scale down to max 1600px on the longest edge — plenty for a
+          // readable screenshot while keeping the data URL small.
+          const MAX_EDGE = 1600;
+          const scale = Math.min(1, MAX_EDGE / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to process the selected image.'));
+            return;
+          }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          let dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+          // Safety net: keep shrinking quality until it fits comfortably.
+          let quality = 0.8;
+          while (dataUrl.length > 4 * 1024 * 1024 && quality > 0.3) {
+            quality -= 0.15;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+          if (dataUrl.length > 6 * 1024 * 1024) {
+            reject(new Error('Image is too large even after compression. Please attach a smaller proof.'));
+            return;
+          }
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Selected file is not a valid image.'));
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read the selected file.'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Create data URL for preview
-    const reader = new FileReader();
-    reader.onload = (event) => {
+    try {
+      const compressedDataUrl = await compressImage(file);
       setForm(prev => ({
         ...prev,
         proofFile: file,
-        proofUrl: event.target?.result as string,
+        proofUrl: compressedDataUrl,
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to process the uploaded file.';
+      setError(msg);
+      toastEmitter.error('Upload Failed', msg);
+    } finally {
+      // Allow re-selecting the same file after a failed attempt.
+      e.target.value = '';
+    }
   };
 
   const validateForm = (): string | null => {
