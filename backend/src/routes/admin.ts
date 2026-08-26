@@ -265,11 +265,15 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
     const [totalUsers, activeMiners, totalDeposits, totalWithdrawals, totalRevenue, miningPlans, referrals, treasuryWallets] = await Promise.all([
       prisma.user.count(),
       prisma.miningPurchase.count({ where: { status: 'active' } }),
+      // Only count deposits that actually funded the user. Rejected deposits
+      // must NOT show in analytics, and pending ones haven't been credited
+      // yet (they are credited only on approval), so both are excluded.
+      // Analytics are reported in USD: deposits can be paid in any currency
+      // (USDT, BTC, GHS...), so sum the locked `usdAmount` stored at
+      // submission time. This keeps the admin Analysis dashboard
+      // currency-consistent regardless of the mix of payment currencies.
       prisma.deposit.aggregate({
-        _sum: { amount: true },
-        // Only count deposits that actually funded the user. Rejected deposits
-        // must NOT show in analytics, and pending ones haven't been credited
-        // yet (they are credited only on approval), so both are excluded.
+        _sum: { usdAmount: true },
         where: { status: { in: ['approved', 'completed'] } },
       }),
       prisma.withdrawal.aggregate({ _sum: { amount: true } }),
@@ -284,8 +288,9 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
     ]);
 
     res.json({
-      totalUsers, activeMiners,
-      totalDeposits: totalDeposits._sum.amount || 0,
+      totalUsers,
+      activeMiners,
+      totalDeposits: totalDeposits._sum.usdAmount || 0,
       totalWithdrawals: totalWithdrawals._sum.amount || 0,
       // Negate because sale transactions are stored as negative amounts
       totalRevenue: totalRevenue._sum.amount ? -Number(totalRevenue._sum.amount) : 0,

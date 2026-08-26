@@ -26,7 +26,7 @@ export default function TransactionsPage() {
     }
   };
 
-  if (loading) {
+    if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
@@ -43,6 +43,24 @@ export default function TransactionsPage() {
       case 'transfer': return { icon: FaExchangeAlt, color: 'bg-sky-50 text-cmblue-700', label: 'Transfer' };
       default: return { icon: amount >= 0 ? FaBolt : FaReceipt, color: amount >= 0 ? 'bg-cmblue-50 text-cmblue-600' : 'bg-rose-50 text-rose-600', label: 'Mining Reward' };
     }
+  };
+
+  // Format the amount shown for each transaction.
+  // Deposits are shown as "$X USD (Y CUR)" — the USD value first, then the
+  // original payment currency and amount in brackets. All other types keep
+  // the plain "+amount CUR" format.
+  const formatAmount = (tx: any): string => {
+    if (tx.type === 'deposit') {
+      const usd = typeof tx.usdAmount === 'number' ? tx.usdAmount : tx.amount;
+      const origAmt = typeof tx.originalAmount === 'number' ? tx.originalAmount : null;
+      const origCur = tx.originalCurrency;
+      if (origAmt != null && origCur) {
+        return `$${usd.toFixed(2)} USD (${origAmt.toFixed(2)} ${origCur})`;
+      }
+      return `$${usd.toFixed(2)} USD`;
+    }
+    const amount = Number(tx.amount || 0);
+    return `${amount >= 0 ? '+' : ''}${amount.toFixed(2)} ${tx.currency || ''}`;
   };
 
   const normalized = transactions.map((tx: any) => {
@@ -99,9 +117,9 @@ export default function TransactionsPage() {
                       {tx.txHash && <p className="mt-0.5 text-[8px] sm:text-[9px] text-slate-500 truncate">Hash: {tx.txHash.slice(0, 12)}...</p>}
                     </div>
                   </div>
-                  <div className="text-right">
+                                                                          <div className="text-right">
                     <p className={`text-xs sm:text-sm font-extrabold ${tx.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {tx.amount >= 0 ? '+' : ''}{tx.amount.toFixed(2)} {tx.currency}
+                      {formatAmount(tx)}
                     </p>
                     <span className={`mc-status text-[8px] sm:text-xs ${
                       tx.status === 'completed' ? 'bg-emerald-50 text-emerald-600' :

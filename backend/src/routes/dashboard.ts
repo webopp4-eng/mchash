@@ -916,7 +916,23 @@ router.get('/transactions', async (req: AuthRequest, res) => {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    res.json({ transactions });
+
+    // For deposits (which may be paid in a non-USD currency), flatten the
+    // original payment amount and currency onto the response so the UI can
+    // render "$X USD (Y CUR)" without parsing metadata.
+    const mapped = transactions.map((tx) => {
+      const meta = (tx.metadata as Record<string, unknown>) || {};
+      return {
+        ...tx,
+        usdAmount: typeof meta.usdAmount === 'number' ? meta.usdAmount : null,
+        originalAmount: typeof meta.originalAmount === 'number' ? meta.originalAmount : null,
+        originalCurrency: typeof meta.originalCurrency === 'string' ? meta.originalCurrency : null,
+        exchangeRate: typeof meta.exchangeRate === 'number' ? meta.exchangeRate : null,
+        rateSource: typeof meta.rateSource === 'string' ? meta.rateSource : null,
+      };
+    });
+
+    res.json({ transactions: mapped });
   } catch (error) {
     console.error('Transactions error:', error);
     res.status(500).json({ error: 'Failed to load transactions' });
