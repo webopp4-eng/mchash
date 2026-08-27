@@ -66,7 +66,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/deposits', label: 'Reports', icon: FaChartPie, show: isStaff },
     { href: '/admin/settings', label: 'Settings', icon: FaCogs, show: isStaff },
     { href: '/admin/support', label: 'Support', icon: FaHeadset, show: isStaff },
-    { href: '/admin/actions', label: 'Actions', icon: FaClipboardList, show: isStaff },
+    // Actions tab - SUPER_ADMIN ONLY (server-side /audit-logs is super-admin gated too)
+    { href: '/admin/actions', label: 'Actions', icon: FaClipboardList, show: isSuperAdmin },
     { href: '/admin/withdrawals', label: 'Notifications', icon: FaBell, show: isStaff },
     { href: '/admin', label: 'Analytics', icon: FaChartLine, show: isStaff },
   ].filter(item => item.show);

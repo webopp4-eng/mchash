@@ -120,6 +120,7 @@ const TAB_SECTIONS: { title: string; items: TabItem[] }[] = [
         label: 'Actions',
         description: 'Activity & audit log',
         icon: FaClipboardList,
+        superAdminOnly: true,
       },
       {
         href: '/admin/withdrawals',

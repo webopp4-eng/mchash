@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FaClipboardList, FaSearch, FaShieldAlt, FaUserTie } from 'react-icons/fa';
-import { apiFetch } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
+import { FaClipboardList, FaLock, FaSearch, FaShieldAlt, FaUserTie } from 'react-icons/fa';
+import { apiFetch, getUser } from '@/lib/auth';
 
 interface ActionEntry {
   id: string;
@@ -51,6 +52,19 @@ export default function AdminActions() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
+  const [denied, setDenied] = useState(false);
+
+  const router = useRouter();
+  // Client-side SUPER_ADMIN gate (the API enforces this server-side regardless).
+  useEffect(() => {
+    setIsMounted(true);
+    try {
+      if (getUser()?.role !== 'SUPER_ADMIN') setDenied(true);
+    } catch {
+      setDenied(true);
+    }
+  }, []);
 
   const loadLogs = useCallback(async (role?: string) => {
     try {
@@ -59,6 +73,8 @@ export default function AdminActions() {
       setLogs(res.logs || []);
     } catch (err) {
       console.error('Failed to load action log:', err);
+      const msg403 = String((err as any)?.message || err || '');
+      if (msg403.includes('403') || msg403.toLowerCase().includes('super admin')) setDenied(true);
     } finally {
       setLoading(false);
     }
@@ -87,10 +103,33 @@ export default function AdminActions() {
 
   const formatTime = (dateStr: string) => new Date(dateStr).toLocaleString();
 
-  if (loading) {
+  if (!isMounted || loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-cmblue-500/30 border-t-cmblue-500" />
+      </div>
+    );
+  }
+
+  // Access restricted: only the super admin may view the audit log.
+  if (denied) {
+    return (
+      <div className="mc-page flex min-h-[60vh] items-center justify-center">
+        <div className="mc-card max-w-md p-8 text-center">
+          <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-red-50 text-red-500">
+            <FaLock className="h-6 w-6" />
+          </span>
+          <h1 className="mc-title">Restricted Area</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            The Actions audit log is visible to the super admin only. Employees and admins cannot access this page.
+          </p>
+          <button
+            onClick={() => router.push('/admin')}
+            className="mt-6 rounded-xl bg-cmblue-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-cmblue-600"
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
     );
   }

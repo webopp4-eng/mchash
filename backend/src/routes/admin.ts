@@ -1225,7 +1225,7 @@ router.put('/settings', requireSuperAdmin, async (req, res) => {
 // ============ AUDIT / ACTION LOG (SUPER_ADMIN or EMPLOYEE) ============
 // Centralized activity + audit log used by the "Actions" tab. Read-only.
 // Newest activity always first, with optional filtering by role / action group.
-router.get('/audit-logs', requireAdminOrEmployee, async (req, res) => {
+router.get('/audit-logs', requireSuperAdmin, async (req, res) => {
   try {
     const { role, action } = req.query;
     const take = Math.min(Number(req.query.take) || 100, 500);
