@@ -33,8 +33,14 @@ export default function AdminDashboard() {
     );
   }
 
-  const totalDeposits = Number(data?.totalDeposits || financial.totalDeposits || 0);
-  const totalWithdrawals = Number(data?.totalWithdrawals || financial.totalWithdrawals || 0);
+  // The API response is authoritative. A genuine 0 from /dashboard must NOT
+  // fall back to useFinancialData() values — that hook carries the logged-in
+  // SESSION OWNER's personal finances (i.e., the admin's own account), which
+  // previously leaked the admin balance onto this Analysis page whenever the
+  // real totals were zero. Use API numbers whenever data exists at all.
+  const hasApiData = Boolean(data);
+  const totalDeposits = Number(hasApiData ? data?.totalDeposits ?? 0 : financial.totalDeposits || 0);
+  const totalWithdrawals = Number(hasApiData ? data?.totalWithdrawals ?? 0 : financial.totalWithdrawals || 0);
   const totalRevenue = Number(data?.totalRevenue || 0);
   const activeMiners = Number(data?.activeMiners || 0);
   const totalUsers = Number(data?.totalUsers || 0);

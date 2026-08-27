@@ -288,9 +288,18 @@ router.post('/employees/:id/reset-password', requireSuperAdmin, async (req: Auth
 // ============ ADMIN DASHBOARD (SUPER_ADMIN or EMPLOYEE) ============
 router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
   try {
+    // ANALYSIS SCOPE: every flow metric below is restricted to NORMAL users.
+    // Staff accounts (SUPER_ADMIN / ADMIN / EMPLOYEE) hold house liquidity,
+    // correction credits and internal top-ups — none of that is customer
+    // volume, so it must never appear in the Analysis dashboard figures.
+    const STAFF_ROLES = ['SUPER_ADMIN', 'ADMIN', 'EMPLOYEE'];
+    const excludeStaffOwner = {
+      User: { role: { mode: 'insensitive' as const, notIn: STAFF_ROLES } },
+    };
+
     const [totalUsers, activeMiners, totalDeposits, totalWithdrawals, totalRevenue, miningPlans, referrals, treasuryWallets] = await Promise.all([
       prisma.user.count(),
-      prisma.miningPurchase.count({ where: { status: 'active' } }),
+      prisma.miningPurchase.count({ where: { status: 'active', ...excludeStaffOwner } }),
       // Only count deposits that actually funded the user. Rejected deposits
       // must NOT show in analytics, and pending ones haven't been credited
       // yet (they are credited only on approval), so both are excluded.
@@ -300,18 +309,19 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
       // currency-consistent regardless of the mix of payment currencies.
       prisma.deposit.aggregate({
         _sum: { usdAmount: true },
-        where: { status: { in: ['approved', 'completed'] } },
+        where: { status: { in: ['approved', 'completed'] }, ...excludeStaffOwner },
       }),
-      prisma.withdrawal.aggregate({ _sum: { amount: true } }),
+      prisma.withdrawal.aggregate({ _sum: { amount: true }, where: { ...excludeStaffOwner } }),
       // Plan sales are stored as NEGATIVE amounts on user transactions
       // (money leaving the USER's balance), for both mining plans ('purchase')
       // and hash renting ('hash_renting'). Flip the sign below so this metric
       // reports positive platform REVENUE from sales.
-      prisma.transaction.aggregate({ _sum: { amount: true }, where: { type: { in: ['purchase', 'hash_renting'] } } }),
+      prisma.transaction.aggregate({ _sum: { amount: true }, where: { type: { in: ['purchase', 'hash_renting'] }, ...excludeStaffOwner } }),
       prisma.miningPlan.count(),
-      prisma.referral.aggregate({ _sum: { totalEarned: true } }),
+      prisma.referral.aggregate({ _sum: { totalEarned: true }, where: { ...excludeStaffOwner } }),
       prisma.treasuryWallet.findMany(),
     ]);
+
 
     res.json({
       totalUsers,
