@@ -120,6 +120,14 @@ export default function AdminDeposits() {
                   }`}>
                     {deposit.status}
                   </span>
+                  {deposit.status !== 'pending' && (deposit.processedByName || deposit.processedByRole) && (
+                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                      {deposit.status === 'approved' || deposit.status === 'completed' ? 'Approved' : 'Rejected'} by{' '}
+                      {deposit.processedByName || 'Staff'}
+                      {deposit.processedByRole ? ` (${deposit.processedByRole === 'SUPER_ADMIN' || deposit.processedByRole === 'admin' ? 'Admin' : 'Employee'})` : ''}
+                      {deposit.approvedAt ? ` · ${new Date(deposit.approvedAt).toLocaleString()}` : ''}
+                    </p>
+                  )}
                 </td>
                 <td className="mc-td">
                   {deposit.status === 'pending' ? (

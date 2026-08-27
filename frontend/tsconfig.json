@@ -21,7 +21,6 @@
     "types": [
       "node"
     ],
-    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
@@ -42,8 +41,5 @@
   ],
   "exclude": [
     "node_modules"
-  ],
-  "devDependencies": {
-    "@types/cookie-parser": "^1.4.0"
-  }
+  ]
 }

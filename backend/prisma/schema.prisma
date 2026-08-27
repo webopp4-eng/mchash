@@ -16,21 +16,26 @@ model AdminSetting {
 }
 
 model AuditLog {
-  id        String   @id @db.Uuid
-  userId    String?  @db.Uuid
-  actorRole String?  @default("user")
-  action    String
-  targetId  String?
-  details   Json?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
-  User      User?    @relation(fields: [userId], references: [id])
+  id            String   @id @db.Uuid
+  userId        String?  @db.Uuid
+  actorRole     String?  @default("user")
+  actorName     String?
+  actorUsername String?
+  action        String
+  targetType    String?
+  targetId      String?
+  details       Json?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  User          User?    @relation(fields: [userId], references: [id])
 
   @@index([action])
   @@index([userId])
   @@index([actorRole])
+  @@index([targetType])
   @@index([targetId])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model Deposit {
@@ -49,12 +54,13 @@ model Deposit {
   note             String?
   // Currency conversion (locked at submission time — never re-rated on approval)
   exchangeRate     Decimal?       @db.Decimal(18, 8) // USD per 1 unit of `currency`
-  usdAmount        Decimal?       @db.Decimal(18, 8) // locked USD credit for this deposit
+    usdAmount        Decimal?       @db.Decimal(18, 8) // locked USD credit for this deposit
   rateSource       String?                            // 'exchangerate-api' | 'coinmarketcap' | 'usd-pegged'
   approvedAt       DateTime?
   confirmedAt      DateTime?
   processedById    String?        @db.Uuid
   processedByName  String?
+  processedByRole  String?
   createdAt        DateTime       @default(now())
   PaymentAccount   PaymentAccount? @relation(fields: [paymentAccountId], references: [id])
   User             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -64,6 +70,7 @@ model Deposit {
   @@index([txHash])
   @@index([userId])
   @@index([processedById])
+  @@index([processedByRole])
   @@index([userId, createdAt(sort: Desc)])
 }
 
@@ -284,6 +291,7 @@ model SupportMessage {
   ticketId      String        @db.Uuid
   senderId      String?       @db.Uuid
   senderRole    String        @default("user")
+  senderName    String?
   message       String
   readByUser    Boolean       @default(false)
   readByStaff   Boolean       @default(false)
@@ -389,6 +397,7 @@ model User {
   emailVerifiedAt     DateTime?
   fullName            String?
   passwordHash        String?
+  balanceResetAt      DateTime?
   AuditLog            AuditLog[]
   Deposit             Deposit[]
   HashRentingPurchase HashRentingPurchase[]
@@ -440,8 +449,9 @@ model Withdrawal {
   status          String    @default("pending")
   txHash          String?
   adminNote       String?
-  processedById   String?   @db.Uuid
+    processedById   String?   @db.Uuid
   processedByName String?
+  processedByRole String?
   requestedAt     DateTime  @default(now())
   processedAt     DateTime?
   createdAt       DateTime  @default(now())
@@ -453,5 +463,6 @@ model Withdrawal {
   @@index([payoutMethodId])
   @@index([status])
   @@index([processedById])
+  @@index([processedByRole])
   @@index([userId, requestedAt(sort: Desc)])
 }

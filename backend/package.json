@@ -10,7 +10,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "setup:admin": "node scripts/setup-admin-once.js"
+    "setup:admin": "node scripts/setup-admin-once.js",
+    "reset:admin-balance": "node scripts/admin-balance-reset.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

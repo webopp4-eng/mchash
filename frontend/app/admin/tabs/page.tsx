@@ -16,6 +16,7 @@ import {
   FaUsers,
   FaWallet,
   FaCoins,
+  FaClipboardList,
 } from 'react-icons/fa';
 import { getUser } from '@/lib/auth';
 
@@ -113,6 +114,12 @@ const TAB_SECTIONS: { title: string; items: TabItem[] }[] = [
         label: 'Support',
         description: 'Support tickets & messages',
         icon: FaHeadset,
+      },
+      {
+        href: '/admin/actions',
+        label: 'Actions',
+        description: 'Activity & audit log',
+        icon: FaClipboardList,
       },
       {
         href: '/admin/withdrawals',

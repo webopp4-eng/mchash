@@ -7,11 +7,37 @@ import { requireSuperAdmin, requireAdminOrEmployee } from '../middleware/admin';
 import { hashPassword } from '../services/emailAuth';
 import { createAuditLog, getActorName } from '../services/auditLog';
 import { getBalanceField } from '../services/balances';
+import { isProtectedRole, isTargetProtectedFrom } from '../lib/privileges';
 
 const router = Router();
 
 // All admin routes require authentication
 router.use(authenticateToken, loadUser);
+
+/**
+ * Guard helper — refuses a restricted administrative action when the target
+ * account is protected from the currently-authenticated actor.
+ *
+ * This is the SERVER-SIDE enforcement that protects ADMIN accounts from
+ * EMPLOYEE staff even when the frontend is bypassed or the API request is
+ * hand-crafted. Call it from every sensitive route before mutating.
+ *
+ * Returns an error response (and `true`) when the action is forbidden, or
+ * `false` when the action may proceed.
+ */
+function forbidRestrictedAction(
+  req: AuthRequest,
+  res: import('express').Response,
+  targetRole: string | null | undefined
+): boolean {
+  if (isTargetProtectedFrom(req.user?.role, targetRole)) {
+    res.status(403).json({
+      error: 'This account is protected. You do not have permission to modify an account with equal or higher privileges.',
+    });
+    return true;
+  }
+  return false;
+}
 
 // ============ EMPLOYEE MANAGEMENT (SUPER_ADMIN ONLY) ============
 
@@ -326,13 +352,26 @@ router.get('/users', requireAdminOrEmployee, async (req, res) => {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    res.json({ users });
+
+    // Annotate each account: is it a protected admin? can the current actor
+    // manage it? The frontend uses these to hide restricted actions, but the
+    // backend still enforces them independently on every mutation route.
+    const actorRole = (req as AuthRequest).user?.role;
+    const annotated = users.map((user) => ({
+      ...user,
+      protectedRole: isProtectedRole(user.role),
+      role: user.role || 'user',
+      canManage: !isTargetProtectedFrom(actorRole, user.role),
+    }));
+
+    res.json({ users: annotated });
   } catch (error) {
     console.error('Admin users error:', error);
     res.status(500).json({ error: 'Failed to load users' });
   }
 });
 
+// Change a user's account status (ban / suspend / activate)
 router.patch('/users/:id/status', requireAdminOrEmployee, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -340,15 +379,31 @@ router.patch('/users/:id/status', requireAdminOrEmployee, async (req: AuthReques
     if (!['active', 'suspended', 'banned'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
-    const user = await prisma.user.update({ where: { id }, data: { status } });
+
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    // SERVER-SIDE PROTECTION: employees/admins can never ban, suspend,
+    // unban or otherwise change the status of a protected admin account.
+    if (forbidRestrictedAction(req, res, target.role)) return;
+
+    const previousStatus = target.status;
+    const updated = await prisma.user.update({ where: { id }, data: { status } });
 
     await createAuditLog(req, {
       action: 'USER_STATUS_CHANGE',
+      targetType: 'user',
       targetId: id,
-      details: { status, adminName: getActorName(req) },
+      details: {
+        status,
+        previousStatus,
+        adminName: getActorName(req),
+        actorRole: req.user?.role,
+        actorUsername: req.user?.username,
+      },
     });
 
-    res.json({ success: true, user });
+    res.json({ success: true, user: updated });
   } catch (error) {
     console.error('User status error:', error);
     res.status(500).json({ error: 'Failed to update user status' });
@@ -367,6 +422,9 @@ router.post('/users/:id/credit', requireSuperAdmin, async (req: AuthRequest, res
 
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Protected-account guard — even super admins cannot credit other admins.
+    if (forbidRestrictedAction(req, res, user.role)) return;
 
     const creditAmount = Number(amount);
     const type = balanceType || 'platformBalance';
@@ -406,6 +464,7 @@ router.post('/users/:id/credit', requireSuperAdmin, async (req: AuthRequest, res
 
     await createAuditLog(req, {
       action: 'ADMIN_CREDIT',
+      targetType: 'user',
       targetId: id,
       details: { amount: creditAmount, balanceType: type, reason: reason || null, adminName: getActorName(req) },
     });
@@ -414,6 +473,101 @@ router.post('/users/:id/credit', requireSuperAdmin, async (req: AuthRequest, res
   } catch (error) {
     console.error('Admin credit error:', error);
     res.status(500).json({ error: 'Failed to credit user' });
+  }
+});
+
+// Debit (deduct / reverse) a user balance — records who performed it.
+// SUPER_ADMIN only (wallet-sensitive).
+router.post('/users/:id/debit', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, balanceType, reason } = req.body;
+
+    if (!amount || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Debit amount must be greater than 0' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Protected-account guard — super admins cannot debit other admins.
+    if (forbidRestrictedAction(req, res, user.role)) return;
+
+    const debitAmount = Number(amount);
+    const type = balanceType || 'platformBalance';
+    const validTypes = ['platformBalance', 'totalEarned', 'totalDeposited'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'Invalid balance type' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        [type]: { decrement: debitAmount },
+        ...(type === 'platformBalance'
+          ? { [getBalanceField('USDT')]: { decrement: debitAmount } }
+          : {}),
+      },
+    });
+
+    await prisma.transaction.create({
+      data: {
+        id: uuid(), userId: id, type: 'admin_debit', amount: -debitAmount,
+        currency: 'USDT', chain: user.chain || 'ethereum', status: 'completed',
+        metadata: { balanceType: type, reason: reason || 'Admin debit', adminId: req.user?.id },
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        id: uuid(), userId: id, type: 'debit', title: 'Account Debited',
+        message: `Your account was debited by ${debitAmount.toFixed(2)} USDT.${reason ? ` Reason: ${reason}` : ''}`,
+      },
+    });
+
+    await createAuditLog(req, {
+      action: 'ADMIN_DEBIT',
+      targetType: 'user',
+      targetId: id,
+      details: { amount: debitAmount, balanceType: type, reason: reason || null, adminName: getActorName(req) },
+    });
+
+    res.json({ success: true, user: updatedUser });
+  } catch (error) {
+    console.error('Admin debit error:', error);
+    res.status(500).json({ error: 'Failed to debit user' });
+  }
+});
+
+// Reset a user's (normal account's) password — guarded against admins.
+router.post('/users/:id/reset-password', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    if (forbidRestrictedAction(req, res, target.role)) return;
+
+    const passwordHash = await hashPassword(newPassword);
+    await prisma.user.update({ where: { id }, data: { passwordHash, updatedAt: new Date() } });
+
+    await createAuditLog(req, {
+      action: 'USER_PASSWORD_RESET',
+      targetType: 'user',
+      targetId: id,
+      details: { resetBy: getActorName(req), actorRole: req.user?.role },
+    });
+
+    res.json({ success: true, message: 'User password reset successfully' });
+  } catch (error) {
+    console.error('Reset user password error:', error);
+    res.status(500).json({ error: 'Failed to reset user password' });
   }
 });
 
@@ -728,10 +882,22 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
       return res.status(400).json({ error: 'Invalid deposit status' });
     }
 
-    const deposit = await prisma.deposit.findUnique({ where: { id } });
+    const deposit = await prisma.deposit.findUnique({
+      where: { id },
+      include: { User: { select: { role: true } } },
+    });
     if (!deposit) return res.status(404).json({ error: 'Deposit not found' });
 
+    // SERVER-SIDE PROTECTION: approving a deposit CREDITS the deposit
+    // owner's balance, so staff must never be able to process a deposit
+    // that belongs to a protected account of equal or higher privilege
+    // (e.g. an employee approving an admin's own deposit to inflate its
+    // balance). This closes the indirect-credit bypass on this
+    // employee-reachable route.
+    if (forbidRestrictedAction(req, res, deposit.User?.role)) return;
+
     const actorName = getActorName(req);
+    const actorRole = req.user?.role || 'user';
     const previousStatus = deposit.status;
 
     if (status === 'rejected') {
@@ -739,7 +905,7 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
         where: { id },
         data: {
           status: 'rejected', note: adminNote || deposit.note, approvedAt: null,
-          processedById: req.user?.id, processedByName: actorName,
+          processedById: req.user?.id, processedByName: actorName, processedByRole: actorRole,
         },
       });
 
@@ -752,9 +918,10 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
 
       await createAuditLog(req, {
         action: 'DEPOSIT_REJECT',
+        targetType: 'deposit',
         targetId: id,
         details: {
-          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName, employeeRole: actorRole,
           previousStatus, newStatus: 'rejected',
           amount: Number(deposit.amount), currency: deposit.currency,
         },
@@ -795,7 +962,7 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
             approvedAt: new Date(),
             confirmedAt: status === 'completed' ? new Date() : deposit.confirmedAt,
             note: adminNote || deposit.note,
-            processedById: req.user?.id, processedByName: actorName,
+            processedById: req.user?.id, processedByName: actorName, processedByRole: actorRole,
           },
         }),
         prisma.transaction.create({
@@ -821,9 +988,10 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
 
       await createAuditLog(req, {
         action: 'DEPOSIT_APPROVE',
+        targetType: 'deposit',
         targetId: id,
         details: {
-          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName, employeeRole: actorRole,
           previousStatus, newStatus: status === 'completed' ? 'completed' : 'approved',
           originalAmount, originalCurrency: deposit.currency,
           exchangeRate: deposit.exchangeRate != null ? Number(deposit.exchangeRate) : null,
@@ -885,7 +1053,15 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
     const user = await prisma.user.findUnique({ where: { id: withdrawal.userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
+    // SERVER-SIDE PROTECTION: a withdrawal decision moves the OWNER's funds
+    // (a rejection credits the balances back), so staff must never process a
+    // withdrawal belonging to a protected account of equal or higher
+    // privilege. Route is SUPER_ADMIN-only; this additionally blocks
+    // admin-on-admin fund movements per the strict hierarchy.
+    if (forbidRestrictedAction(req, res, user.role)) return;
+
     const actorName = getActorName(req);
+    const actorRole = req.user?.role || 'user';
     const previousStatus = withdrawal.status;
 
     const transactionWhere = {
@@ -899,7 +1075,7 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
         where: { id },
         data: {
           status: 'approved', adminNote: adminNote || undefined,
-          processedById: req.user?.id, processedByName: actorName,
+          processedById: req.user?.id, processedByName: actorName, processedByRole: actorRole,
         },
       });
 
@@ -914,9 +1090,10 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
 
       await createAuditLog(req, {
         action: 'WITHDRAWAL_APPROVE',
+        targetType: 'withdrawal',
         targetId: id,
         details: {
-          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName, employeeRole: actorRole,
           previousStatus, newStatus: 'approved',
           amount: Number(withdrawal.amount), currency: withdrawal.currency,
         },
@@ -940,7 +1117,7 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
           where: { id },
           data: {
             status: 'rejected', adminNote: adminNote || undefined, processedAt: new Date(),
-            processedById: req.user?.id, processedByName: actorName,
+            processedById: req.user?.id, processedByName: actorName, processedByRole: actorRole,
           },
         }),
         prisma.transaction.updateMany({ where: transactionWhere, data: { status: 'failed' } }),
@@ -954,9 +1131,10 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
 
       await createAuditLog(req, {
         action: 'WITHDRAWAL_REJECT',
+        targetType: 'withdrawal',
         targetId: id,
         details: {
-          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName, employeeRole: actorRole,
           previousStatus, newStatus: 'rejected',
           amount: Number(withdrawal.amount), currency: withdrawal.currency,
         },
@@ -974,7 +1152,7 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
         where: { id },
         data: {
           status: 'completed', txHash, adminNote: adminNote || undefined,
-          processedAt: new Date(), processedById: req.user?.id, processedByName: actorName,
+          processedAt: new Date(), processedById: req.user?.id, processedByName: actorName, processedByRole: actorRole,
         },
       });
 
@@ -989,9 +1167,10 @@ router.patch('/withdrawals/:id', requireSuperAdmin, async (req: AuthRequest, res
 
       await createAuditLog(req, {
         action: 'WITHDRAWAL_COMPLETE',
+        targetType: 'withdrawal',
         targetId: id,
         details: {
-          transactionId: id, employeeId: req.user?.id, employeeName: actorName,
+          transactionId: id, employeeId: req.user?.id, employeeName: actorName, employeeRole: actorRole,
           previousStatus, newStatus: 'completed',
           amount: Number(withdrawal.amount), currency: withdrawal.currency, txHash,
         },
@@ -1033,18 +1212,156 @@ router.put('/settings', requireSuperAdmin, async (req, res) => {
   }
 });
 
-// ============ AUDIT LOGS (SUPER_ADMIN ONLY) ============
-router.get('/audit-logs', requireSuperAdmin, async (_req, res) => {
+// ============ AUDIT / ACTION LOG (SUPER_ADMIN or EMPLOYEE) ============
+// Centralized activity + audit log used by the "Actions" tab. Read-only.
+// Newest activity always first, with optional filtering by role / action group.
+router.get('/audit-logs', requireAdminOrEmployee, async (req, res) => {
   try {
+    const { role, action } = req.query;
+    const take = Math.min(Number(req.query.take) || 100, 500);
+
+    const where: Record<string, unknown> = {};
+    if (role) {
+      const normalized = String(role).toUpperCase();
+      if (normalized === 'ADMIN' || normalized === 'SUPER_ADMIN') {
+        where.actorRole = { in: ['SUPER_ADMIN', 'admin', 'Admin'] };
+      } else if (normalized === 'EMPLOYEE') {
+        where.actorRole = 'EMPLOYEE';
+      }
+    }
+    if (action) {
+      where.OR = [
+        { action: { contains: String(action), mode: 'insensitive' } },
+        { targetType: { contains: String(action), mode: 'insensitive' } },
+      ];
+    }
+
     const logs = await prisma.auditLog.findMany({
+      where,
       include: { User: true },
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take,
     });
     res.json({ logs });
   } catch (error) {
     console.error('Audit logs error:', error);
     res.status(500).json({ error: 'Failed to load audit logs' });
+  }
+});
+
+// ============ ONE-TIME ADMIN BALANCE RESET (SAFEGUARD) ============
+// Safely resets the affected admin account's balance to exactly 0.00.
+//
+// SAFETY GUARANTEES:
+//  - Identifies the target admin ONLY via an explicit environment variable
+//    (ADMIN_RESET_TARGET_EMAIL, ADMIN_RESET_TARGET_USERNAME or
+//    ADMIN_RESET_TARGET_ID). Nothing is ever reset automatically.
+//  - Only that ONE account is touched — normal user balances are never
+//    affected. The target must be a SUPER_ADMIN (role == 'SUPER_ADMIN').
+//  - Idempotent: runs at most once, ever, per account (guarded by the
+//    "balanceResetAt" column). Re-running after a successful reset is a no-op.
+//  - Every reset is recorded in the audit / action log as an administrative
+//    correction.
+router.post('/admin-balance-reset', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    // Env var that unambiguously identifies the affected admin account.
+    const targetEnv = [
+      process.env.ADMIN_RESET_TARGET_EMAIL,
+      process.env.ADMIN_RESET_TARGET_USERNAME,
+      process.env.ADMIN_RESET_TARGET_ID,
+    ].find(Boolean);
+
+    if (!targetEnv) {
+      return res.status(400).json({
+        error: 'No reset target configured. Set ADMIN_RESET_TARGET_EMAIL / ADMIN_RESET_TARGET_USERNAME / ADMIN_RESET_TARGET_ID to proceed.',
+      });
+    }
+
+    // Resolve the target account by the strongest identifier present.
+    const targetEmail = process.env.ADMIN_RESET_TARGET_EMAIL?.toLowerCase();
+    const targetUsername = process.env.ADMIN_RESET_TARGET_USERNAME;
+    const targetId = process.env.ADMIN_RESET_TARGET_ID;
+
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          ...(targetEmail ? [{ email: targetEmail as string }] : []),
+          ...(targetUsername ? [{ username: targetUsername as string }] : []),
+          ...(targetId ? [{ id: targetId as string }] : []),
+        ],
+      },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: 'Reset target account was not found' });
+    }
+
+    // Hard safety: only an administrator account may be reset this way.
+    if (String(targetUser.role).toUpperCase() !== 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Reset target is not an admin account; aborting.' });
+    }
+
+    // Idempotency guard — never reset twice.
+    if (targetUser.balanceResetAt) {
+      return res.status(409).json({ error: 'This admin balance has already been reset.' });
+    }
+
+    const before = {
+      platformBalance: Number(targetUser.platformBalance || 0),
+      balanceUSDT: Number(targetUser.balanceUSDT || 0),
+      balanceBTC: Number(targetUser.balanceBTC || 0),
+      balanceETH: Number(targetUser.balanceETH || 0),
+      balanceMCCoin: Number(targetUser.balanceMCCoin || 0),
+    };
+
+    const resetNow = new Date();
+
+    // Reset the four spendable balances and platform balance to exactly 0.
+    // NOTE: totalDeposited / totalEarned / totalWithdrawn (historical counters)
+    // are intentionally left untouched so accounting history is preserved.
+    const updated = await prisma.user.update({
+      where: { id: targetUser.id },
+      data: {
+        platformBalance: 0,
+        balanceUSDT: 0,
+        balanceBTC: 0,
+        balanceETH: 0,
+        balanceMCCoin: 0,
+        balanceResetAt: resetNow,
+        updatedAt: resetNow,
+      },
+    });
+
+    await createAuditLog(req, {
+      action: 'ADMIN_BALANCE_RESET',
+      targetType: 'user',
+      targetId: targetUser.id,
+      details: {
+        reason: 'Administrative correction: reset affected admin account balance to 0.00',
+        before,
+        after: {
+          platformBalance: 0,
+          balanceUSDT: 0,
+          balanceBTC: 0,
+          balanceETH: 0,
+          balanceMCCoin: 0,
+        },
+        performedBy: getActorName(req),
+        actorRole: req.user?.role,
+        resetAt: resetNow.toISOString(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Admin balance reset to 0.00 (administrative correction).',
+      target: { id: targetUser.id, email: targetUser.email, username: targetUser.username, role: targetUser.role },
+      before,
+      after: { platformBalance: 0, balanceUSDT: 0, balanceBTC: 0, balanceETH: 0, balanceMCCoin: 0 },
+    });
+  } catch (error) {
+    console.error('Admin balance reset error:', error);
+    res.status(500).json({ error: 'Failed to reset admin balance' });
   }
 });
 
@@ -1088,6 +1405,7 @@ router.get('/support/tickets', requireAdminOrEmployee, async (_req, res) => {
             createdAt: msg.createdAt,
             senderId: msg.senderId,
             senderRole: msg.senderRole,
+            senderName: msg.senderName,
             isAdmin: msg.senderRole !== 'user',
             readByUser: msg.readByUser,
             readByStaff: msg.readByStaff,
@@ -1157,6 +1475,7 @@ router.patch('/support/tickets/:ticketId', requireAdminOrEmployee, async (req: A
 
     await createAuditLog(req, {
       action: 'SUPPORT_TICKET_STATUS',
+      targetType: 'support_ticket',
       targetId: ticketId,
       details: {
         conversationId: ticketId, previousStatus, newStatus: status,
@@ -1196,6 +1515,7 @@ router.post('/support/tickets/:ticketId/respond', requireAdminOrEmployee, async 
         ticketId,
         senderId: req.user?.id || '',
         senderRole: req.user?.role === 'SUPER_ADMIN' ? 'admin' : 'employee',
+        senderName: getActorName(req),
         message: message.trim(),
         readByUser: false,
         readByStaff: true,
@@ -1224,6 +1544,7 @@ router.post('/support/tickets/:ticketId/respond', requireAdminOrEmployee, async 
 
     await createAuditLog(req, {
       action: 'SUPPORT_ADMIN_RESPONSE',
+      targetType: 'support_ticket',
       targetId: ticketId,
       details: {
         conversationId: ticketId, messageId: staffMessage.id,

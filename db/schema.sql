@@ -1,4 +1,15 @@
 -- CM HASH PostgreSQL schema
+--
+-- ⚠ LEGACY REFERENCE ONLY.
+-- The live database schema is managed by Prisma:
+--   source of truth : backend/prisma/schema.prisma
+--   migrations      : backend/prisma/migrations/
+-- This file predates several model changes and is NOT auto-applied anywhere.
+-- Columns introduced by recent work exist ONLY in the Prisma layer, e.g.:
+--   - AuditLog actor snapshot fields (actorRole / actorName / actorUsername)
+--   - Deposit & Withdrawal processedBy fields (processedById/Name/Role)
+--   - User.balanceResetAt (one-time admin balance reset flag)
+--   - SupportMessage sender attribution (senderId / senderRole / senderName)
 
 CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

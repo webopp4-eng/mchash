@@ -12,6 +12,7 @@ interface ChatMessage {
   ticketId: string;
   senderId: string | null;
   senderRole: string;
+  senderName?: string | null;
   message: string;
   readByUser: boolean;
   readByStaff: boolean;
@@ -342,7 +343,9 @@ export default function AdminSupport() {
                             {isStaff ? (
                               <>
                                 <FaShieldAlt className="h-3 w-3" />
-                                {msg.senderRole === 'admin' ? 'Admin' : 'Employee'}
+                                {msg.senderName
+                                  ? `${msg.senderName} — ${msg.senderRole === 'admin' ? 'Admin' : 'Employee'}`
+                                  : (msg.senderRole === 'admin' ? 'Admin' : 'Employee')}
                               </>
                             ) : (
                               <>

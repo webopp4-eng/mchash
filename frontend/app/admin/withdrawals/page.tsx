@@ -103,6 +103,14 @@ export default function AdminWithdrawals() {
                   }`}>
                     {wd.status}
                   </span>
+                  {wd.status !== 'pending' && (wd.processedByName || wd.processedByRole) && (
+                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                      {wd.status === 'approved' ? 'Approved' : wd.status === 'rejected' ? 'Rejected' : 'Completed'} by{' '}
+                      {wd.processedByName || 'Staff'}
+                      {wd.processedByRole ? ` (${wd.processedByRole === 'SUPER_ADMIN' || wd.processedByRole === 'admin' ? 'Admin' : 'Employee'})` : ''}
+                      {wd.processedAt ? ` · ${new Date(wd.processedAt).toLocaleString()}` : ''}
+                    </p>
+                  )}
                 </td>
                 <td className="mc-td text-[10px] text-slate-500">{new Date(wd.requestedAt).toLocaleDateString()}</td>
                 <td className="mc-td">

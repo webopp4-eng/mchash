@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FaSearch, FaUsers, FaWallet, FaBolt, FaCoins, FaPlus } from 'react-icons/fa';
-import { apiFetch } from '@/lib/auth';
+import { FaSearch, FaUsers, FaWallet, FaBolt, FaCoins, FaPlus, FaShieldAlt } from 'react-icons/fa';
+import { apiFetch, getUser } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
 import { toastEmitter } from '@/components/NotificationToast';
 
@@ -15,8 +15,10 @@ export default function AdminUsers() {
   const [creditMessage, setCreditMessage] = useState<string | null>(null);
   const [creditError, setCreditError] = useState<string | null>(null);
   const [submittingCredit, setSubmittingCredit] = useState(false);
+  const [currentRole, setCurrentRole] = useState<string | null>(null);
 
   useEffect(() => {
+    setCurrentRole(getUser()?.role ?? null);
     loadUsers();
   }, []);
 
@@ -242,7 +244,14 @@ export default function AdminUsers() {
                       <FaUsers className="h-3.5 w-3.5" />
                     </span>
                     <div>
-                      <p className="text-xs font-bold text-slate-950">{user.username}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-bold text-slate-950">{user.username}</p>
+                        {user.protectedRole && (
+                          <span className="inline-flex items-center gap-1 rounded bg-rose-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-rose-600 ring-1 ring-rose-100">
+                            <FaShieldAlt className="h-2 w-2" /> Protected
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-500">{new Date(user.createdAt).toLocaleDateString()}</p>
                     </div>
                   </div>
@@ -261,38 +270,44 @@ export default function AdminUsers() {
                   </span>
                 </td>
                 <td className="mc-td">
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => { setCreditUser(user); setCreditForm({ amount: '', balanceType: 'platformBalance', reason: '' }); setCreditError(null); setCreditMessage(null); }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100"
-                    >
-                      <FaCoins className="h-2.5 w-2.5" /> Credit
-                    </button>
-                    {user.status !== 'active' && (
+                  {user.canManage !== false ? (
+                    <div className="flex gap-1.5">
                       <button
-                        onClick={() => updateStatus(user.id, 'active')}
-                        className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100"
+                        onClick={() => { setCreditUser(user); setCreditForm({ amount: '', balanceType: 'platformBalance', reason: '' }); setCreditError(null); setCreditMessage(null); }}
+                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100"
                       >
-                        Activate
+                        <FaCoins className="h-2.5 w-2.5" /> Credit
                       </button>
-                    )}
-                    {user.status !== 'suspended' && (
-                      <button
-                        onClick={() => updateStatus(user.id, 'suspended')}
-                        className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-600 hover:bg-amber-100"
-                      >
-                        Suspend
-                      </button>
-                    )}
-                    {user.status !== 'banned' && (
-                      <button
-                        onClick={() => updateStatus(user.id, 'banned')}
-                        className="rounded-lg bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-100"
-                      >
-                        Ban
-                      </button>
-                    )}
-                  </div>
+                      {user.status !== 'active' && (
+                        <button
+                          onClick={() => updateStatus(user.id, 'active')}
+                          className="rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-100"
+                        >
+                          Activate
+                        </button>
+                      )}
+                      {user.status !== 'suspended' && (
+                        <button
+                          onClick={() => updateStatus(user.id, 'suspended')}
+                          className="rounded-lg bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-600 hover:bg-amber-100"
+                        >
+                          Suspend
+                        </button>
+                      )}
+                      {user.status !== 'banned' && (
+                        <button
+                          onClick={() => updateStatus(user.id, 'banned')}
+                          className="rounded-lg bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600 hover:bg-rose-100"
+                        >
+                          Ban
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-[10px] font-bold text-slate-400">
+                      <FaShieldAlt className="h-2.5 w-2.5" /> Restricted
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
