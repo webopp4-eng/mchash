@@ -298,7 +298,7 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
       User: { role: { mode: 'insensitive' as const, notIn: STAFF_ROLES } },
     };
 
-    const [totalUsers, activeMiners, totalDeposits, totalWithdrawals, totalRevenue, miningPlans, referrals, treasuryWallets] = await Promise.all([
+    const [totalUsers, activeMiners, totalDeposits, totalWithdrawals, totalMinedEarnings, totalRevenue, miningPlans, referrals, treasuryWallets] = await Promise.all([
       prisma.user.count(),
       prisma.miningPurchase.count({ where: { status: 'active', ...excludeStaffOwner } }),
       // Only count deposits that actually funded the user. Rejected deposits
@@ -312,7 +312,22 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
         _sum: { usdAmount: true },
         where: { status: { in: ['approved', 'completed'] }, ...excludeStaffOwner },
       }),
-      prisma.withdrawal.aggregate({ _sum: { amount: true }, where: { ...excludeStaffOwner } }),
+      // Only SUCCESSFUL withdrawals count as payouts. Rejected withdrawals
+      // return the funds to the user's balance, so they must not inflate the
+      // payout total. Pending ones are still held (not yet paid out).
+      prisma.withdrawal.aggregate({
+        _sum: { amount: true },
+        where: { status: { in: ['approved', 'completed'] }, ...excludeStaffOwner },
+      }),
+      // Total mined earnings: every completed mining reward transaction
+      // credited to normal users. Tracked INDEPENDENTLY of deposits so the
+      // Analysis "Net Balance" can include legitimate mining profit — users
+      // may withdraw more than they deposited, which must never make any
+      // analytics value negative.
+      prisma.transaction.aggregate({
+        _sum: { amount: true },
+        where: { type: 'mining', status: 'completed', ...excludeStaffOwner },
+      }),
       // Plan sales are stored as NEGATIVE amounts on user transactions
       // (money leaving the USER's balance), for both mining plans ('purchase')
       // and hash renting ('hash_renting'). Flip the sign below so this metric
@@ -327,8 +342,11 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
     res.json({
       totalUsers,
       activeMiners,
-      totalDeposits: totalDeposits._sum.usdAmount || 0,
-      totalWithdrawals: totalWithdrawals._sum.amount || 0,
+      // Analytics values must NEVER be negative — clamp every independent
+      // total at zero (e.g. legacy/corrupt records cannot drag a metric under 0).
+      totalDeposits: Math.max(0, Number(totalDeposits._sum.usdAmount || 0)),
+      totalWithdrawals: Math.max(0, Number(totalWithdrawals._sum.amount || 0)),
+      totalMinedEarnings: Math.max(0, Number(totalMinedEarnings._sum.amount || 0)),
       // Negate because sale transactions are stored as negative amounts
       totalRevenue: totalRevenue._sum.amount ? -Number(totalRevenue._sum.amount) : 0,
       miningPlans,

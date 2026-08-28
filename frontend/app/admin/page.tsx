@@ -39,8 +39,14 @@ export default function AdminDashboard() {
   // previously leaked the admin balance onto this Analysis page whenever the
   // real totals were zero. Use API numbers whenever data exists at all.
   const hasApiData = Boolean(data);
-  const totalDeposits = Number(hasApiData ? data?.totalDeposits ?? 0 : financial.totalDeposits || 0);
-  const totalWithdrawals = Number(hasApiData ? data?.totalWithdrawals ?? 0 : financial.totalWithdrawals || 0);
+  // ANALYSIS CARD RULES: deposits, mined earnings and payouts are tracked
+  // independently and must never be netted against each other or go negative.
+  // Net Balance = Total Deposits + Total Mined Earnings (withdrawals are NOT
+  // subtracted — users can legitimately withdraw more than they deposited).
+  const totalDeposits = Math.max(0, Number(hasApiData ? data?.totalDeposits ?? 0 : financial.totalDeposits || 0));
+  const totalMinedEarnings = Math.max(0, Number(hasApiData ? data?.totalMinedEarnings ?? 0 : financial.miningEarnings || 0));
+  const totalWithdrawals = Math.max(0, Number(hasApiData ? data?.totalWithdrawals ?? 0 : financial.totalWithdrawals || 0));
+  const netBalance = totalDeposits + totalMinedEarnings;
   const totalRevenue = Number(data?.totalRevenue || 0);
   const activeMiners = Number(data?.activeMiners || 0);
   const totalUsers = Number(data?.totalUsers || 0);
@@ -71,9 +77,9 @@ export default function AdminDashboard() {
         <section className="mc-glass-blue">
           <div className="relative z-10 flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase text-white/75">Total Balance</p>
-              <p className="mt-3 text-4xl font-extrabold tracking-normal sm:text-5xl">${(totalDeposits - totalWithdrawals).toFixed(2)}</p>
-              <p className="mt-2 text-sm text-white/80">Deposits minus withdrawals across MC HASH treasury flows.</p>
+              <p className="text-xs font-semibold uppercase text-white/75">Net Balance</p>
+              <p className="mt-3 text-4xl font-extrabold tracking-normal sm:text-5xl">${netBalance.toFixed(2)}</p>
+              <p className="mt-2 text-sm text-white/80">Total deposits plus mined earnings across MC HASH.</p>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:min-w-64">
               <div className="rounded-2xl bg-white/18 p-3 ring-1 ring-white/25">
@@ -81,8 +87,8 @@ export default function AdminDashboard() {
                 <p className="mt-1 text-lg font-bold">+${totalDeposits.toFixed(2)}</p>
               </div>
               <div className="rounded-2xl bg-white/18 p-3 ring-1 ring-white/25">
-                <p className="text-[10px] font-bold uppercase text-white/70">Withdrawals</p>
-                <p className="mt-1 text-lg font-bold">-${totalWithdrawals.toFixed(2)}</p>
+                <p className="text-[10px] font-bold uppercase text-white/70">Payouts</p>
+                <p className="mt-1 text-lg font-bold">${totalWithdrawals.toFixed(2)}</p>
               </div>
             </div>
           </div>
