@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { API_URL } from '@/lib/auth';
 import { FaWallet, FaUnlink, FaPlus, FaSpinner } from 'react-icons/fa';
 import {
@@ -42,6 +43,12 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
   const [mobileWallets, setMobileWallets] = useState<any[]>([]);
   const [isMobile, setIsMobile] = useState(false);
 
+  // Authentication gate for wallet connection ("Please log in first before
+  // adding additional wallets"). Resolved once on mount and cached so the
+  // Connect-Add-Wallet click never opens the wallet picker for a logged-out user.
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const router = useRouter();
+
   // Fetch connected wallets on mount (only if authenticated)
   useEffect(() => {
     const checkAuthAndFetch = async () => {
@@ -51,7 +58,11 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
           credentials: 'include',
         });
         const sessionData = await sessionRes.json();
-        
+
+        // Cache authentication state for the wallet-connection gate
+        // ("Please log in first before adding additional wallets").
+        setIsAuthenticated(Boolean(sessionData.authenticated));
+
         // Only fetch wallets if user is authenticated
         if (sessionData.authenticated) {
           await fetchWallets();
@@ -207,7 +218,32 @@ export default function WalletConnectionPanel({ compact = false, showTitle = tru
     setAvailableWallets(list);
   };
 
-  const openConnectModal = () => {
+  // Opens the Connect/Add-Wallet picker only for authenticated users.
+  // Unauthenticated users see a clear error + a "Log In" call to action
+  // instead of being allowed to add another wallet without signing in.
+  const openConnectModal = async () => {
+    if (!isAuthenticated) {
+      // Lazy re-check in case this is called before the mount effect resolved.
+      try {
+        const sessionRes = await fetch(`${API_URL}/api/auth/session-check`, {
+          credentials: 'include',
+        });
+        const sessionData = await sessionRes.json();
+        if (!sessionData.authenticated) {
+          setError('Please log in first before adding additional wallets');
+          // Send the user to the login flow — wallet connection requires login.
+          setShowConnectModal(false);
+          router.push('/auth');
+          return;
+        }
+        setIsAuthenticated(true);
+      } catch {
+        setError('Please log in first before adding additional wallets');
+        setShowConnectModal(false);
+        router.push('/auth');
+        return;
+      }
+    }
     setShowConnectModal(true);
     setError(null);
     detectAvailable();
