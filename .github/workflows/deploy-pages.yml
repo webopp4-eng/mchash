@@ -39,11 +39,38 @@ jobs:
         env:
           NODE_ENV: production
           NEXT_TELEMETRY_DISABLED: '1'
-          NEXT_PUBLIC_DEPLOY_MODE: github-pages
-          NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY: 'false'
-          NEXT_PUBLIC_ALLOWED_ADMIN_ORIGIN: https://mchash.site
-          NEXT_PUBLIC_ADMIN_ORIGIN: https://mchash.site
-          NEXT_PUBLIC_ADMIN_LOCAL_URL: https://mchash.site
+          # All build-time configuration comes from GitHub Secrets (repo Settings
+          # > Secrets and variables > Actions). Safe public-URL fallbacks keep the
+          # site building even before secrets are configured. NO .env files are
+          # committed or used — see the guard step below.
+          NEXT_PUBLIC_API_URL: ${{ secrets['NEXT_PUBLIC_API_URL'] || 'https://mchash.onrender.com' }}
+          NEXT_PUBLIC_RENDER_API_URL: ${{ secrets['NEXT_PUBLIC_RENDER_API_URL'] || 'https://mchash.onrender.com' }}
+          NEXT_PUBLIC_ADMIN_API_URL: ${{ secrets['NEXT_PUBLIC_ADMIN_API_URL'] || 'https://mchash.onrender.com' }}
+          NEXT_PUBLIC_DEPLOY_MODE: ${{ secrets['NEXT_PUBLIC_DEPLOY_MODE'] || 'github-pages' }}
+          NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY: ${{ secrets['NEXT_PUBLIC_ADMIN_PANEL_LOCAL_ONLY'] || 'false' }}
+          NEXT_PUBLIC_ALLOWED_ADMIN_ORIGIN: ${{ secrets['NEXT_PUBLIC_ALLOWED_ADMIN_ORIGIN'] || 'https://mchash.site' }}
+          NEXT_PUBLIC_ADMIN_ORIGIN: ${{ secrets['NEXT_PUBLIC_ADMIN_ORIGIN'] || 'https://mchash.site' }}
+          NEXT_PUBLIC_ADMIN_LOCAL_URL: ${{ secrets['NEXT_PUBLIC_ADMIN_LOCAL_URL'] || 'https://mchash.site' }}
+          # Secret-only value: no fallback in the repo. Add it in repo Settings >
+          # Secrets and variables > Actions to keep WalletConnect enabled.
+          NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${{ secrets['NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID'] }}
+
+      - name: Guard — no .env files may exist (repo checkout or exported site)
+        working-directory: frontend
+        run: |
+          set -e
+          echo "Checking that no real .env files are present in the checkout..."
+          LEAKS=$(find . -path ./node_modules -prune -o -type f \( -name '.env' -o -name '.env.*' -o -name '*.env' \) -print | grep -v '\.env\.example$' || true)
+          if [ -n "$LEAKS" ]; then
+            echo "::error::Refusing to build: real .env file(s) found in repository:"; echo "$LEAKS"; exit 1
+          fi
+          echo "OK — no .env files in the checkout."
+          # After the build, double-check the exported site ships no env files either.
+          LEAKS_OUT=$(find out -type f \( -name '.env' -o -name '.env.*' -o -name '*.env' \) -print || true)
+          if [ -n "$LEAKS_OUT" ]; then
+            echo "::error::Refusing to deploy: .env file(s) found in the exported site:"; echo "$LEAKS_OUT"; exit 1
+          fi
+          echo "OK — exported site contains no .env files."
 
       - name: Deployment diagnostics (local)
         working-directory: frontend

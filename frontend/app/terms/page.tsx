@@ -25,7 +25,36 @@ export default function TermsPage() {
         <p>Users who do not agree with these documents must not create an account or use the platform.</p>
       </LegalSection>
 
-      <LegalSection number={2} title="Eligibility and Account Responsibility">
+      <LegalSection number={2} title="Age Requirement (18+) and Eligibility">
+        <p>
+          MCHash.site is intended strictly for adults.{' '}
+          <strong>
+            You must be at least 18 years of age (or the age of legal majority
+            in your jurisdiction) to create an account, access, or use the
+            platform.
+          </strong>
+        </p>
+        <p>
+          By creating an account or using MCHash.site, you represent and
+          warrant that you are 18 years of age or older and that you are
+          legally permitted to use cryptocurrency services in your
+          jurisdiction. The platform is not directed at, and must not be used
+          by, minors.
+        </p>
+        <p>
+          Accounts created by, or on behalf of, persons under the age of 18
+          violate these Terms, will be terminated without notice, and any
+          associated balances may be withheld. MCHash.site may require
+          age-verification documentation at any time and may suspend or
+          terminate any account that cannot demonstrate eligibility.
+        </p>
+        <LegalNote>
+          <p>
+            If you are accessing this platform from a jurisdiction where the
+            age of majority is higher than 18, the higher age applies.
+          </p>
+        </LegalNote>
+        <p className="mt-4 font-semibold">Eligibility and Account Responsibility</p>
         <p>Users are responsible for providing accurate and truthful information when creating and maintaining their accounts.</p>
         <p>Each user is responsible for:</p>
         <LegalList

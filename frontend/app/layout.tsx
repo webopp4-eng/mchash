@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Poppins } from 'next/font/google';
 import NotificationContainer from '@/components/NotificationToast';
 import DeviceNoticeProvider from '@/components/DeviceNoticeProvider';
+import AgeGate from '@/components/AgeGate';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -116,6 +117,7 @@ export default function RootLayout({
         {children}
         <NotificationContainer />
         <DeviceNoticeProvider />
+        <AgeGate />
       </body>
     </html>
   );
