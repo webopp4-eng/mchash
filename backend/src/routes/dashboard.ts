@@ -12,6 +12,12 @@ import {
   getFiatCurrencies,
   getFiatToUsdRate,
 } from '../services/exchangeRates';
+import {
+  sanitizeDepositForViewer,
+  sanitizeDepositsForViewer,
+  sanitizeWithdrawalForViewer,
+  sanitizeWithdrawalsForViewer,
+} from '../services/transactionVisibility';
 
 const router = Router();
 
@@ -691,7 +697,11 @@ router.get('/deposits', async (req: AuthRequest, res) => {
       take: 50,
     });
 
-    res.json({ deposits });
+    // RBAC: internal action/approval data (processedBy*, internal review
+    // notes) must never leave the server for non-admin viewers — employees,
+    // workers and normal users all get sanitized records, so the data cannot
+    // be retrieved by calling the API directly or tampering with the UI.
+    res.json({ deposits: sanitizeDepositsForViewer(deposits, req.user?.role) });
   } catch (error) {
     console.error('User deposits error:', error);
     res.status(500).json({ error: 'Failed to load deposits' });
@@ -780,7 +790,7 @@ router.post('/deposits', async (req: AuthRequest, res) => {
       })
     );
 
-    res.status(201).json({ success: true, deposit });
+    res.status(201).json({ success: true, deposit: sanitizeDepositForViewer(deposit, req.user?.role) });
   } catch (error) {
     console.error('Create deposit error:', error);
     // Give users a clear, actionable message during a transient infra blip.
@@ -823,7 +833,7 @@ router.get('/wallet', async (req: AuthRequest, res) => {
         ETH: Number(user?.balanceETH || 0),
         BTC: Number(user?.balanceBTC || 0),
       },
-      deposits,
+      deposits: sanitizeDepositsForViewer(deposits, req.user?.role),
       paymentAccounts,
     });
   } catch (error) {
@@ -960,7 +970,9 @@ router.get('/withdrawals', async (req: AuthRequest, res) => {
       },
       orderBy: { requestedAt: 'desc' },
     });
-    res.json({ withdrawals });
+    // RBAC: internal action/approval data (adminNote, processedBy*) must
+    // never leave the server for non-admin viewers.
+    res.json({ withdrawals: sanitizeWithdrawalsForViewer(withdrawals, req.user?.role) });
   } catch (error) {
     console.error('Withdrawals error:', error);
     res.status(500).json({ error: 'Failed to load withdrawals' });
@@ -1072,13 +1084,13 @@ router.post('/withdrawals', async (req: AuthRequest, res) => {
 
     res.json({
       success: true,
-      withdrawal: {
+      withdrawal: sanitizeWithdrawalForViewer({
         ...createdWithdrawal,
         payoutMethod: {
           type: payoutMethod.type,
           name: payoutMethod.name,
         },
-      },
+      }, req.user?.role),
       // Return the freshly-debited balances so the frontend can sync instantly
       // without waiting for a separate refetch.
       balances: updatedBalances,

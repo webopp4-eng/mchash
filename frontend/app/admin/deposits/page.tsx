@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { FaArrowDown, FaCheck, FaTimes, FaEye } from 'react-icons/fa';
-import { apiFetch } from '@/lib/auth';
+import { apiFetch, getUser } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
 import { toastEmitter } from '@/components/NotificationToast';
 
@@ -10,6 +10,17 @@ export default function AdminDeposits() {
   const [deposits, setDeposits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  // Action/audit attribution ("Approved by X") is only rendered for the main
+  // Admin — the API also strips these fields server-side for other roles.
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      setIsSuperAdmin(getUser()?.role === 'SUPER_ADMIN');
+    } catch {
+      setIsSuperAdmin(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadDeposits();
@@ -120,7 +131,7 @@ export default function AdminDeposits() {
                   }`}>
                     {deposit.status}
                   </span>
-                  {deposit.status !== 'pending' && (deposit.processedByName || deposit.processedByRole) && (
+                  {isSuperAdmin && deposit.status !== 'pending' && (deposit.processedByName || deposit.processedByRole) && (
                     <p className="mt-1 text-[10px] font-semibold text-slate-500">
                       {deposit.status === 'approved' || deposit.status === 'completed' ? 'Approved' : 'Rejected'} by{' '}
                       {deposit.processedByName || 'Staff'}

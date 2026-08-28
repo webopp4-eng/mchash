@@ -2,13 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import { FaArrowUp, FaCheck, FaCheckCircle, FaTimes, FaClock } from 'react-icons/fa';
-import { apiFetch } from '@/lib/auth';
+import { apiFetch, getUser } from '@/lib/auth';
 import { refreshFinancialData } from '@/lib/financialData';
 import { shortenAddress } from '@/lib/wallet';
 
 export default function AdminWithdrawals() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Employees/workers must NOT see or use the Actions tab/buttons on
+  // transactions — only the main Admin processes withdrawals. The API also
+  // rejects employee processing attempts server-side (SUPER_ADMIN-only route)
+  // and strips the audit/attribution fields from list responses.
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    try {
+      setIsSuperAdmin(getUser()?.role === 'SUPER_ADMIN');
+    } catch {
+      setIsSuperAdmin(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadWithdrawals();
@@ -83,7 +96,7 @@ export default function AdminWithdrawals() {
               <th className="mc-th">Destination</th>
               <th className="mc-th">Status</th>
               <th className="mc-th">Date</th>
-              <th className="mc-th">Actions</th>
+              {isSuperAdmin && <th className="mc-th">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -103,7 +116,7 @@ export default function AdminWithdrawals() {
                   }`}>
                     {wd.status}
                   </span>
-                  {wd.status !== 'pending' && (wd.processedByName || wd.processedByRole) && (
+                  {isSuperAdmin && wd.status !== 'pending' && (wd.processedByName || wd.processedByRole) && (
                     <p className="mt-1 text-[10px] font-semibold text-slate-500">
                       {wd.status === 'approved' ? 'Approved' : wd.status === 'rejected' ? 'Rejected' : 'Completed'} by{' '}
                       {wd.processedByName || 'Staff'}
@@ -113,6 +126,7 @@ export default function AdminWithdrawals() {
                   )}
                 </td>
                 <td className="mc-td text-[10px] text-slate-500">{new Date(wd.requestedAt).toLocaleDateString()}</td>
+                {isSuperAdmin && (
                 <td className="mc-td">
                   <div className="flex gap-1.5">
                     {wd.status === 'pending' && (
@@ -144,6 +158,7 @@ export default function AdminWithdrawals() {
                     )}
                   </div>
                 </td>
+                )}
               </tr>
             ))}
           </tbody>

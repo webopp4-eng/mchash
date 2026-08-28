@@ -6,6 +6,7 @@ import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
 import { requireSuperAdmin, requireAdminOrEmployee } from '../middleware/admin';
 import { hashPassword } from '../services/emailAuth';
 import { createAuditLog, getActorName } from '../services/auditLog';
+import { sanitizeDepositForViewer, sanitizeDepositsForViewer, sanitizeWithdrawalsForViewer } from '../services/transactionVisibility';
 import { getBalanceField } from '../services/balances';
 import { isProtectedRole, isTargetProtectedFrom } from '../lib/privileges';
 
@@ -864,7 +865,7 @@ router.delete('/payment-accounts/:id', requireSuperAdmin, async (req: AuthReques
 // ============ FINANCIAL MANAGEMENT ============
 
 // Deposits - employees can view and process deposits
-router.get('/deposits', requireAdminOrEmployee, async (_req, res) => {
+router.get('/deposits', requireAdminOrEmployee, async (req: AuthRequest, res) => {
   try {
     const deposits = await prisma.deposit.findMany({
       include: {
@@ -874,7 +875,11 @@ router.get('/deposits', requireAdminOrEmployee, async (_req, res) => {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    res.json({ deposits });
+    // RBAC: approval/action history (who processed, when, internal notes) is
+    // visible ONLY to the main Admin. Employees receive sanitized records so
+    // they can work their pending queue but cannot inspect action history —
+    // enforced server-side, not just hidden in the UI.
+    res.json({ deposits: sanitizeDepositsForViewer(deposits, req.user?.role) });
   } catch (error) {
     console.error('Admin deposits error:', error);
     res.status(500).json({ error: 'Failed to load deposits' });
@@ -937,7 +942,9 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
         },
       });
 
-      return res.json({ success: true, deposit: updated });
+      // RBAC: employees may perform the approval but must not receive the
+      // action/attribution fields back (only the main Admin sees those).
+      return res.json({ success: true, deposit: sanitizeDepositForViewer(updated, req.user?.role) });
     }
 
     if (status === 'approved' || status === 'completed') {
@@ -1009,7 +1016,8 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
         },
       });
 
-      return res.json({ success: true, deposit: processed[1] });
+      // RBAC: strip action/attribution fields for non-admin actors.
+      return res.json({ success: true, deposit: sanitizeDepositForViewer(processed[1], req.user?.role) });
     }
 
     const updated = await prisma.deposit.update({
@@ -1017,7 +1025,7 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
       data: { status, note: adminNote || deposit.note },
     });
 
-    res.json({ success: true, deposit: updated });
+    res.json({ success: true, deposit: sanitizeDepositForViewer(updated, req.user?.role) });
   } catch (error) {
     console.error('Deposit update error:', error);
     res.status(500).json({ error: 'Failed to update deposit' });
@@ -1025,7 +1033,7 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
 });
 
 // Withdrawals - employees can view, only SUPER_ADMIN can process
-router.get('/withdrawals', requireAdminOrEmployee, async (_req, res) => {
+router.get('/withdrawals', requireAdminOrEmployee, async (req: AuthRequest, res) => {
   try {
     const withdrawals = await prisma.withdrawal.findMany({
       include: {
@@ -1041,7 +1049,10 @@ router.get('/withdrawals', requireAdminOrEmployee, async (_req, res) => {
       orderBy: { requestedAt: 'desc' },
       take: 100,
     });
-    res.json({ withdrawals });
+    // RBAC: approval/action history (who processed, internal notes) is
+    // visible ONLY to the main Admin — enforced server-side so employees
+    // cannot retrieve it by calling the API directly.
+    res.json({ withdrawals: sanitizeWithdrawalsForViewer(withdrawals, req.user?.role) });
   } catch (error) {
     console.error('Admin withdrawals error:', error);
     res.status(500).json({ error: 'Failed to load withdrawals' });
