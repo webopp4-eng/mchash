@@ -25,6 +25,10 @@ import {
   normalizeEmail,
 } from '../services/emailAuth';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
+import {
+  LEGAL_ACCEPTANCE_ERROR_MESSAGE,
+  recordLegalAcceptances,
+} from '../lib/legal';
 
 const router = Router();
 
@@ -282,6 +286,8 @@ const authSchema = z.object({
   message: z.string(),
   walletType: z.string().optional(),
   referredBy: z.string().optional(),
+  // Required server-side when this request would CREATE a new account.
+  legalAccepted: z.boolean().optional(),
 });
 
 router.post('/wallet', async (req, res) => {
@@ -299,7 +305,7 @@ router.post('/wallet', async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data', details: parsed.error.errors });
     }
 
-    const { address, chain, signature, message, walletType, referredBy } = parsed.data;
+    const { address, chain, signature, message, walletType, referredBy, legalAccepted } = parsed.data;
 
     // Verify nonce from message
     if (!isValidWalletAddress(address, chain)) {
@@ -363,6 +369,19 @@ router.post('/wallet', async (req, res) => {
       }
     }
 
+    // SERVER-SIDE legal acceptance enforcement for account creation:
+    // If this wallet does not yet have an account, the request MUST include
+    // explicit legal acceptance (Terms, Privacy Policy, Risk Disclosure).
+    // This mirrors the lookup performed by findOrCreateUser so the check
+    // happens BEFORE any account is created — the API cannot be bypassed.
+    const existingWalletForLegal = await prisma.wallet.findFirst({
+      where: { address: address.toLowerCase(), chain },
+      select: { id: true },
+    });
+    if (!existingWalletForLegal && legalAccepted !== true) {
+      return res.status(400).json({ error: LEGAL_ACCEPTANCE_ERROR_MESSAGE });
+    }
+
     // Find or create user
     if (process.env.ENABLE_DEBUG_LOGGING) {
       console.log(`[AUTH-DEBUG:SESSION] Calling findOrCreateUser()`);
@@ -374,6 +393,15 @@ router.post('/wallet', async (req, res) => {
         console.log(`[AUTH-DEBUG:SESSION] findOrCreateUser returned null user`);
       }
       return res.status(500).json({ error: 'Unable to materialize wallet account' });
+    }
+
+    // Record legal document acceptance audit trail for newly created accounts.
+    if (created) {
+      await recordLegalAcceptances(
+        user.id,
+        getClientIp(req),
+        req.headers['user-agent'] || null
+      );
     }
 
     if (process.env.ENABLE_DEBUG_LOGGING) {
@@ -758,7 +786,7 @@ router.post('/logout', (req, res) => {
 // Email signup
 router.post('/email/register', async (req, res) => {
   try {
-    const { email, password, confirmPassword, fullName, username, country } = req.body;
+    const { email, password, confirmPassword, fullName, username, country, acceptedLegal } = req.body;
 
     // Basic validation - only require email and password
     if (!email || !password) {
@@ -767,6 +795,14 @@ router.post('/email/register', async (req, res) => {
 
     if (password !== confirmPassword) {
       return res.status(400).json({ error: 'Passwords do not match' });
+    }
+
+    // SERVER-SIDE legal acceptance enforcement — the account MUST NOT be
+    // created unless the Terms & Conditions, Privacy Policy and Risk
+    // Disclosure have been explicitly accepted. This cannot be bypassed by
+    // calling the API directly.
+    if (acceptedLegal !== true) {
+      return res.status(400).json({ error: LEGAL_ACCEPTANCE_ERROR_MESSAGE });
     }
 
     const normalizedEmail = normalizeEmail(email);
@@ -827,6 +863,16 @@ router.post('/email/register', async (req, res) => {
         code: referralCode,
       },
     });
+
+    // Record legal document acceptance audit trail (Terms, Privacy Policy,
+    // Risk Disclosure) with the current versions, IP address and user agent.
+    // Historical acceptance records are never overwritten — each acceptance
+    // is appended to the LegalAcceptance table.
+    await recordLegalAcceptances(
+      user.id,
+      getClientIp(req),
+      req.headers['user-agent'] || null
+    );
 
     // Generate JWT
     const token = generateJWT(user.id);

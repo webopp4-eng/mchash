@@ -2,7 +2,9 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { API_URL } from '@/lib/auth';
+import { LEGAL_ACCEPTANCE_ERROR_MESSAGE } from '@/lib/legal';
 
 interface EmailSignUpProps {
   onBack: () => void;
@@ -13,6 +15,8 @@ export default function EmailSignUp({ onBack, onLoginClick }: EmailSignUpProps) 
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mandatory legal acceptance — registration is blocked until checked.
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -45,12 +49,20 @@ export default function EmailSignUp({ onBack, onLoginClick }: EmailSignUpProps) 
     setError(null);
     setFieldErrors({});
 
+    // Frontend enforcement — must also be accepted by the backend, which
+    // rejects the request if acceptance is missing (cannot be bypassed).
+    if (!acceptedLegal) {
+      setError(LEGAL_ACCEPTANCE_ERROR_MESSAGE);
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/auth/email/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, acceptedLegal }),
       });
 
       const data = await response.json();
@@ -211,6 +223,41 @@ export default function EmailSignUp({ onBack, onLoginClick }: EmailSignUpProps) 
           {fieldErrors.confirmPassword && (
             <p className="text-red-600 text-xs mt-1">{fieldErrors.confirmPassword}</p>
           )}
+        </div>
+
+        {/* Legal acceptance — MANDATORY, directly above the submit button */}
+        <div>
+          <label
+            className={`flex items-start gap-3 rounded-lg border p-3 text-sm cursor-pointer transition ${
+              acceptedLegal
+                ? 'border-cmblue-200 bg-cmblue-50/60'
+                : 'border-slate-300 bg-white'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={acceptedLegal}
+              onChange={(e) => setAcceptedLegal(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-cmblue-600"
+              disabled={loading}
+              required
+            />
+            <span className="text-slate-700">
+              I confirm that I have read and agree to the{' '}
+              <Link href="/terms" target="_blank" className="font-semibold text-cmblue-600 hover:underline">
+                Terms &amp; Conditions
+              </Link>
+              ,{' '}
+              <Link href="/privacy-policy" target="_blank" className="font-semibold text-cmblue-600 hover:underline">
+                Privacy Policy
+              </Link>{' '}
+              and{' '}
+              <Link href="/risk-disclosure" target="_blank" className="font-semibold text-cmblue-600 hover:underline">
+                Risk Disclosure
+              </Link>{' '}
+              of MCHash.site.
+            </span>
+          </label>
         </div>
 
         {/* Submit Button */}

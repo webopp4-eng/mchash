@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { FaClipboard, FaExclamationTriangle, FaPaste, FaShieldAlt, FaWallet, FaQrcode, FaSyncAlt } from 'react-icons/fa';
 import { API_URL } from '@/lib/auth';
 import {
@@ -67,6 +68,10 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
   const [mobileFallback, setMobileFallback] = useState<string | null>(null);
   const [phantomAvailable, setPhantomAvailable] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  // Legal acceptance — required server-side when a NEW account is created
+  // with this wallet. Existing wallet users can sign in without re-accepting
+  // (they are handled by the in-app re-acceptance gate instead).
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   const { address, connector, isConnected } = useAccount();
   const chainId = useChainId();
@@ -137,6 +142,7 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
           signature,
           message,
           walletType: connector?.name || 'unknown',
+          legalAccepted,
         }),
       });
 
@@ -155,7 +161,7 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
       setError(errMsg);
       setConnecting(false);
     }
-  }, [isMounted, address, chainId, signMessageAsync, connector, router, openConnectModal]);
+  }, [isMounted, address, chainId, signMessageAsync, connector, router, openConnectModal, legalAccepted]);
 
   const handleManualAddress = useCallback(async () => {
     if (!walletAddress.trim()) {
@@ -226,6 +232,43 @@ export default function WalletSignIn({ onBack }: WalletSignInProps) {
           <span>{authStatus}</span>
         </div>
       )}
+
+      {/* Legal acceptance — required when a NEW account is created */}
+      <div>
+        <label
+          className={`flex items-start gap-3 rounded-lg border p-3 text-sm cursor-pointer transition ${
+            legalAccepted
+              ? 'border-cmblue-200 bg-cmblue-50/60'
+              : 'border-slate-300 bg-white'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={legalAccepted}
+            onChange={(e) => setLegalAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-cmblue-600"
+            disabled={connecting}
+          />
+          <span className="text-slate-700">
+            I confirm that I have read and agree to the{' '}
+            <Link href="/terms" target="_blank" className="font-semibold text-cmblue-600 hover:underline">
+              Terms &amp; Conditions
+            </Link>
+            ,{' '}
+            <Link href="/privacy-policy" target="_blank" className="font-semibold text-cmblue-600 hover:underline">
+              Privacy Policy
+            </Link>{' '}
+            and{' '}
+            <Link href="/risk-disclosure" target="_blank" className="font-semibold text-cmblue-600 hover:underline">
+              Risk Disclosure
+            </Link>{' '}
+            of MCHash.site.
+            <span className="mt-1 block text-xs text-slate-500">
+              Required when creating a new account with this wallet.
+            </span>
+          </span>
+        </label>
+      </div>
 
       {/* Login Method Selection */}
       <div className="flex gap-2 bg-slate-100 rounded-lg p-1">

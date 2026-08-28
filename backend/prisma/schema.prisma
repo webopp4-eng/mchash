@@ -111,6 +111,26 @@ model HashRentingPurchase {
   @@index([status])
 }
 
+model LegalAcceptance {
+  id              String   @id @db.Uuid
+  userId          String   @db.Uuid
+  // 'TERMS' | 'PRIVACY_POLICY' | 'RISK_DISCLOSURE'
+  documentType    String
+  documentVersion String
+  acceptedAt      DateTime @default(now())
+  // Recorded where legally appropriate and technically available
+  ipAddress       String?
+  userAgent       String?
+  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([documentType])
+  @@index([documentVersion])
+  @@index([userId, documentType])
+  @@index([userId, documentType, documentVersion])
+  @@index([userId, acceptedAt(sort: Desc)])
+}
+
 model LoginHistory {
   id            String   @id @db.Uuid
   userId        String   @db.Uuid
@@ -412,6 +432,7 @@ model User {
   Wallet              Wallet[]
   Withdrawal          Withdrawal[]
   PayoutMethod        PayoutMethod[]
+  LegalAcceptance     LegalAcceptance[]
 
   @@index([authMethod])
   @@index([email])

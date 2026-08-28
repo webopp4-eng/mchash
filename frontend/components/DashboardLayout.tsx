@@ -9,9 +9,13 @@ import {
 } from 'react-icons/fa';
 import Logo from './Logo';
 import BottomNav from './BottomNav';
+import SiteFooter from './SiteFooter';
+import LegalAcceptanceGate from './legal/LegalAcceptanceGate';
 import { useRouter } from 'next/navigation';
 import { getUser, logout, User } from '@/lib/auth';
 import { shortenAddress } from '@/lib/wallet';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: FaHome },
@@ -129,11 +133,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="relative z-10 flex min-h-[100dvh] flex-col pt-20 lg:pl-64 lg:pt-0">
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-6 lg:px-8 lg:py-6">
-            {children}
+            {/* Legal re-acceptance gate: blocks platform usage when the user
+                must accept updated Terms / Privacy Policy / Risk Disclosure */}
+            <LegalAcceptanceGate>{children}</LegalAcceptanceGate>
           </div>
           {/* Mobile bottom spacer for navbar */}
           <div className="h-24 lg:h-0" />
         </div>
+        <SiteFooter />
       </main>
 
       <BottomNav />

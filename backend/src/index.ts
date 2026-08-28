@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import dashboardRoutes from './routes/dashboard';
 import adminRoutes from './routes/admin';
 import payoutMethodsRoutes from './routes/payoutMethods';
+import legalRoutes from './routes/legal';
 import { processHourlyRewards } from './services/mining';
 
 dotenv.config();
@@ -79,6 +80,9 @@ app.get('/api/health', (_, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
+// Legal document routes (public /current + authenticated /status, /accept).
+// MUST be registered before the generic '/api' dashboard router.
+app.use('/api/legal', legalRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payout-methods', payoutMethodsRoutes);
