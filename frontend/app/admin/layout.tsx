@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  FaBell,
   FaChartLine,
   FaChartPie,
   FaCoins,
@@ -13,8 +12,8 @@ import {
   FaHeadset,
   FaHome,
   FaLayerGroup,
+  FaLock,
   FaSignOutAlt,
-  FaStore,
   FaTable,
   FaThLarge,
   FaUsers,
@@ -24,6 +23,7 @@ import {
 } from 'react-icons/fa';
 import Logo from '@/components/Logo';
 import { getUser, logout, User } from '@/lib/auth';
+import { hasPageAccess, pageKeyForPath } from '@/lib/employeePermissions';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,7 +38,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const hydrateOptionalUser = async () => {
       try {
         await new Promise(resolve => setTimeout(resolve, 100));
-        setUser(getUser());
+        const localUser = getUser();
+        setUser(localUser);
+
+        // For EMPLOYEE accounts: re-hydrate pagePermissions from the server on
+        // every page load so permission changes by the admin take effect
+        // immediately (never trust stale localStorage for authorization data).
+        if (localUser?.role === 'EMPLOYEE') {
+          try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://mchash.onrender.com'}/api/admin/permissions/me`, {
+              credentials: 'include',
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.pagePermissions !== undefined) {
+                setUser((prev) => prev ? { ...prev, pagePermissions: data.pagePermissions } : prev);
+              }
+            }
+          } catch {
+            // Network failure: fall back to localStorage permissions silently.
+          }
+        }
       } catch (err) {
         console.error('[AdminLayout] Optional user hydration failed:', err);
       } finally {
@@ -53,6 +73,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const isEmployee = user?.role === 'EMPLOYEE';
   const isStaff = isSuperAdmin || isEmployee;
 
+  // Employee page permissions: hide nav entries for pages the employee has
+  // not been granted (the backend/API enforces this too — this is UI-only).
+  const canSeePage = (href?: string): boolean => {
+    if (!isEmployee || !href) return true;
+    const pageKey = pageKeyForPath(href);
+    if (!pageKey) return true; // not a permission-managed page
+    return hasPageAccess(user?.role, user?.pagePermissions, pageKey);
+  };
+
   // Build navigation based on role
   const adminNav = [
     { href: '/admin', label: 'Dashboard', icon: FaHome, show: isStaff },
@@ -62,24 +91,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: '/admin/treasury', label: 'Wallet', icon: FaWallet, show: isSuperAdmin },
     { href: '/admin/deposits', label: 'Transactions', icon: FaTable, show: isStaff },
     { href: '/admin/withdrawals', label: 'Rewards & Activity', icon: FaCoins, show: isStaff },
-    { href: '/admin/plans', label: 'Marketplace', icon: FaStore, show: isStaff },
-    { href: '/admin/deposits', label: 'Reports', icon: FaChartPie, show: isStaff },
     { href: '/admin/settings', label: 'Settings', icon: FaCogs, show: isStaff },
     { href: '/admin/support', label: 'Support', icon: FaHeadset, show: isStaff },
     // Actions tab - SUPER_ADMIN ONLY (server-side /audit-logs is super-admin gated too)
     { href: '/admin/actions', label: 'Actions', icon: FaClipboardList, show: isSuperAdmin },
-    { href: '/admin/withdrawals', label: 'Notifications', icon: FaBell, show: isStaff },
-    { href: '/admin', label: 'Analytics', icon: FaChartLine, show: isStaff },
-  ].filter(item => item.show);
+    // Restrictions tab - SUPER_ADMIN ONLY (employee permission management)
+    { href: '/admin/restrictions', label: 'Restrictions', icon: FaLock, show: isSuperAdmin },
+  ]
+    .filter(item => item.show)
+    .filter(item => canSeePage(item.href));
 
   const mobileNav = [
     { href: '/admin', label: 'Home', icon: FaHome, show: isStaff },
     { href: '/admin/plans', label: 'Mining', icon: FaLayerGroup, show: isStaff },
-    // Featured center button - opens the Tabs page with ALL other pages
+    // Featured Tabs button - opens the Tabs page with ALL other pages
     { href: '/admin/tabs', label: 'Tabs', icon: FaThLarge, show: isStaff, featured: true },
     { href: '/admin/users', label: 'Team', icon: FaUsers, show: isStaff },
     { href: '/admin/settings', label: 'More', icon: FaCogs, show: isStaff },
-  ].filter(item => item.show);
+  ]
+    .filter(item => item.show)
+    .filter(item => canSeePage(item.href));
 
   // Show loading while checking access
   if (isChecking || !isMounted) {
@@ -99,6 +130,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       window.location.href = '/login';
     }
     return null;
+  }
+
+  // URL access guard: an employee typing a restricted page URL directly into
+  // the browser gets an Access Denied screen instead of the page content.
+  // (APIs are independently protected server-side.)
+  if (isEmployee) {
+    const currentKey = pageKeyForPath(pathname);
+    if (currentKey && !hasPageAccess(user?.role, user?.pagePermissions, currentKey)) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#f4fbff] px-4 text-slate-900">
+          <div className="mc-card max-w-md text-center">
+            <span className="mc-stat-icon mx-auto bg-rose-50 text-rose-600">
+              <FaLock className="h-5 w-5" />
+            </span>
+            <h1 className="mt-4 text-xl font-extrabold text-slate-950">Access Denied</h1>
+            <p className="mt-2 text-sm text-slate-500">
+              You do not have permission to view this page. Please contact your administrator if you believe this is a mistake.
+            </p>
+            <button
+              onClick={() => { window.location.href = '/admin'; }}
+              className="mt-6 rounded-xl bg-cmblue-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-cmblue-600"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (

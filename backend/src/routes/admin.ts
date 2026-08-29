@@ -1,14 +1,16 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import crypto from 'crypto';
+import { Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { authenticateToken, loadUser, AuthRequest } from '../middleware/auth';
-import { requireSuperAdmin, requireAdminOrEmployee } from '../middleware/admin';
+import { requireSuperAdmin, requireAdminOrEmployee, requirePage } from '../middleware/admin';
 import { hashPassword } from '../services/emailAuth';
 import { createAuditLog, getActorName } from '../services/auditLog';
 import { sanitizeDepositForViewer, sanitizeDepositsForViewer, sanitizeWithdrawalsForViewer } from '../services/transactionVisibility';
 import { getBalanceField } from '../services/balances';
 import { isProtectedRole, isTargetProtectedFrom } from '../lib/privileges';
+import { EMPLOYEE_PAGES, normalizePagePermissions } from '../lib/employeePermissions';
 
 const router = Router();
 
@@ -43,6 +45,62 @@ function forbidRestrictedAction(
 // ============ EMPLOYEE MANAGEMENT (SUPER_ADMIN ONLY) ============
 
 // List all employees
+// ============ EMPLOYEE RESTRICTIONS (SUPER_ADMIN ONLY) ============
+
+// GET /api/admin/employees/restrictions — all employees + the canonical page registry
+router.get('/employees/restrictions', requireSuperAdmin, async (_req, res) => {
+  try {
+    const employees = await prisma.user.findMany({
+      where: { role: 'EMPLOYEE' },
+      select: { id: true, username: true, fullName: true, email: true, employeeStatus: true, pagePermissions: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ employees, pages: EMPLOYEE_PAGES });
+  } catch (error) {
+    console.error('List employee restrictions error:', error);
+    res.status(500).json({ error: 'Failed to load employee restrictions' });
+  }
+});
+
+// PUT /api/admin/employees/restrictions/:id — replace an employee's page whitelist
+router.put('/employees/restrictions/:id', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { permissions } = req.body ?? {};
+
+    const employee = await prisma.user.findUnique({ where: { id } });
+    if (!employee || employee.role !== 'EMPLOYEE') {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // Normalize + validate against the canonical registry (drops unknown keys).
+    const normalized = normalizePagePermissions(permissions);
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { pagePermissions: normalized === null ? Prisma.JsonNull : (normalized as any) },
+      select: { id: true, username: true, fullName: true, email: true, employeeStatus: true, pagePermissions: true },
+    });
+
+    await createAuditLog(req, {
+      action: 'EMPLOYEE_PERMISSIONS_UPDATE',
+      targetType: 'user',
+      targetId: id,
+      details: {
+        employeeId: id,
+        employeeName: employee.username,
+        permissions: normalized,
+        configured: normalized !== null,
+      },
+    });
+
+    res.json({ success: true, employee: updated });
+  } catch (error) {
+    console.error('Update employee restrictions error:', error);
+    res.status(500).json({ error: 'Failed to update employee restrictions' });
+  }
+});
+
 router.get('/employees', requireSuperAdmin, async (_req, res) => {
   try {
     const employees = await prisma.user.findMany({
@@ -51,6 +109,7 @@ router.get('/employees', requireSuperAdmin, async (_req, res) => {
         id: true, email: true, fullName: true, username: true,
         role: true, employeeStatus: true, status: true,
         createdAt: true, updatedAt: true, lastLoginAt: true,
+        pagePermissions: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -58,6 +117,90 @@ router.get('/employees', requireSuperAdmin, async (_req, res) => {
   } catch (error) {
     console.error('List employees error:', error);
     res.status(500).json({ error: 'Failed to load employees' });
+  }
+});
+
+// ============ EMPLOYEE PAGE PERMISSIONS (SUPER_ADMIN ONLY) ============
+
+// Catalog of all restrict-able dashboard pages — drives the Restrictions UI.
+router.get('/employees/permissions/catalog', requireSuperAdmin, async (_req, res) => {
+  res.json({ pages: EMPLOYEE_PAGES });
+});
+
+// Read one employee's current page permissions.
+router.get('/employees/:id/permissions', requireSuperAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const employee = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, fullName: true, role: true, employeeStatus: true, pagePermissions: true },
+    });
+    if (!employee || employee.role !== 'EMPLOYEE') {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    res.json({ employee });
+  } catch (error) {
+    console.error('Get employee permissions error:', error);
+    res.status(500).json({ error: 'Failed to load employee permissions' });
+  }
+});
+
+// Update one employee's page permissions (persisted in the database).
+// SUPER_ADMIN only — employees can never modify their own (or any) permissions.
+router.patch('/employees/:id/permissions', requireSuperAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { pagePermissions } = req.body ?? {};
+
+    const employee = await prisma.user.findUnique({ where: { id } });
+    if (!employee || employee.role !== 'EMPLOYEE') {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    // Validate + normalize: only known page keys survive; null resets to the
+    // unconfigured (full access) state. Accepts [] = deny all pages.
+    const normalized = normalizePagePermissions(pagePermissions);
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        pagePermissions: normalized === null ? Prisma.JsonNull : (normalized as Prisma.InputJsonValue),
+        updatedAt: new Date(),
+      },
+      select: { id: true, email: true, fullName: true, role: true, employeeStatus: true, pagePermissions: true },
+    });
+
+    await createAuditLog(req, {
+      action: 'EMPLOYEE_PERMISSIONS_CHANGE',
+      targetId: id,
+      details: {
+        changedBy: getActorName(req),
+        employeeEmail: employee.email,
+        previousPermissions: employee.pagePermissions ?? null,
+        newPermissions: normalized,
+      },
+    });
+
+    res.json({ success: true, employee: updated });
+  } catch (error) {
+    console.error('Update employee permissions error:', error);
+    res.status(500).json({ error: 'Failed to update employee permissions' });
+  }
+});
+
+// An employee's OWN permissions — used by the frontend router/nav guard.
+// Employees may read their own access; they can never change it here.
+router.get('/permissions/me', requireAdminOrEmployee, async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, role: true, pagePermissions: true },
+    });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ role: user.role, pagePermissions: user.pagePermissions ?? null, pages: EMPLOYEE_PAGES });
+  } catch (error) {
+    console.error('Own permissions error:', error);
+    res.status(500).json({ error: 'Failed to load permissions' });
   }
 });
 
@@ -287,7 +430,7 @@ router.post('/employees/:id/reset-password', requireSuperAdmin, async (req: Auth
 });
 
 // ============ ADMIN DASHBOARD (SUPER_ADMIN or EMPLOYEE) ============
-router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
+router.get('/dashboard', requireAdminOrEmployee, requirePage('dashboard'), async (_req, res) => {
   try {
     // ANALYSIS SCOPE: every flow metric below is restricted to NORMAL users.
     // Staff accounts (SUPER_ADMIN / ADMIN / EMPLOYEE) hold house liquidity,
@@ -360,7 +503,7 @@ router.get('/dashboard', requireAdminOrEmployee, async (_req, res) => {
 });
 
 // ============ USER MANAGEMENT (SUPER_ADMIN or EMPLOYEE) ============
-router.get('/users', requireAdminOrEmployee, async (req, res) => {
+router.get('/users', requireAdminOrEmployee, requirePage('users'), async (req, res) => {
   try {
     const { search, status } = req.query;
     const where: Record<string, unknown> = {};
@@ -401,7 +544,7 @@ router.get('/users', requireAdminOrEmployee, async (req, res) => {
 });
 
 // Change a user's account status (ban / suspend / activate)
-router.patch('/users/:id/status', requireAdminOrEmployee, async (req: AuthRequest, res) => {
+router.patch('/users/:id/status', requireAdminOrEmployee, requirePage('users'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -600,7 +743,7 @@ router.post('/users/:id/reset-password', requireSuperAdmin, async (req: AuthRequ
   }
 });
 
-router.get('/users/:id/mining', requireAdminOrEmployee, async (req, res) => {
+router.get('/users/:id/mining', requireAdminOrEmployee, requirePage('users'), async (req, res) => {
   try {
     const { id } = req.params;
     const [purchases, sessions] = await Promise.all([
@@ -615,7 +758,7 @@ router.get('/users/:id/mining', requireAdminOrEmployee, async (req, res) => {
 });
 
 // ============ MINING PLAN MANAGEMENT ============
-router.get('/plans', requireAdminOrEmployee, async (_req, res) => {
+router.get('/plans', requireAdminOrEmployee, requirePage('mining'), async (_req, res) => {
   try {
     const plans = await prisma.miningPlan.findMany({ orderBy: { price: 'asc' } });
     res.json({ plans });
@@ -883,7 +1026,7 @@ router.delete('/payment-accounts/:id', requireSuperAdmin, async (req: AuthReques
 // ============ FINANCIAL MANAGEMENT ============
 
 // Deposits - employees can view and process deposits
-router.get('/deposits', requireAdminOrEmployee, async (req: AuthRequest, res) => {
+router.get('/deposits', requireAdminOrEmployee, requirePage('deposits'), async (req: AuthRequest, res) => {
   try {
     const deposits = await prisma.deposit.findMany({
       include: {
@@ -904,8 +1047,8 @@ router.get('/deposits', requireAdminOrEmployee, async (req: AuthRequest, res) =>
   }
 });
 
-// Approve/reject deposits - employees can do this
-router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, res) => {
+// Approve/reject deposits - employees can do this (if they have Deposits access)
+router.patch('/deposits/:id', requireAdminOrEmployee, requirePage('deposits'), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status, adminNote } = req.body;
@@ -1051,7 +1194,7 @@ router.patch('/deposits/:id', requireAdminOrEmployee, async (req: AuthRequest, r
 });
 
 // Withdrawals - employees can view, only SUPER_ADMIN can process
-router.get('/withdrawals', requireAdminOrEmployee, async (req: AuthRequest, res) => {
+router.get('/withdrawals', requireAdminOrEmployee, requirePage('withdrawals'), async (req: AuthRequest, res) => {
   try {
     const withdrawals = await prisma.withdrawal.findMany({
       include: {
@@ -1407,7 +1550,7 @@ router.post('/admin-balance-reset', requireSuperAdmin, async (req: AuthRequest, 
 // ============ SUPPORT SYSTEM (SUPER_ADMIN or EMPLOYEE) ============
 
 // Get all support conversations - shared across staff
-router.get('/support/tickets', requireAdminOrEmployee, async (_req, res) => {
+router.get('/support/tickets', requireAdminOrEmployee, requirePage('support'), async (_req, res) => {
   try {
     const tickets = await prisma.supportTicket.findMany({
       include: {
@@ -1461,7 +1604,7 @@ router.get('/support/tickets', requireAdminOrEmployee, async (_req, res) => {
 });
 
 // Get single conversation with full message history
-router.get('/support/tickets/:ticketId', requireAdminOrEmployee, async (req, res) => {
+router.get('/support/tickets/:ticketId', requireAdminOrEmployee, requirePage('support'), async (req, res) => {
   try {
     const { ticketId } = req.params;
     const ticket = await prisma.supportTicket.findUnique({
@@ -1490,7 +1633,7 @@ router.get('/support/tickets/:ticketId', requireAdminOrEmployee, async (req, res
 });
 
 // Update conversation status
-router.patch('/support/tickets/:ticketId', requireAdminOrEmployee, async (req: AuthRequest, res) => {
+router.patch('/support/tickets/:ticketId', requireAdminOrEmployee, requirePage('support'), async (req: AuthRequest, res) => {
   try {
     const { ticketId } = req.params;
     const { status } = req.body;
@@ -1530,7 +1673,7 @@ router.patch('/support/tickets/:ticketId', requireAdminOrEmployee, async (req: A
 });
 
 // Reply to a conversation - shared across staff
-router.post('/support/tickets/:ticketId/respond', requireAdminOrEmployee, async (req: AuthRequest, res) => {
+router.post('/support/tickets/:ticketId/respond', requireAdminOrEmployee, requirePage('support'), async (req: AuthRequest, res) => {
   try {
     const { ticketId } = req.params;
     const { message } = req.body;

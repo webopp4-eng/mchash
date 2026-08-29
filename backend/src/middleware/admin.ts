@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import prisma from '../lib/prisma';
 import { AuthRequest } from './auth';
+import { hasPageAccess } from '../lib/employeePermissions';
 
 // Role constants
 export const ROLES = {
@@ -87,6 +88,7 @@ export async function requireAdminOrEmployee(req: AuthRequest, res: Response, ne
     email: user.email,
     username: user.username,
     fullName: user.fullName,
+    pagePermissions: user.pagePermissions ?? null,
   };
   next();
 }
@@ -96,4 +98,35 @@ export async function requireAdminOrEmployee(req: AuthRequest, res: Response, ne
  */
 export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   return requireSuperAdmin(req, res, next);
+}
+
+/**
+ * Require access to a specific admin dashboard page/section (RBAC).
+ *
+ * Must be mounted AFTER `loadUser` / `requireAdminOrEmployee` so that
+ * `req.user.pagePermissions` is populated. SUPER_ADMIN always passes;
+ * EMPLOYEE access is governed by their persisted `pagePermissions`
+ * whitelist (null = legacy full access). This is the server-side
+ * enforcement that prevents employees from reaching restricted sections
+ * by calling the API directly — the UI only mirrors these rules.
+ */
+export function requirePage(pageKey: string) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user?.id) return res.status(401).json({ error: 'Unauthorized' });
+
+    // Re-read the employee from the database on EVERY request so permission
+    // changes take effect immediately (never trust a stale JWT/session).
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) return res.status(401).json({ error: 'User not found' });
+
+    if (!hasPageAccess(user.role, user.pagePermissions, pageKey)) {
+      return res.status(403).json({
+        error: 'Access denied: you do not have permission to access this section.',
+        code: 'PAGE_PERMISSION_DENIED',
+        page: pageKey,
+      });
+    }
+
+    next();
+  };
 }

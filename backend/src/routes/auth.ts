@@ -475,6 +475,8 @@ router.post('/wallet', async (req, res) => {
         referralCode: user.referralCode,
         platformBalance: user.platformBalance,
         role: user.role,
+        // Dashboard page permissions (EMPLOYEE whitelist; null = full access)
+        pagePermissions: user.pagePermissions ?? null,
       },
     });
   } catch (error) {
@@ -704,6 +706,8 @@ router.get('/session-check', async (req, res) => {
         role: user.role,
         status: user.status,
         employeeStatus: user.employeeStatus,
+        // Dashboard page permissions (EMPLOYEE whitelist; null = full access)
+        pagePermissions: user.pagePermissions ?? null,
       },
     });
   } catch (error) {
@@ -740,6 +744,8 @@ router.get('/me', authenticateToken, loadUser, async (req: AuthRequest, res) => 
         role: user.role,
         status: user.status,
         employeeStatus: user.employeeStatus,
+        // Dashboard page permissions (EMPLOYEE whitelist; null = full access)
+        pagePermissions: user.pagePermissions ?? null,
         createdAt: user.createdAt,
         wallets: user.Wallet,
       },
@@ -922,6 +928,8 @@ router.post('/email/register', async (req, res) => {
         referralCode: user.referralCode,
         platformBalance: user.platformBalance,
         role: user.role,
+        // Dashboard page permissions (EMPLOYEE whitelist; null = full access)
+        pagePermissions: user.pagePermissions ?? null,
       },
     });
   } catch (error) {
@@ -1016,6 +1024,8 @@ router.post('/email/login', async (req, res) => {
         referralCode: user.referralCode,
         platformBalance: user.platformBalance,
         role: user.role,
+        // Dashboard page permissions (EMPLOYEE whitelist; null = full access)
+        pagePermissions: user.pagePermissions ?? null,
       },
     });
   } catch (error) {

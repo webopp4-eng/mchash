@@ -11,6 +11,8 @@ export interface User {
   role: string;
   employeeStatus?: string;
   avatar?: string;
+  /** Dashboard page whitelist for EMPLOYEE accounts (null = not configured/legacy full access). */
+  pagePermissions?: string[] | null;
 }
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_RENDER_API_URL || 'https://mchash.onrender.com';

@@ -74,21 +74,51 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-        <section className="mc-glass-blue">
+        <section className="mc-glass-blue mc-sheen">
+          {/* Decorative depth layers — soft light orbs + radial highlight */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/15 blur-2xl animate-mc-float"
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-24 -left-10 h-72 w-72 rounded-full bg-sky-300/20 blur-3xl animate-mc-float"
+            style={{ animationDelay: '1.4s' }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_0%,rgba(255,255,255,0.22),transparent_45%)]"
+          />
+
           <div className="relative z-10 flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase text-white/75">Net Balance</p>
-              <p className="mt-3 text-4xl font-extrabold tracking-normal sm:text-5xl">${netBalance.toFixed(2)}</p>
-              <p className="mt-2 text-sm text-white/80">Total deposits plus mined earnings across MC HASH.</p>
+            <div className="min-w-0">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/90 ring-1 ring-white/25 backdrop-blur-sm">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                </span>
+                Live Analytics
+              </span>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-white/75">Net Balance</p>
+              <p className="mt-2 text-4xl font-extrabold tracking-tight [text-shadow:0_2px_18px_rgba(2,66,140,0.45)] sm:text-5xl">
+                ${netBalance.toFixed(2)}
+              </p>
+              <p className="mt-2 text-sm font-medium text-white/85">Total deposits plus mined earnings across MC HASH.</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:min-w-64">
-              <div className="rounded-2xl bg-white/18 p-3 ring-1 ring-white/25">
-                <p className="text-[10px] font-bold uppercase text-white/70">Deposits</p>
-                <p className="mt-1 text-lg font-bold">+${totalDeposits.toFixed(2)}</p>
+            <div className="grid grid-cols-2 gap-2 sm:min-w-[272px] sm:gap-3">
+              <div className="rounded-2xl bg-white/15 p-3 ring-1 ring-white/25 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/25 hover:ring-white/40 sm:p-3.5">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-300/20 text-emerald-50 ring-1 ring-emerald-200/30">
+                  <FaArrowDown className="h-3.5 w-3.5" />
+                </span>
+                <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-white/70">Deposits</p>
+                <p className="mt-1 truncate text-lg font-extrabold sm:text-xl">+${totalDeposits.toFixed(2)}</p>
               </div>
-              <div className="rounded-2xl bg-white/18 p-3 ring-1 ring-white/25">
-                <p className="text-[10px] font-bold uppercase text-white/70">Payouts</p>
-                <p className="mt-1 text-lg font-bold">${totalWithdrawals.toFixed(2)}</p>
+              <div className="rounded-2xl bg-white/15 p-3 ring-1 ring-white/25 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/25 hover:ring-white/40 sm:p-3.5">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-300/20 text-cyan-50 ring-1 ring-cyan-200/30">
+                  <FaArrowUp className="h-3.5 w-3.5" />
+                </span>
+                <p className="mt-2.5 text-[10px] font-bold uppercase tracking-wider text-white/70">Payouts</p>
+                <p className="mt-1 truncate text-lg font-extrabold sm:text-xl">${totalWithdrawals.toFixed(2)}</p>
               </div>
             </div>
           </div>

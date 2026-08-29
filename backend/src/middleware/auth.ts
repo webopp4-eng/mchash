@@ -21,6 +21,10 @@ export interface AuthRequest extends Request {
     email?: string | null;
     username?: string | null;
     fullName?: string | null;
+    // Dashboard page permissions (EMPLOYEE accounts). Json value from the
+    // User table: null = unconfigured (legacy full access) or a whitelist
+    // array of page keys. See lib/employeePermissions.ts.
+    pagePermissions?: unknown;
   };
 }
 
@@ -69,6 +73,7 @@ export async function loadUser(req: AuthRequest, res: Response, next: NextFuncti
     email: user.email,
     username: user.username,
     fullName: user.fullName,
+    pagePermissions: user.pagePermissions ?? null,
   };
   next();
 }

@@ -65,7 +65,11 @@
   }
 
   .mc-glass-blue {
-    @apply overflow-hidden rounded-[24px] border border-white/60 bg-gradient-to-br from-[#18aaff] via-[#0794f2] to-[#0274d8] p-5 text-white shadow-[0_22px_60px_rgba(0,139,255,0.28)];
+    @apply relative overflow-hidden rounded-[26px] border border-white/60 bg-gradient-to-br from-[#21b6ff] via-[#0794f2] to-[#0165c4] p-5 text-white sm:p-6;
+    box-shadow:
+      0 24px 70px rgba(0, 139, 255, 0.38),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      inset 0 -1px 0 rgba(0, 60, 130, 0.3);
   }
 
   .mc-button {
