@@ -40,7 +40,7 @@ router.get('/current', (_req, res) => {
     versions: LEGAL_VERSIONS,
     lastUpdated: LEGAL_LAST_UPDATED,
     jurisdiction: getJurisdiction(),
-    supportEmail: process.env.SUPPORT_CONTACT_EMAIL || 'support@mchash.site',
+    supportEmail: process.env.SUPPORT_CONTACT_EMAIL || 'wifiasert@gmail.com',
     documents: LEGAL_DOCUMENT_LIST.map((documentType) => ({
       type: documentType,
       version: LEGAL_VERSIONS[documentType],

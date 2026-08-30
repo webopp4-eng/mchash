@@ -39,13 +39,6 @@ export default function AuthPage() {
           </p>
         </div>
 
-        {/* Legal footer links (accessible without logging in) */}
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[11px] font-semibold">
-          <a href="/terms" className="text-slate-400 transition-colors hover:text-cmblue-600">Terms &amp; Conditions</a>
-          <a href="/privacy-policy" className="text-slate-400 transition-colors hover:text-cmblue-600">Privacy Policy</a>
-          <a href="/risk-disclosure" className="text-slate-400 transition-colors hover:text-cmblue-600">Risk Disclosure</a>
-          <a href="mailto:support@mchash.site" className="text-slate-400 transition-colors hover:text-cmblue-600">Contact / Support</a>
-        </div>
       </div>
       <div className="w-full">
         <SiteFooter />
